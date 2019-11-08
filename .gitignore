@@ -1,0 +1,6 @@
+*.out
+*.code-workspace
+obj
+*.dat
+build
+*.py
