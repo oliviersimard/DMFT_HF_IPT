@@ -4,3 +4,4 @@ obj
 *.dat
 build
 *.py
+!pade.py
