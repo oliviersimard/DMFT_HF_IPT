@@ -1,0 +1,15 @@
+{
+    "n_t_spin": 0.5,
+    "Umax": 1.0,
+    "Ustep": 0.1,
+    "Umin": 0.9,
+    "betamax": 10.0,
+    "betastep": 5.0,
+    "betamin": 10.0,
+    "Ntau": 512, 
+    "N_it": 100,
+    "gridK": 60,
+    "q_1D": 0.0,
+    "q_2D": [0.0,0.0],
+    "dGdPhi": true
+}

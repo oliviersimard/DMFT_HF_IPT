@@ -7,13 +7,14 @@ set(CMAKE_CXX_FLAGS "-std=c++14")
 set(CMAKE_SOURCE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/cmake_source")
 message("CMAKE_SOURCE_PREFIX for GMock setup: " ${CMAKE_SOURCE_PREFIX})
 
-set(LIBRARIES_CUSTOM fftw3 armadillo)
+set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
 
 set(SOURCES_COMMON
         src/IPT2nd3rdorderSingle2
         src/integral_utils
         src/green_utils
-        src/file_utils)
+        src/file_utils
+        src/json_utils)
 
 set(SOURCES_MAIN mainIPT ${SOURCES_COMMON})
 set(SOURCES_TEST test/src/test_utils)

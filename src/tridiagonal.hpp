@@ -1,6 +1,7 @@
 #include "green_utils.hpp"
 
 // Inspired from http://www.mymathlib.com/matrices/linearsystems/tridiagonal.html
+// and https://kluge.in-chemnitz.de/opensource/spline/
 
 template<class T>
 class LUtools{
@@ -430,51 +431,3 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
 //    std::cout << s(1.5) << std::endl;
 //    s.iwn_tau_spl_extrm();
 
-
-
-//    // C++ version of the algorithm
-//    // Testing the LU methods <----------------------------------------KEEP FOR TEST 
-//    // const std::complex<double> im = std::complex<double>(0.0,1.0);
-//    // arma::Mat< std::complex<double> > matArmaD = { { 2.+1.0*im, -1.-0.3*im, 0.0+0.0*im },
-//    //                                                 { -4.-2.1*im, 6.-0.1*im, 3.+0.0*im },
-//    //                                                 { 0.0+0.0*im, -2.-0.3*im, 8.+0.5*im } };
-
-//    // std::vector< std::complex<double> > subdiagonalArma, diagonalArma, superdiagonalArma;
-
-//    // std::cout << "size of matArma: " << matArmaD.size() << std::endl;
-//    // std::cout << "size if row: " << matArmaD.n_rows << std::endl; // square matrix
-
-//    // std::vector< std::complex<double> > BArma{ 2.+0.1*im , 0.5-2.3*im , 7.+0.2*im }, xArma(matArmaD.n_rows,0.0);
-
-//    // // Building main parts of the routine.
-//    // for (unsigned int k=0; k<matArmaD.n_cols-1; k++){
-//    //    subdiagonalArma.push_back(matArmaD(k+1,k));
-//    //    superdiagonalArma.push_back(matArmaD(k,k+1));
-//    // }
-//    // for (unsigned int k=0; k<matArmaD.n_cols; k++){
-//    //    diagonalArma.push_back(matArmaD(k,k));
-//    // }
-
-//    // try{
-//    //    LUObj.tridiagonal_LU_decomposition(subdiagonalArma,diagonalArma,superdiagonalArma);
-//    //    LUObj.tridiagonal_LU_solve(subdiagonalArma,diagonalArma,superdiagonalArma,BArma,xArma);
-//    // } 
-//    // catch (const std::exception& err){
-//    //    std::cout << err.what() << std::endl;
-//    // }
-
-//    // for (unsigned int i=0; i<NN; i++){
-//    //    std::cout << x[i] << "  ";
-//    //    std::cout << xArma[i] << "\n";
-//    // }
-
-//    // else {                                                                 
-//    //      err = Tridiagonal_LU_Solve(subdiagonal, diagonal, superdiagonal, B, x, N);
-//    // }
-
-//    // for (int i=0; i<N; i++){
-//    //    std::cout << x[i] << "\n";
-//    // }
-
-//    return 0;
-// }

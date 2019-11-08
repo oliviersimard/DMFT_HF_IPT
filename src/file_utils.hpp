@@ -3,7 +3,9 @@
 
 #include<sys/stat.h> // for posix stat()
 //#include<regex> // for regular expressions
+extern "C" {
 #include<glob.h> // glob() and globfree()
+}
 #include<fstream>
 #include<vector>
 #include<string>

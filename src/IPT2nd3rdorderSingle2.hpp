@@ -2,10 +2,12 @@
 #define IPT2Single_H_
 
 #include<functional>
+extern "C" {
 #include<fftw3.h>
+}
+#include<cmath> // double abs(double)
 #include<stdexcept>
 //#include<algorithm> // copy() and assign()
-#include<cmath> // double abs(double)
 #include<armadillo>
 #include<gsl/gsl_errno.h>
 #include<gsl/gsl_fft_complex.h>
