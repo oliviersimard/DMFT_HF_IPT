@@ -1,0 +1,28 @@
+************ Compile Instructions *************
+To compile successfully, you must have installed:
+
+-armadillo, 
+-fftw3, 
+-gsl, 
+-gtest,
+-gmock,
+-CMake. 
+
+Usually both gtest and gmock are bundled with the compiler provided.
+The program uses the 2014 c++ standards, although it also compiles with the 2011 standards. 
+
+To compile, simply run
+
+$ mkdir build && cd build && cmake ..
+
+and wait for the CMake Makefile to be automatically generated. Then run:
+
+$ make
+
+to compile the main program binary and the test binary. To test if the installation was successful, run
+
+$./IPT-test
+
+You can also type in make test instead of the previous command to perform the tests, but it is executed with less verbosity.
+
+For any questions, you can contact me through email: olivier.simard AT unifr.ch.
