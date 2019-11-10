@@ -5,14 +5,14 @@ CXX=g++ -std=c++11 -Wall -g
 INC=${HOME}/gsl/include
 LIB=${HOME}/gsl/lib
 
-CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 #-lgtest -lgmock -lpthread
+CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -ljson_spirit #-lgtest -lgmock -lpthread
 
 PROG=IPT-DMFT-OLI
 
 all: $(PROG)
 
-$(PROG): $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o
-	$(CXX) $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(CXXFLAGS) -o mainIPT.out
+$(PROG): $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o
+	$(CXX) $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(CXXFLAGS) -o mainIPT.out
 
 $(OBJ)/mainIPT.o: $(PWD)/mainIPT.cpp
 	$(CXX) -c -I$(INC) $(PWD)/mainIPT.cpp -o $(OBJ)/mainIPT.o
@@ -25,6 +25,12 @@ $(OBJ)/integral_utils.o: $(SRC)/integral_utils.cpp
 
 $(OBJ)/IPT2nd3rdorderSingle2.o: $(SRC)/IPT2nd3rdorderSingle2.cpp
 	$(CXX) -c -I$(INC) $(SRC)/IPT2nd3rdorderSingle2.cpp -o $(OBJ)/IPT2nd3rdorderSingle2.o
+
+$(OBJ)/json_utils.o: $(SRC)/json_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/json_utils.cpp -o $(OBJ)/json_utils.o
+
+$(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/file_utils.cpp -o $(OBJ)/file_utils.o
 
 clean:
 	rm -f $(OBJ)/* $(PWD)/mainIPT.out && cd test && make clean

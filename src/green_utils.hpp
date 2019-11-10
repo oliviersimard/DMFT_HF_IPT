@@ -50,12 +50,18 @@ struct GreenStuff final : Data{ // Non-subclassable
                                         arma::Cube<double>&, arma::Cube<double>&, arma::Cube< std::complex<double> >&) noexcept(false);
     GreenStuff(const GreenStuff& obj)=delete; // Copy constructor
     GreenStuff& operator=(const GreenStuff& obj)=delete; // Copy assignment
-    arma::Cube< std::complex<double> > green_inf() const; 
+    arma::Cube< std::complex<double> > green_inf() const;
+    void reset_counter(){
+        this->objectCount=0; // Important to update parameters in loop.
+    }
     double get_mu() const{
         return this->mu;
     }
     double get_mu0() const{
         return this->mu0;
+    }
+    double get_hyb_c() const{
+        return this->hyb_c;
     }
     void update_mu(double mu){
         this->mu=mu;

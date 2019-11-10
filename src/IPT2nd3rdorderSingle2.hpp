@@ -13,6 +13,7 @@ extern "C" {
 #include<gsl/gsl_fft_complex.h>
 #include "tridiagonal.hpp"
 #include "file_utils.hpp"
+#include "integral_utils.hpp"
 
 #define TOL 0.000000001
 
@@ -20,10 +21,8 @@ namespace IPT2{ class DMFTproc; };
 struct GreenStuff;
 
 // Prototypes
-//bool file_exists(const std::string&);
-//std::vector<std::string> glob(const std::string& pattern) noexcept(false);
 void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&);
-//void check_file_content(const std::vector< std::string >&, std::string) noexcept(false);
+void DMFTloop(IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&, std::vector< std::string >&, const unsigned int) noexcept(false);
 void get_tau_obj(GreenStuff&, GreenStuff&);
 double Hsuperior(double tau, double mu, double c, double beta);
 double Hpsuperior(double tau, double mu, double c, double beta);
@@ -50,6 +49,7 @@ namespace IPT2{
 
 class DMFTproc{
     friend void ::saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW);
+    friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
     public:
         DMFTproc(GreenStuff&,GreenStuff&,GreenStuff&,GreenStuff&, arma::Cube<double>&, arma::Cube<double>&,
                                                         const std::vector<double>&, const double);
