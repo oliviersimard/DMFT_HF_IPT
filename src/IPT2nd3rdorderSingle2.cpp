@@ -2,15 +2,6 @@
 
 //using namespace std;
 
-
-double epsilonk(double kx){
-    return -2.0*std::cos(kx);
-}
-
-double epsilonk(double kx, double ky){
-    return -2.0*(std::cos(kx)+std::cos(ky));
-}
-
 /**************************************************************************************************/
 
 namespace IPT2{

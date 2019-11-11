@@ -4,7 +4,7 @@
 
 int main(int argc, char** argv){
     // Loading parameters from Json file
-    const std::string filename("params.json"); // ../ necessary because compiled inside build directory using CMake. For Makefile, set to params.json only (Debug mode).
+    const std::string filename("../params.json"); // ../ necessary because compiled inside build directory using CMake. For Makefile, set to params.json only (Debug mode).
     Json_utils JsonObj;
     const MembCarrier params = JsonObj.JSONLoading(filename);
     const double n_t_spin=params.db_arr[0];
@@ -43,7 +43,7 @@ int main(int argc, char** argv){
     std::string pathToDir("./data/");
     std::string trailingStr("");
     for (double beta=beta_init; beta<=beta_max; beta+=beta_step){
-        iwnArr_l.clear();
+        iwnArr_l.clear(); // Clearing to not append at each iteration over previous set.
         for (signed int j=(-(signed int)N_tau); j<(signed int)N_tau; j++){
             std::complex<double> matFreq(0.0 , (2.0*(double)j+1.0)*M_PI/beta );
             iwnArr_l.push_back( matFreq );

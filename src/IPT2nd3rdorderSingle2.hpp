@@ -30,10 +30,6 @@ double Hinferior(double tau, double mu, double c, double beta);
 double Hpinferior(double tau, double mu, double c, double beta);
 
 
-extern double epsilonk(double,double);
-extern double epsilonk(double);
-
-
 class FFTtools{
 
     public:
