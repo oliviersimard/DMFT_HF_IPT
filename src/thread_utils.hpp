@@ -1,3 +1,6 @@
+#ifndef Thread_Utils_H_
+#define Thread_Utils_H_
+
 #include<mutex>
 #include<thread>
 #include "green_utils.hpp"
@@ -31,6 +34,8 @@ namespace ThreadFunctor{
             HF::K_1D& _q;
             //arma::cx_dmat::iterator _ktb;
             //arma::cx_dmat::iterator _ktbW;
-};
+    };
 
 } /* end of namespace ThreadFunctor */
+
+#endif /* end of Thread_Utils_H_ */

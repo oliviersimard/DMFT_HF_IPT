@@ -14,6 +14,7 @@ namespace IPT2{ class DMFTproc; };
 namespace HF{ class FunctorBuildGk; };
 namespace ThreadFunctor{ class ThreadWrapper; };
 class FFTtools;
+template<class T> class Susceptibility;
 
 extern std::vector<double> vecK;
 extern std::vector< std::complex<double> > iwnArr_l;
@@ -28,6 +29,8 @@ std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
     friend class IPT2::DMFTproc;
+    template<class T>
+    friend class Susceptibility;
     protected:
         static double beta;
         static double hyb_c;
@@ -89,7 +92,9 @@ namespace HF{
 
     class FunctorBuildGk{
         friend std::ostream& ::operator<<(std::ostream& os, const HF::FunctorBuildGk& obj);
-        friend class ThreadFunctor::ThreadWrapper;
+        friend class ::ThreadFunctor::ThreadWrapper;
+        template<class T>
+        friend class ::Susceptibility;
         public:
             FunctorBuildGk(double,int,double,double,std::vector<double>&,int,int,std::vector< std::complex<double> >&);
             FunctorBuildGk()=default;

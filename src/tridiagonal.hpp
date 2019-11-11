@@ -1,4 +1,4 @@
-#include "green_utils.hpp"
+#include "thread_utils.hpp"
 
 // Inspired from http://www.mymathlib.com/matrices/linearsystems/tridiagonal.html
 // and https://kluge.in-chemnitz.de/opensource/spline/

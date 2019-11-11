@@ -15,7 +15,8 @@ set(SOURCES_COMMON
         src/green_utils
         src/file_utils
         src/json_utils
-        src/thread_utils)
+        src/thread_utils
+        src/susceptibilities)
 
 set(SOURCES_MAIN mainIPT ${SOURCES_COMMON})
 set(SOURCES_TEST test/src/test_utils)

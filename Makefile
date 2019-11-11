@@ -11,8 +11,8 @@ PROG=IPT-DMFT-OLI
 
 all: $(PROG)
 
-$(PROG): $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(OBJ)/thread_utils.o
-	$(CXX) $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(OBJ)/thread_utils.o $(CXXFLAGS) -o mainIPT.out
+$(PROG): $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(OBJ)/thread_utils.o $(OBJ)/susceptibilities.o
+	$(CXX) $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(OBJ)/thread_utils.o $(OBJ)/susceptibilities.o $(CXXFLAGS) -o mainIPT.out
 
 $(OBJ)/mainIPT.o: $(PWD)/mainIPT.cpp
 	$(CXX) -c -I$(INC) $(PWD)/mainIPT.cpp -o $(OBJ)/mainIPT.o
@@ -34,6 +34,9 @@ $(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
 
 $(OBJ)/thread_utils.o: $(SRC)/thread_utils.cpp
 	$(CXX) -c -I$(INC) $(SRC)/thread_utils.cpp -o $(OBJ)/thread_utils.o
+
+$(OBJ)/susceptibilities.o: $(SRC)/susceptibilities.cpp
+	$(CXX) -c -I$(INC) $(SRC)/susceptibilities.cpp -o $(OBJ)/susceptibilities.o
 
 clean:
 	rm -f $(OBJ)/* $(PWD)/mainIPT.out && cd test && make clean
