@@ -327,9 +327,9 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
 void saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW){
     for (size_t j=0; j<sublatt1.LocalGreen.matsubara_t_pos.n_slices; j++){
         if (j==0){
-            ofGloc << "G_loc AAup tau pos" << "\t" << "G_loc AAup tau neg" << "\t" << "iwn" << "\t\t" << "G_loc AAup iwn re" << "\t" << "G_loc AAup iwn im" << "\n";
-            ofSE << "SE AAup tau pos" << "\t" << "SE AAup tau neg" << "\t" << "iwn" << "\t\t" << "SE AAup iwn re" << "\t" << "SE AAup iwn im" << "\n";
-            ofGW << "G0 AAup tau pos" << "\t" << "G0 AAup tau neg" << "\t" << "iwn" << "\t\t" << "G0 AAup iwn re" << "\t" << "G0 AAup iwn im" << "\n";
+            ofGloc << "/G_loc AAup tau pos" << "\t" << "G_loc AAup tau neg" << "\t" << "iwn" << "\t\t" << "G_loc AAup iwn re" << "\t" << "G_loc AAup iwn im" << "\n";
+            ofSE << "/SE AAup tau pos" << "\t" << "SE AAup tau neg" << "\t" << "iwn" << "\t\t" << "SE AAup iwn re" << "\t" << "SE AAup iwn im" << "\n";
+            ofGW << "/G0 AAup tau pos" << "\t" << "G0 AAup tau neg" << "\t" << "iwn" << "\t\t" << "G0 AAup iwn re" << "\t" << "G0 AAup iwn im" << "\n";
 
             ofGloc << sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
             ofGloc << sublatt1.LocalGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup

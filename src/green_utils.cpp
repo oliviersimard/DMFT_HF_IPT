@@ -3,6 +3,7 @@
 unsigned int iter=0;
 std::vector<double> vecK;
 std::vector< std::complex<double> > iwnArr_l;
+std::vector< std::complex<double> > iqnArr_l;
 const arma::Mat< std::complex<double> > ZEROS_(2, 2, arma::fill::zeros);
 arma::Mat< std::complex<double> > statMat(2,2);
 

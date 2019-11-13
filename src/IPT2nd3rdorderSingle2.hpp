@@ -9,8 +9,6 @@ extern "C" {
 #include<stdexcept>
 //#include<algorithm> // copy() and assign()
 #include<armadillo>
-#include<gsl/gsl_errno.h>
-#include<gsl/gsl_fft_complex.h>
 #include "tridiagonal.hpp"
 #include "file_utils.hpp"
 #include "integral_utils.hpp"

@@ -48,6 +48,11 @@ int main(int argc, char** argv){
             std::complex<double> matFreq(0.0 , (2.0*(double)j+1.0)*M_PI/beta );
             iwnArr_l.push_back( matFreq );
         }
+        iqnArr_l.clear();
+        for (size_t j=0; j<N_tau; j++){
+            std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
+            iqnArr_l.push_back( matFreq );
+        }
 
         for (double U=U_init; U<=U_max; U+=U_step){
 

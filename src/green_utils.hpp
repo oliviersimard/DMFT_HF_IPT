@@ -18,6 +18,7 @@ template<class T> class Susceptibility;
 
 extern std::vector<double> vecK;
 extern std::vector< std::complex<double> > iwnArr_l;
+extern std::vector< std::complex<double> > iqnArr_l;
 extern unsigned int iter;
 extern const arma::Mat< std::complex<double> > ZEROS_;
 extern arma::Mat< std::complex<double> > statMat;
