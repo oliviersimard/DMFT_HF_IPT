@@ -8,6 +8,7 @@ int main(int argc, char** argv){
     // Loading parameters from Json file
     const std::string filename("./../params.json"); // ../ necessary because compiled inside build directory using CMake. For Makefile, set to params.json only (Debug mode).
     Json_utils JsonObj;
+    struct stat infoDir;
     const MembCarrier params = JsonObj.JSONLoading(filename);
     const double n_t_spin=params.db_arr[0];
     const unsigned int N_tau=(unsigned int)params.int_arr[0]; // 4096
@@ -86,18 +87,21 @@ int main(int argc, char** argv){
 
             IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos,data_dG_dtau_neg,vecK,n_t_spin);
 
-            /* Performs the complete DMFT calculations */
-            DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
+            /* Performs the complete DMFT calculations if directory doesn't already exist */
+            int message = stat( (pathToDir+customDirName).c_str(), &infoDir );
+            if ( !(infoDir.st_mode & S_IFDIR) && message==0 ) // If the directory doesn't already exist
+                DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
+            else
+                std::cout << "The DMFT loop has been skipped since according to the directories, it has already been created for this set of parameters." << std::endl;
+            
             
             std::vector<double> initVec(MULT_N_TAU*MULT_N_TAU*N_tau,0.0);
             IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec);
             if (load_first){
-                
                 try{
-                    std::cout << "filenameToLoad: " << filenameToLoad << std::endl;
                     splInlineObj.loadFileSpline(filenameToLoad); // Spline is ready for use by calling function calculateSpline()
                 } catch(const std::exception& err){
-                    std::cerr << err.what() << std::endl;
+                    std::cerr << err.what();
                 }
                 std::complex<double> test = splInlineObj.calculateSpline(3.22);
                 std::cout << test << std::endl;

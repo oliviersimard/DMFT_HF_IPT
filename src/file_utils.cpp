@@ -17,7 +17,7 @@ std::vector<std::string> glob(const std::string& pattern) noexcept(false){
     if(return_value != 0){
         globfree(&glob_result);
         stringstream ss;
-        ss << "glob() failed with return_value " << return_value;
+        ss << "glob() failed with return_value " << return_value << " for "+pattern;
         throw std::runtime_error(ss.str());
     }
 

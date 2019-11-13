@@ -98,7 +98,12 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     std::ifstream infile;   
     std::string firstline("");
     std::string patternFile = filename+"*";
-    std::vector< std::string > vecStr = glob(patternFile);
+    std::vector< std::string > vecStr;
+    try{
+        vecStr=glob(patternFile);
+    }catch (const std::exception& err){
+        std::cerr << err.what() << std::endl;
+    }
     int largestNum=-1; // Numbers after N_it are always positive.
     for (auto str : vecStr){ // Getting the largest iteration number to eventually load for interpolation.
         int tempNum=extractIntegerLastWords(str);
