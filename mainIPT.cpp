@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv){
     // Loading parameters from Json file
-    const std::string filename("../params.json"); // ../ necessary because compiled inside build directory using CMake. For Makefile, set to params.json only (Debug mode).
+    const std::string filename("./../params.json"); // ../ necessary because compiled inside build directory using CMake. For Makefile, set to params.json only (Debug mode).
     Json_utils JsonObj;
     const MembCarrier params = JsonObj.JSONLoading(filename);
     const double n_t_spin=params.db_arr[0];
@@ -62,29 +62,22 @@ int main(int argc, char** argv){
 
         for (double U=U_init; U<=U_max; U+=U_step){
 
-            #if DIM == 1
-            std::string filenameToSaveGloc(pathToDir+"Green_loc_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
-            std::string filenameToSaveSE(pathToDir+"Self_energy_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
-            std::string filenameToSaveGW(pathToDir+"Weiss_Green_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
+            std::string customDirName(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
+            std::string filenameToSaveGloc(pathToDir+customDirName+"/Green_loc_"+customDirName);
+            std::string filenameToSaveSE(pathToDir+customDirName+"/Self_energy_"+customDirName);
+            std::string filenameToSaveGW(pathToDir+customDirName+"/Weiss_Green_"+customDirName);
             std::string filenameToLoad;
             if (load_first){ // This file has got to be containing the self-energy data. For at least twice the number N_tau for proper interpolation in formulae.
-                filenameToLoad=pathToDirLoad+"Self_energy_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(MULT_N_TAU*N_tau);
+                std::string customDirNameLoad(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(MULT_N_TAU*N_tau));
+                filenameToLoad=pathToDirLoad+customDirNameLoad+"/Self_energy_"+customDirNameLoad;
             }
-            #elif DIM == 2
-            std::string filenameToSaveGloc(pathToDir+"Green_loc_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
-            std::string filenameToSaveSE(pathToDir+"Self_energy_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
-            std::string filenameToSaveGW(pathToDir+"Weiss_Green_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
-            #endif
             std::vector< std::string > vecFiles={filenameToSaveGloc,filenameToSaveSE,filenameToSaveGW};
             try{
-                check_file_content(vecFiles,pathToDir+"analytic_continuations"); // Checks whether files already exist to avoid overwritting.
-            } catch (const std::exception& err){
+                check_file_content(vecFiles,pathToDir+customDirName+"/analytic_continuations"); // Checks whether files already exist to avoid overwritting. Also creates 
+            } catch (const std::exception& err){                                                         // directory architecture
                 std::cerr << err.what();
                 exit(1);
             }
-            // Array for cubic spline interpolation (self-energy). Loading file having twice as much matsubara frequencies.
-            std::vector<double> realIwn(iwnArr_l.size());
-            transform(iwnArr_l.begin(),iwnArr_l.end(),realIwn.begin(),[](std::complex<double> cd){ return cd.imag(); }); // casting into array of double for cubic spline.
             // Initializing the main Green's function objects.
             GreenStuff WeissGreenA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_A_matsubara_t_pos,weiss_green_A_matsubara_t_neg,weiss_green_A_matsubara_w);
             GreenStuff HybA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_tmp_A_matsubara_t_pos,weiss_green_tmp_A_matsubara_t_neg,weiss_green_tmp_A_matsubara_w);
@@ -94,17 +87,20 @@ int main(int argc, char** argv){
             IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos,data_dG_dtau_neg,vecK,n_t_spin);
 
             /* Performs the complete DMFT calculations */
-            //DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
-
+            DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
+            
+            std::vector<double> initVec(MULT_N_TAU*MULT_N_TAU*N_tau,0.0);
+            IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec);
             if (load_first){
-                std::vector<double> initVec(MULT_N_TAU*N_tau,0.0);
-                IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec);
+                
                 try{
                     std::cout << "filenameToLoad: " << filenameToLoad << std::endl;
-                    splInlineObj.loadFileSpline(filenameToLoad);
+                    splInlineObj.loadFileSpline(filenameToLoad); // Spline is ready for use by calling function calculateSpline()
                 } catch(const std::exception& err){
                     std::cerr << err.what() << std::endl;
                 }
+                std::complex<double> test = splInlineObj.calculateSpline(3.22);
+                std::cout << test << std::endl;
             }
         }
     }

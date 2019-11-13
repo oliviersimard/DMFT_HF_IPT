@@ -58,8 +58,8 @@ void mkdirTree(std::string sub, std::string dir) noexcept(false){
     }
 }
 
-void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir) noexcept(false){
-    mkdirTree(pathToDir,"");
+void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir1) noexcept(false){
+    mkdirTree(pathToDir1,"");
     // Now looking if files exist
     std::string globsearch0(filenamesToSave[0]+"*");
     std::string globsearch1(filenamesToSave[1]+"*");
@@ -89,7 +89,7 @@ std::string eraseAllSubStr(std::string mainStr, const std::string& toErase){
     return mainStr;
 }
 
-int extractIntegerWords(std::string str){ 
+int extractIntegerLastWords(std::string str){ 
     //std::regex r("[0-9]*\\.[0-9]+|[0-9]+");
     std::vector<double> intContainer;
     std::string toDel(".dat");

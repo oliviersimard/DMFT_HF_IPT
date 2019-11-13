@@ -15,8 +15,8 @@ extern "C" {
 inline bool file_exists(const std::string& name);
 std::vector<std::string> glob(const std::string& pattern) noexcept(false);
 void mkdirTree(std::string sub, std::string dir) noexcept(false);
-void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir) noexcept(false);
-int extractIntegerWords(std::string str);
+void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir1) noexcept(false);
+int extractIntegerLastWords(std::string str);
 std::string eraseAllSubStr(std::string,const std::string&);
 
 

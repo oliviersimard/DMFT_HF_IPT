@@ -325,60 +325,34 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
 }
 
 void saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW){
-    for (size_t j=0; j<sublatt1.LocalGreen.matsubara_t_pos.n_slices; j++){
-        if (j==0){
-            ofGloc << "/G_loc AAup tau pos" << "\t" << "G_loc AAup tau neg" << "\t" << "iwn" << "\t\t" << "G_loc AAup iwn re" << "\t" << "G_loc AAup iwn im" << "\n";
-            ofSE << "/SE AAup tau pos" << "\t" << "SE AAup tau neg" << "\t" << "iwn" << "\t\t" << "SE AAup iwn re" << "\t" << "SE AAup iwn im" << "\n";
-            ofGW << "/G0 AAup tau pos" << "\t" << "G0 AAup tau neg" << "\t" << "iwn" << "\t\t" << "G0 AAup iwn re" << "\t" << "G0 AAup iwn im" << "\n";
+    for (size_t j=0; j<sublatt1.LocalGreen.matsubara_w.n_slices; j++){
+        if (j==0){ // The "/" is important when reading files.
+            ofGloc << "/iwn" << "\t\t" << "G_loc AAup iwn re" << "\t\t" << "G_loc AAup iwn im" << "\n";
+            ofSE << "/iwn" << "\t\t" << "SE AAup iwn re" << "\t\t" << "SE AAup iwn im" << "\n";
+            ofGW << "/iwn" << "\t\t" << "G0 AAup iwn re" << "\t\t" << "G0 AAup iwn im" << "\n";
 
-            ofGloc << sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-            ofGloc << sublatt1.LocalGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
             ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
             ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
             ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
             //
-            ofSE << sublatt1.SelfEnergy.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-            ofSE << sublatt1.SelfEnergy.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
             ofSE << iwnArr_l[j].imag() << "\t\t"; // AAup
             ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
             ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
             //
-            ofGW << sublatt1.WeissGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-            ofGW << sublatt1.WeissGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
             ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
             ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
             ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
         }
         else{
-            if (j<sublatt1.LocalGreen.matsubara_t_pos.n_slices-1){ // To avoid busting bounds of matsubara w array.
-                ofGloc << sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << iwnArr_l[j].imag() << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
-            } else{
-                ofGloc << sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << "\t\t" << "\t\t" << "\t\t"; // Important to be able to read off data with python programs.
-                //
-                ofSE << sublatt1.SelfEnergy.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << "\t\t" << "\t\t" << "\t\t";
-                //
-                ofGW << sublatt1.WeissGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << "\t\t" << "\t\t" << "\t\t";
-            }
+            ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
+            ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
+            ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
+            ofSE << iwnArr_l[j].imag() << "\t\t"; // AAup
+            ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
+            ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
+            ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
+            ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
+            ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
         }
     }
     ofGloc.close();
