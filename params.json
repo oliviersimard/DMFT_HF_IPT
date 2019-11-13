@@ -1,15 +1,16 @@
 {
     "n_t_spin": 0.5,
-    "Umax": 10.0,
+    "Umax": 6.0,
     "Ustep": 1.0,
-    "Umin": 10.0,
-    "betamax": 20.0,
+    "Umin": 6.0,
+    "betamax": 50.0,
     "betastep": 10.0,
-    "betamin": 20.0,
+    "betamin": 50.0,
     "Ntau": 1024, 
     "N_it": 100,
     "gridK": 60,
     "q_1D": 0.0,
     "q_2D": [0.0,0.0],
-    "dGdPhi": true
+    "dGdPhi": true,
+    "load_first": true
 }

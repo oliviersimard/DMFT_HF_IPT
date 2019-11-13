@@ -71,6 +71,77 @@ class DMFTproc{
         static unsigned int objCount;
 };
 
+template<class T>
+class SplineInline{
+    public:
+        void loadFileSpline(const std::string&) noexcept(false);
+        T calculateSpline(const GreenStuff&, const std::vector<double>&, double) const;
+        SplineInline(const size_t,const std::vector<double>&);
+    private:
+        std::vector<double> tau_pos;
+        std::vector<double> tau_neg;
+        std::vector<double> iwn;
+        std::vector<double> iwn_re;
+        std::vector<double> iwn_im;
+        const size_t N_tau_size;
+};
+
+}
+
+template<typename T>
+IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,const std::vector<double>& initVec) : N_tau_size(sizeArr),
+                                            tau_pos(initVec),tau_neg(initVec),iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
+
+template<>
+inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std::string& filename) noexcept(false){
+    std::ifstream infile;   
+    std::string firstline("");
+    std::string patternFile = filename+"*";
+    std::vector< std::string > vecStr = glob(patternFile);
+    std::vector<int> lastInts;
+    for (auto str : vecStr){
+        lastInts.push_back(extractIntegerWords(str));
+    }
+    for (auto el : lastInts){
+        std::cout << el << std::endl;
+    }
+    exit(0);
+    unsigned int num = 0; // num must start at 0
+    arma::Cube< std::complex<double> > inputFunct(2,2,2*N_tau_size);
+    infile.open(filename);// file containing numbers in 3 columns 
+    if(infile.fail()){ // checks to see if file opended 
+        std::cout << "error" << std::endl; 
+        throw std::ios_base::failure("File not Found in SplineInline!!"); // no point continuing if the file didn't open...
+    } 
+    while(!infile.eof()){ // reads file to end of *file*, not line
+        if (num==0 && firstline==""){ 
+        getline(infile,firstline);
+        std::cout << firstline << std::endl;
+        if (firstline[0]!='/'){
+            std::cout << "Gotta remove first line" << std::endl;
+            throw std::invalid_argument("The files loaded should have the marker \"/\" in front of the lines commented.");
+        }
+        }else{
+	        infile >> tau_pos[num]; // read first column number
+	        infile >> tau_neg[num]; // read second column number
+	        infile >> iwn[num]; // read third column number
+            infile >> iwn_re[num];
+            infile >> iwn_im[num];
+        ++num;
+        }
+    } 
+    infile.close();
+    for (size_t i=0; i<2*N_tau_size; i++){
+        inputFunct.slice(i)(0,0)=std::complex<double>(iwn_re[i],iwn_im[i]);
+        //cout << inputFunct.slice(i)(0,0) << endl;
+    }
+}
+
+template<>
+inline std::complex<double> IPT2::SplineInline< std::complex<double> >::calculateSpline(const GreenStuff& Obj, const std::vector<double>& reIwnArr, double reIwn) const{
+    spline< std::complex<double> > spl;
+    spl.set_points(reIwnArr,Obj.matsubara_w);
+    return spl(reIwn);
 }
 
 #endif /* end of IPT2Single_H_ */

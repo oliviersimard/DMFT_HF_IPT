@@ -1,5 +1,5 @@
-#ifndef File_Utils_
-#define File_Utils_
+#ifndef File_Utils_H_
+#define File_Utils_H_
 
 #include<sys/stat.h> // for posix stat()
 //#include<regex> // for regular expressions
@@ -16,6 +16,8 @@ inline bool file_exists(const std::string& name);
 std::vector<std::string> glob(const std::string& pattern) noexcept(false);
 void mkdirTree(std::string sub, std::string dir) noexcept(false);
 void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir) noexcept(false);
+int extractIntegerWords(std::string str);
+std::string eraseAllSubStr(std::string,const std::string&);
 
 
 #endif /* end of File_Utils_ */

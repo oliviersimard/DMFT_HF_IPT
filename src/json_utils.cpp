@@ -57,6 +57,7 @@ const MembCarrier Json_utils::JSONLoading(const std::string& filename) const noe
     const auto& gridK_val = get_object_item(value, "gridK");
     //bool
     const auto& full_dG_dphi = get_object_item(value, "dGdPhi");
+    const auto& load_first_val = get_object_item(value, "load_first");
     //array
     const auto& array_val = get_object_item(value, "q_2D");
     double container[2]; // Way to extract array inputs in json file!
@@ -73,9 +74,8 @@ const MembCarrier Json_utils::JSONLoading(const std::string& filename) const noe
     double Umin = Umin_val.get_real(); double n_t_spin = n_t_spin_val.get_real();
     double betamax = betamax_val.get_real(); double betastep = betastep_val.get_real();
     double betamin = betamin_val.get_real(); double q_1D = q_1D_val.get_real();
-    int N_it = N_it_val.get_int(); int Ntau = Ntau_val.get_int();
-    int gridK = gridK_val.get_int();
-    bool dGdPhi = full_dG_dphi.get_bool();
+    int N_it = N_it_val.get_int(); int Ntau = Ntau_val.get_int(); int gridK = gridK_val.get_int();
+    bool dGdPhi = full_dG_dphi.get_bool(); bool load_first = load_first_val.get_bool();
 
     //std::cout << dGdPhi << " has type: " << typeid(dGdPhi).name() << std::endl;
 
@@ -88,7 +88,7 @@ const MembCarrier Json_utils::JSONLoading(const std::string& filename) const noe
     // for (size_t i=0; i<=sizeof(integ)/sizeof(int); i++){
     //     std::cout << integ[i] << std::endl;
     // }
-    bool boo[MAX_BOOL_SIZE] = { dGdPhi };
+    bool boo[MAX_BOOL_SIZE] = { dGdPhi, load_first };
 
     MembCarrier membCarrObj(dub,container,integ,boo);
 
