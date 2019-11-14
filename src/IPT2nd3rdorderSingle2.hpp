@@ -102,7 +102,7 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     try{
         vecStr=glob(patternFile);
     }catch (const std::exception& err){
-        std::cerr << err.what() << std::endl;
+        std::cerr << err.what() << "\n";
     }
     int largestNum=-1; // Numbers after N_it are always positive.
     for (auto str : vecStr){ // Getting the largest iteration number to eventually load for interpolation.
@@ -114,7 +114,7 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     arma::Cube< std::complex<double> > inputFunct(2,2,2*N_tau_size);
     std::string finalFile=filename+"_Nit_"+std::to_string(largestNum)+".dat";
     infile.open(finalFile);// file containing numbers in 3 columns
-    std::cout << "The file from which the spline is done: "+finalFile << std::endl;
+    std::cout << "The file from which the spline is done: "+finalFile << "\n";
     if(infile.fail()){ // checks to see if file opended 
         std::cout << "error" << std::endl; 
         throw std::ios_base::failure("File not Found in SplineInline!!"); // no point continuing if the file didn't open...
@@ -122,9 +122,9 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     while(!infile.eof()){ // reads file to end of *file*, not line
         if (num==0 && firstline==""){ 
         getline(infile,firstline);
-        std::cout << firstline << std::endl;
+        //std::cout << firstline << std::endl;
         if (firstline[0]!='/'){
-            std::cerr << "Gotta remove first line of: "+finalFile << std::endl;
+            std::cerr << "Gotta remove first line of: "+finalFile << "\n";
             throw std::invalid_argument("The files loaded should have the marker \"/\" in front of the lines commented.");
         }
         }else{

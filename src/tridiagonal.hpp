@@ -231,7 +231,7 @@ void spline<T>::set_points(const std::vector<double>& x,
             LUObj.tridiagonal_LU_decomposition(subdiagonal,diagonal,superdiagonal);
             LUObj.tridiagonal_LU_solve(subdiagonal,diagonal,superdiagonal,rhs,m_b); // Writes in m_b
         }catch (const std::exception& err){
-            std::cerr << err.what() << std::endl;
+            std::cerr << err.what() << "\n";
         }
         // calculate parameters a[] and c[] based on b[]
         for(size_t i=0; i<n-1; i++) {

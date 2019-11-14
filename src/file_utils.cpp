@@ -17,7 +17,7 @@ std::vector<std::string> glob(const std::string& pattern) noexcept(false){
     if(return_value != 0){
         globfree(&glob_result);
         stringstream ss;
-        ss << "glob() failed with return_value " << return_value << " for "+pattern;
+        ss << "glob() failed with return_value " << return_value << " for "+pattern << "\n";
         throw std::runtime_error(ss.str());
     }
 
@@ -71,7 +71,7 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
         search2=glob(globsearch2);
     }
     catch(const std::runtime_error& e){
-        std::cerr << e.what() << std::endl;
+        std::cerr << e.what() << "\n";
     }
 
     if ( search0.size() > 0 || search1.size() > 0 || search2.size() > 0 ){

@@ -14,7 +14,9 @@ DMFTproc::DMFTproc(GreenStuff& WeissGreen_,GreenStuff& Hyb_,GreenStuff& LocalGre
                                                 const std::vector<double>& karr_l_, const double n_t_spin_) : WeissGreen(WeissGreen_),
                                                 Hyb(Hyb_), LocalGreen(LocalGreen_), SelfEnergy(SelfEnergy_),
                                                 data_dg_dtau_pos(dg_dtau_pos), data_dg_dtau_neg(dg_dtau_neg), karr_l(karr_l_){
-    std::cout << "DMFTproc: N_k: " << GreenStuff::N_k << std::endl;
+    std::cout << "DMFTproc: U: " << GreenStuff::U << "\n";
+    std::cout << "DMFTproc: beta: " << GreenStuff::beta << "\n";
+    std::cout << "DMFTproc: N_k: " << GreenStuff::N_k << "\n";
     std::cout << "DMFTproc: N_tau: " << GreenStuff::N_tau << std::endl;
     if (objCount<1){
         this->n=n_t_spin_;
@@ -273,7 +275,7 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
                 std::cout << "mu_new at iter " << iter << ": " << mu_new << std::endl;
                 sublatt1.WeissGreen.update_mu(mu_new); // Updates mu from instance, even though it is a static member variable.
             }catch (const std::exception& err){
-                std::cerr << err.what() << std::endl;
+                std::cerr << err.what() << "\n";
             }
         }
         if ( ( std::abs(n0-sublatt1.n)>ROOT_FINDING_TOL ) ){
@@ -283,7 +285,7 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
                 std::cout << "mu0_new at iter " << iter << ": " << mu0_new << std::endl;
                 sublatt1.WeissGreen.update_mu0(mu0_new); // Updates mu from instance, even though it is a static member variable.
             }catch (const std::exception& err){
-                std::cerr << err.what() << std::endl;
+                std::cerr << err.what() << "\n";
             }
         }
         // Determining G_loc

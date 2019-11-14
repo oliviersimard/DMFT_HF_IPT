@@ -11,7 +11,7 @@ int main(int argc, char** argv){
     struct stat infoDir;
     const MembCarrier params = JsonObj.JSONLoading(filename);
     const double n_t_spin=params.db_arr[0];
-    const unsigned int N_tau=(unsigned int)params.int_arr[0]; // 4096
+    const unsigned int N_tau=(unsigned int)params.int_arr[0]; // Has to be a power of 2, i.e 512!
     const unsigned int N_it=(unsigned int)params.int_arr[1];
     const unsigned int N_k=(unsigned int)params.int_arr[2];
     const double beta_init=params.db_arr[6], beta_step=params.db_arr[5], beta_max=params.db_arr[4];
@@ -51,12 +51,12 @@ int main(int argc, char** argv){
     std::string trailingStr("");
     for (double beta=beta_init; beta<=beta_max; beta+=beta_step){
         iwnArr_l.clear(); // Clearing to not append at each iteration over previous set.
-        for (signed int j=(-(signed int)N_tau); j<(signed int)N_tau; j++){
+        for (signed int j=(-(signed int)N_tau); j<(signed int)N_tau; j++){ // Fermionic frequencies.
             std::complex<double> matFreq(0.0 , (2.0*(double)j+1.0)*M_PI/beta );
             iwnArr_l.push_back( matFreq );
         }
         iqnArr_l.clear();
-        for (size_t j=0; j<N_tau; j++){
+        for (size_t j=0; j<N_tau; j++){ // Bosonic frequencies.
             std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
             iqnArr_l.push_back( matFreq );
         }
@@ -70,12 +70,12 @@ int main(int argc, char** argv){
             std::string filenameToLoad;
             if (load_first){ // This file has got to be containing the self-energy data. For at least twice the number N_tau for proper interpolation in formulae.
                 std::string customDirNameLoad(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(MULT_N_TAU*N_tau));
-                filenameToLoad=pathToDirLoad+customDirNameLoad+"/Self_energy_"+customDirNameLoad;
+                filenameToLoad=pathToDirLoad+customDirNameLoad+"/Self_energy_"+customDirNameLoad; // Stick to the self-energy.
             }
             std::vector< std::string > vecFiles={filenameToSaveGloc,filenameToSaveSE,filenameToSaveGW};
-            try{
+            try{ // Ensures that we don't overwrite any files within build/.
                 check_file_content(vecFiles,pathToDir+customDirName+"/analytic_continuations"); // Checks whether files already exist to avoid overwritting. Also creates 
-            } catch (const std::exception& err){                                                         // directory architecture
+            } catch (const std::exception& err){                                                // directory architecture
                 std::cerr << err.what();
                 exit(1);
             }
@@ -88,8 +88,8 @@ int main(int argc, char** argv){
             IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos,data_dG_dtau_neg,vecK,n_t_spin);
 
             /* Performs the complete DMFT calculations if directory doesn't already exist */
-            int message = stat( (pathToDir+customDirName).c_str(), &infoDir );
-            if ( !(infoDir.st_mode & S_IFDIR) && message==0 ) // If the directory doesn't already exist
+            int message = stat( (pathToDirLoad+customDirName).c_str(), &infoDir );
+            if ( !(infoDir.st_mode & S_IFDIR) && message==0 ) // If the directory doesn't already exist in ../data/ ...
                 DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
             else
                 std::cout << "The DMFT loop has been skipped since according to the directories, it has already been created for this set of parameters." << std::endl;
@@ -97,13 +97,15 @@ int main(int argc, char** argv){
             
             std::vector<double> initVec(MULT_N_TAU*MULT_N_TAU*N_tau,0.0);
             IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec);
-            if (load_first){
+            if (load_first){ // The file containing wider Matsubara frequency domain is loaded for spline.
                 try{
-                    splInlineObj.loadFileSpline(filenameToLoad); // Spline is ready for use by calling function calculateSpline()
-                } catch(const std::exception& err){
-                    std::cerr << err.what();
+                    splInlineObj.loadFileSpline(filenameToLoad); // Spline is ready for use by calling function calculateSpline()-
+                } catch(const std::exception& err){ // If filenameToLoad is not found...
+                    std::cerr << err.what() << "\n";
+                    std::cerr << "Check if data with "+std::to_string(MULT_N_TAU)+" times the N_tau selected is available...\n";
+                    exit(1);
                 }
-                std::complex<double> test = splInlineObj.calculateSpline(3.22);
+                std::complex<double> test = splInlineObj.calculateSpline(0.4);
                 std::cout << test << std::endl;
             }
         }

@@ -34,7 +34,7 @@ inline Data::Data(const Data& obj){}
 Data& Data::operator=(const Data& obj){
     if (&obj == this) return *this;
     else{
-        std::cerr << "assignment operator used.\n";
+        std::cerr << "assignment operator used.\n"; // Unbuffered.
     }
     return *this;
 }
