@@ -104,7 +104,7 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     }catch (const std::exception& err){
         std::cerr << err.what() << "\n";
     }
-    int largestNum=-1; // Numbers after N_it are always positive.
+    int largestNum=1; // Numbers after N_it are always positive.
     for (auto str : vecStr){ // Getting the largest iteration number to eventually load for interpolation.
         int tempNum=extractIntegerLastWords(str);
         if (tempNum>largestNum)
@@ -112,6 +112,7 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     }
     unsigned int num = 0; // num must start at 0
     arma::Cube< std::complex<double> > inputFunct(2,2,2*N_tau_size);
+    std::cout << 2*N_tau_size << "\n";
     std::string finalFile=filename+"_Nit_"+std::to_string(largestNum)+".dat";
     infile.open(finalFile);// file containing numbers in 3 columns
     std::cout << "The file from which the spline is done: "+finalFile << "\n";
@@ -136,6 +137,7 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
         }
     }
     infile.close();
+    std::cout << iwn.size() << "\n";
     for (size_t i=0; i<2*N_tau_size; i++){
         inputFunct.slice(i)(0,0)=std::complex<double>(iwn_re[i],iwn_im[i]);
         //std::cout << inputFunct.slice(i)(0,0) << std::endl;

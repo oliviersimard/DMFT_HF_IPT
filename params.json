@@ -6,11 +6,11 @@
     "betamax": 50.0,
     "betastep": 10.0,
     "betamin": 50.0,
-    "Ntau": 2048, 
+    "Ntau": 128,
     "N_it": 100,
-    "gridK": 60,
+    "gridK": 50,
     "q_1D": 0.0,
     "q_2D": [0.0,0.0],
-    "dGdPhi": true,
+    "dGdPhi": false,
     "load_first": true
 }

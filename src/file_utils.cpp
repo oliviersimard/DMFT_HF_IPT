@@ -58,8 +58,9 @@ void mkdirTree(std::string sub, std::string dir) noexcept(false){
     }
 }
 
-void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir1) noexcept(false){
+void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir1, std::string pathToDir2) noexcept(false){
     mkdirTree(pathToDir1,"");
+    mkdirTree(pathToDir2,"");
     // Now looking if files exist
     std::string globsearch0(filenamesToSave[0]+"*");
     std::string globsearch1(filenamesToSave[1]+"*");
@@ -75,7 +76,11 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
     }
 
     if ( search0.size() > 0 || search1.size() > 0 || search2.size() > 0 ){
+        #ifndef DEBUG
         throw std::runtime_error("Files "+filenamesToSave[0]+" and "+filenamesToSave[1]+" and "+filenamesToSave[2]+" already exist!!");
+        #else
+        std::cerr << "Warning: Files "+filenamesToSave[0]+" and "+filenamesToSave[1]+" and "+filenamesToSave[2]+" already exist!!" << "\n";
+        #endif
     }
 }
 

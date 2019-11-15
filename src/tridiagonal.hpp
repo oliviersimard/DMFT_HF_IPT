@@ -1,3 +1,6 @@
+#ifndef Tridiagonal_H_
+#define Tridiagonal_H_
+
 #include<gsl/gsl_errno.h>
 #include<gsl/gsl_fft_complex.h>
 #include "thread_utils.hpp"
@@ -435,3 +438,4 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
 //    std::cout << s(1.5) << std::endl;
 //    s.iwn_tau_spl_extrm();
 
+#endif /* end of Tridiagonal_H_ */

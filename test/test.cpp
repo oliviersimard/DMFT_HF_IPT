@@ -208,7 +208,7 @@ namespace{
     }
     std::string stdoutval = buffer.str();
     redirectObj.~cerr_redirect(); // redirect to standard output buffer.
-    EXPECT_EQ("glob() failed with return_value -3\n", stdoutval) << "Glob should return -3 to std output.";
+    EXPECT_EQ("glob() failed with return_value -3 for "+strTest+"\n\n", stdoutval) << "Glob should return -3 to std output.";
   }
 
   // TEST_F(TestGreenStuff, copyAssignment){
