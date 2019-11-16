@@ -2,6 +2,7 @@
 #include "src/json_utils.hpp"
 
 #define MULT_N_TAU 4
+#define PARALLEL
 //enum SolverType{ HF, IPT } SolverType;  // Include in params.json. OPT takes in "IPT" and "HF" as parameters.
 
 int main(int argc, char** argv){
@@ -38,7 +39,13 @@ int main(int argc, char** argv){
         double epsilonk = -1.0*M_PI + 2.0*(double)k*M_PI/N_k;
         vecK.push_back(epsilonk);
     }
-    
+    #ifdef PARALLEL
+    matGamma = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros); // Matrices used in case parallel.
+    matWeigths = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
+    matTotSus = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
+    matCorr = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
+    matMidLev = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
+    #endif
     arma::Cube<double> weiss_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> weiss_green_tmp_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_tmp_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> self_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), self_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
@@ -139,8 +146,9 @@ int main(int argc, char** argv){
                 HF::FunctorBuildGk Gk(mu_HF,beta,U,ndo,vecK,N_it,N_k,Gk_up);
                 /* Computing the corresponding HF self-energy. */
                 Gk.update_ndo_1D();
-                std::cout << "The final density on impurity is: " << Gk.get_ndo() << "\n";
-                std::string customDirName(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(Gk.get_ndo())+trailingStr+"_N_tau_"+std::to_string(N_tau));
+                double ndo_converged=Gk.get_ndo();
+                std::cout << "The final density on impurity is: " << ndo_converged << "\n";
+                std::string customDirName(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(ndo_converged)+trailingStr+"_N_tau_"+std::to_string(N_tau));
                 std::string filenameToSaveGloc(pathToDir+customDirName+"/Green_loc_"+customDirName);
                 std::string filenameToSaveSE(pathToDir+customDirName+"/Self_energy_"+customDirName);
                 std::string filenameToSaveGW(pathToDir+customDirName+"/Weiss_Green_"+customDirName);
@@ -151,11 +159,19 @@ int main(int argc, char** argv){
                     std::cerr << err.what() << "\n";
                     exit(1);
                 }
+                #ifdef PARALLEL
+                #if DIM == 1
+                calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj,ndo_converged);
+                #elif DIM == 2
+
+                #endif
+                #else
                 #if DIM == 1
                 calculateSusceptibilities<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj);
                 #elif DIM == 2
 
-                #endif
+                #endif // DIM
+                #endif // PARALLEL
             }
         }
     }

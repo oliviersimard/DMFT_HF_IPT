@@ -76,7 +76,8 @@ class SplineInline{
     public:
         void loadFileSpline(const std::string&) noexcept(false);
         T calculateSpline(double) const;
-        SplineInline(const size_t,const std::vector<double>&);
+        //SplineInline(const size_t,const std::vector<double>&);
+        SplineInline(const size_t,std::vector<double>);
     private:
         const size_t N_tau_size;
         std::vector<double> iwn;
@@ -89,9 +90,13 @@ template<class T> spline<T> SplineInline<T>::spl;
 
 }
 
+// template<typename T>
+// IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,const std::vector<double>& initVec) : N_tau_size(sizeArr),
+//                                             iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
+
 template<typename T>
-IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,const std::vector<double>& initVec) : N_tau_size(sizeArr),
-                                            iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
+IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec) : N_tau_size(sizeArr),
+                                                                iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
 
 template<>
 inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std::string& filename) noexcept(false){

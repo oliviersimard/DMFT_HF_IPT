@@ -11,8 +11,8 @@
     "gridK": 50,
     "q_1D": 0.0,
     "q_2D": [0.0,0.0],
-    "dGdPhi": true,
+    "dGdPhi": false,
     "load_self": false,
-    "is_jj": false,
+    "is_jj": true,
     "solver_type": "HF"
 }

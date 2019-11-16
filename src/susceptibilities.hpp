@@ -12,6 +12,7 @@ inline void calculateSusceptibilities(T&,const IPT2::SplineInline< std::complex<
 template<class T>
 class Susceptibility{ // The current-current susceptibility uses the +U in gamma, multiplied by the currents thereafter.
     public:
+        /* 1D methods */
         std::complex<double> get_weights(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D) const;
         std::complex<double> get_weights(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
         std::complex<double> gamma_oneD_spsp(T&,double,std::complex<double>,double,std::complex<double>) const;
@@ -28,6 +29,8 @@ class Susceptibility{ // The current-current susceptibility uses the +U in gamma
         std::tuple< std::complex<double>, std::complex<double> > gamma_oneD_spsp_crossed_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
         std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > gamma_oneD_jj_full_middle_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D) const;
         std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > gamma_oneD_jj_full_middle_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
+        /* 2D methods */
+        
 };
 
 /*************************************************************** 1D methods ***************************************************************/

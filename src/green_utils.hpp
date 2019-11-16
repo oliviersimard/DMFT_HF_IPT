@@ -30,6 +30,8 @@ extern double epsilonk(double);
 
 template<typename T>
 inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
+template<typename T>
+inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
@@ -104,6 +106,8 @@ namespace HF{
         friend class ::Susceptibility;
         template<typename T>
         friend void ::calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
+        template<typename T>
+        friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double);
         public:
             FunctorBuildGk(double,double,double,double,std::vector<double>&,unsigned int,unsigned int,std::vector< std::complex<double> >&);
             FunctorBuildGk()=default;

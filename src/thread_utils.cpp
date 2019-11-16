@@ -5,25 +5,26 @@ using namespace ThreadFunctor;
 arma::Mat< std::complex<double> > matGamma; // Matrices used in case parallel.
 arma::Mat< std::complex<double> > matWeigths;
 arma::Mat< std::complex<double> > matTotSus;
+arma::Mat< std::complex<double> > matCorr;
+arma::Mat< std::complex<double> > matMidLev;
 
 
-ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_1D& q,double ndo_converged) : _q(q){
+ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_1D q,double ndo_converged) : _q(q){
     this->_ndo_converged=ndo_converged;
     this->_Gk=Gk;
 }
 
-ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_2D& q,double ndo_converged) : _q(q){
+ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_2D q,double ndo_converged) : _q(q){
     this->_ndo_converged=ndo_converged;
     this->_Gk=Gk;
 }
 
-void ThreadWrapper::operator()(int ktilde, int kbar, double beta){ // Overloaded for 1D case
+void ThreadWrapper::operator()(size_t ktilde, size_t kbar, double beta, bool is_jj){
     std::complex<double> tmp_val_kt_kb(0.0,0.0);
     std::complex<double> tmp_val_weights(0.0,0.0);
     std::complex<double> tmp_val_tot_sus(0.0,0.0);
-    // cout << beta << " " << _Gk._kArr_l[ktilde] << " " << _q._iwn << " " << _q._qx << " " << _Gk._kArr_l[kbar] << endl;
-    for (int wtilde=0; wtilde<_Gk._size; wtilde++){
-        for (int wbar=0; wbar<_Gk._size; wbar++){
+    for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
+        for (size_t wbar=0; wbar<_Gk._size; wbar++){
             std::complex<double> tmp_val_kt_kb_tmp = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
             std::complex<double> tmp_val_weights_tmp = buildGK1D(
                                     _Gk._precomp_wn[wtilde],_Gk._kArr_l[ktilde]
@@ -49,12 +50,18 @@ void ThreadWrapper::operator()(int ktilde, int kbar, double beta){ // Overloaded
     // lock_guard<mutex> guard(mutx); 
     matGamma(kbar,ktilde) = tmp_val_kt_kb; // These matrices are static variables.
     matWeigths(kbar,ktilde) = tmp_val_weights;
-    matTotSus(kbar,ktilde) = 1.0/(_Gk._beta)/(_Gk._beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
+    if (!is_jj){
+        matTotSus(kbar,ktilde) = 1.0/(_Gk._beta)/(_Gk._beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
+    }
+    else if (is_jj){
+        matTotSus(kbar,ktilde) = -1.0/(_Gk._beta)/(_Gk._beta)*(-2.0*std::sin(_Gk._kArr_l[ktilde]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[kbar]));
+    }
     //cout << "Gamma for " << "ktilde " << ktilde << " and kbar " << kbar << ": " << matGamma(kbar,ktilde) << "\n";
     //cout << "Weigths for " << "ktilde " << ktilde << " and kbar " << kbar << ": " << matWeigths(kbar,ktilde) << "\n";
 }
 
-void ThreadWrapper::operator()(int kbarx_m_tildex, int kbary_m_tildey){ // no beta to overload operator() function.
+
+void ThreadWrapper::operator()(size_t kbarx_m_tildex, size_t kbary_m_tildey){ // no beta to overload operator() function.
 /* In 2D, calculating the weights implies computing whilst dismissing the translational invariance of the vertex function (Gamma). */
     std::complex<double> tmp_val_kt_kb(0.0,0.0);
     for (int wtilde=0; wtilde<_Gk._size; wtilde++){
