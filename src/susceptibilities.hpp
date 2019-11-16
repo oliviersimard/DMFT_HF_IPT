@@ -5,6 +5,9 @@
 #include<algorithm>
 #include "IPT2nd3rdorderSingle2.hpp"
 
+template<typename T>
+inline void calculateSusceptibilities(T&,const IPT2::SplineInline< std::complex<double> >&,const std::string&,const std::string&,const bool&,const bool&);
+
 // Make this class a template such that it hosts HF::FunctorBuildGk and IPT::DMFTproc objects
 template<class T>
 class Susceptibility{ // The current-current susceptibility uses the +U in gamma, multiplied by the currents thereafter.
@@ -19,8 +22,12 @@ class Susceptibility{ // The current-current susceptibility uses the +U in gamma
         std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > gamma_oneD_spsp_full_middle_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
         std::tuple< std::complex<double>, std::complex<double> > gamma_oneD_spsp_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D) const;
         std::tuple< std::complex<double>, std::complex<double> > gamma_oneD_spsp_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
+        std::tuple< std::complex<double>, std::complex<double> > gamma_oneD_jj_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D) const;
+        std::tuple< std::complex<double>, std::complex<double> > gamma_oneD_jj_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
         std::tuple< std::complex<double>, std::complex<double> > gamma_oneD_spsp_crossed_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D) const;
         std::tuple< std::complex<double>, std::complex<double> > gamma_oneD_spsp_crossed_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
+        std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > gamma_oneD_jj_full_middle_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D) const;
+        std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > gamma_oneD_jj_full_middle_plotting(T&,double,std::complex<double>,double,std::complex<double>,HF::K_1D,const IPT2::SplineInline< std::complex<double> >&) const;
 };
 
 /*************************************************************** 1D methods ***************************************************************/
@@ -81,6 +88,37 @@ inline std::complex<double> Susceptibility<T>::gamma_oneD_spsp(T& Type,double kt
 }
 
 template<>
+inline std::tuple< std::complex<double>, std::complex<double> > Susceptibility<HF::FunctorBuildGk>::gamma_oneD_jj_plotting(HF::FunctorBuildGk& Gk,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar,HF::K_1D q) const{
+    std::complex<double> lower_level(0.0,0.0), chi_bubble(0.0,0.0);
+    for (size_t wttilde=0; wttilde<Gk._size; wttilde++){
+        for (size_t qttilde=0; qttilde<Gk._kArr_l.size(); qttilde++){
+            lower_level+=Gk(wtilde+q._iwn-Gk._precomp_qn[wttilde],ktilde+q._qx-Gk._kArr_l[qttilde])(0,0)*Gk(wbar+q._iwn-Gk._precomp_qn[wttilde],kbar+q._qx-Gk._kArr_l[qttilde])(1,1);
+        }
+    }
+    lower_level*=-SPINDEG*Gk._u/(Gk._beta*Gk._Nk);
+    chi_bubble=lower_level;
+    lower_level*=-1.0;
+    lower_level+=1.0;
+    return std::make_tuple( -1.0*(-2.0*std::sin(ktilde))*Gk._u/lower_level*(-2.0*std::sin(kbar)), chi_bubble );
+}
+
+template<class T>
+inline std::tuple< std::complex<double>, std::complex<double> > Susceptibility<T>::gamma_oneD_jj_plotting(T& Gk,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar,HF::K_1D q,const IPT2::SplineInline< std::complex<double> >& splInline) const{
+    static_assert(std::is_same<T, IPT2::DMFTproc>::value, "Designed only for IPT2::DMFTproc!");
+    std::complex<double> lower_level(0.0,0.0), chi_bubble(0.0,0.0);
+    for (size_t wttilde=static_cast<size_t>(iwnArr_l.size()/2); wttilde<iwnArr_l.size(); wttilde++){
+        for (size_t qttilde=0; qttilde<vecK.size(); qttilde++){
+            lower_level+=1.0/( (wtilde+q._iwn-iqnArr_l[wttilde]) + GreenStuff::mu - epsilonk(ktilde+q._qx-vecK[qttilde]) - splInline.calculateSpline( (wtilde+q._iwn-iqnArr_l[wttilde]).imag() ) )*1.0/( (wbar+q._iwn-iqnArr_l[wttilde]) + GreenStuff::mu - epsilonk(kbar+q._qx-vecK[wttilde]) - splInline.calculateSpline( (wbar+q._iwn-iqnArr_l[wttilde]).imag() ) );
+        }
+    }
+    lower_level*=-SPINDEG*GreenStuff::U/(GreenStuff::beta*GreenStuff::N_k);
+    chi_bubble=lower_level;
+    lower_level*=-1.0;
+    lower_level+=1.0;
+    return std::make_tuple( -1.0*(-2.0*std::sin(ktilde))*GreenStuff::U/lower_level*(-2.0*std::sin(kbar)), chi_bubble );
+}
+
+template<>
 inline std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Susceptibility<HF::FunctorBuildGk>::gamma_oneD_spsp_full_middle_plotting(HF::FunctorBuildGk& Gk,double ktilde,std::complex<double> wbar,double kbar,std::complex<double> wtilde,HF::K_1D q) const{
 /* Uses gamma_oneD_spsp to compute the infinite-ladder-down part and gamma_oneD_spsp_lower to compute corrections stemming from infinite delta G/delta phi. */    
     std::complex<double> middle_level(0.0,0.0),middle_level_inf(0.0,0.0),middle_level_corr(0.0,0.0);
@@ -121,6 +159,42 @@ inline std::tuple< std::complex<double>,std::complex<double>,std::complex<double
     middle_level-=middle_level_inf;
     middle_level+=1.0;
     return std::make_tuple(GreenStuff::U/middle_level,middle_level_inf,middle_level_corr);
+}
+
+template<>
+inline std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > Susceptibility<HF::FunctorBuildGk>::gamma_oneD_jj_full_middle_plotting(HF::FunctorBuildGk& Gk,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar,HF::K_1D q) const{
+    std::complex<double> middle_level(0.0,0.0), middle_level_inf(0.0,0.0), middle_level_corr(0.0,0.0);
+    for (size_t kp=0; kp<Gk._kArr_l.size(); kp++){
+        for (size_t iknp=0; iknp<Gk._size; iknp++){
+            middle_level_inf+=Gk(Gk._precomp_wn[iknp],Gk._kArr_l[kp])(0,0)*gamma_oneD_spsp_full_lower(Gk,Gk._kArr_l[kp],kbar,Gk._precomp_wn[iknp],wbar
+            )*Gk(Gk._precomp_wn[iknp]-q._iwn,Gk._kArr_l[kp]-q._qx)(0,0);
+        }
+    }
+    middle_level_inf*=SPINDEG/(Gk._Nk*Gk._beta);
+    middle_level_corr+=middle_level_inf;
+    middle_level_inf+=gamma_oneD_spsp(Gk,ktilde,wtilde,kbar,wbar);
+    middle_level-=middle_level_inf;
+    middle_level+=1.0;
+    return std::make_tuple( -1.0*(-2.0*std::sin(ktilde))*Gk._u/middle_level*(-2.0*std::sin(kbar)), middle_level_inf, middle_level_corr );
+}
+
+template<class T>
+inline std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > Susceptibility<T>::gamma_oneD_jj_full_middle_plotting(T& Type,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar,HF::K_1D q,const IPT2::SplineInline< std::complex<double> >& splInline) const{
+    static_assert(std::is_same<T, IPT2::DMFTproc>::value, "Designed only for IPT2::DMFTproc!");
+    std::complex<double> middle_level(0.0,0.0), middle_level_inf(0.0,0.0), middle_level_corr(0.0,0.0);
+    for (size_t kp=0; kp<vecK.size(); kp++){
+        std::cout << "kp: " << kp << "\n";
+        for (size_t iknp=static_cast<size_t>(iwnArr_l.size()/2); iknp<iwnArr_l.size(); iknp++){
+            middle_level_inf+=1.0/( iwnArr_l[iknp] + GreenStuff::mu - epsilonk(vecK[kp]) - splInline.calculateSpline( (iwnArr_l[iknp]).imag() ) )*gamma_oneD_spsp_full_lower(Type,vecK[kp],kbar,iwnArr_l[iknp],wbar,splInline
+            )*1.0/( (iwnArr_l[iknp]-q._iwn) + GreenStuff::mu - epsilonk(vecK[kp]-q._qx) - splInline.calculateSpline( (iwnArr_l[iknp]-q._iwn).imag() ) );
+        }
+    }
+    middle_level_inf*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
+    middle_level_corr+=middle_level_inf;
+    middle_level_inf+=gamma_oneD_spsp(Type,ktilde,wtilde,kbar,wbar,splInline);
+    middle_level-=middle_level_inf;
+    middle_level+=1.0;
+    return std::make_tuple( -1.0*(-2.0*std::sin(ktilde))*GreenStuff::U/middle_level*(-2.0*std::sin(kbar)), middle_level_inf, middle_level_corr );
 }
 
 template<>
@@ -197,6 +271,150 @@ inline std::complex<double> Susceptibility<T>::get_weights(T& Type,double ktilde
     std::complex<double> weightsTmp=1.0/( (wtilde) + GreenStuff::mu - epsilonk(ktilde) - splInline.calculateSpline( (wtilde).imag() ) ) * 1.0/( (wtilde+q._iwn) + GreenStuff::mu - epsilonk(ktilde+q._qx) - splInline.calculateSpline( (wtilde+q._iwn).imag() ) 
     ) * 1.0/( (wbar) + GreenStuff::mu - epsilonk(kbar) - splInline.calculateSpline( (wbar).imag() ) ) * 1.0/( (wbar+q._iwn) + GreenStuff::mu - epsilonk(kbar+q._qx) - splInline.calculateSpline( (wbar+q._iwn).imag() ) );
     return weightsTmp;
+}
+
+template<>
+inline void calculateSusceptibilities< IPT2::DMFTproc >(IPT2::DMFTproc& sublatt1,const IPT2::SplineInline< std::complex<double> >& splInlineObj,const std::string& pathToDir,const std::string& customDirName,const bool& is_full,const bool& is_jj){
+    Susceptibility<IPT2::DMFTproc> susObj;
+    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspBubble, outputChispspBubbleCorr;
+    std::string trailingStr = is_full ? "_full" : "";
+    std::string frontStr = is_jj ? "jj_" : "";
+    std::string strOutputChispspGamma(pathToDir+customDirName+"/susceptibilities/ChispspGamma_IPT2_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat");
+    std::string strOutputChispspWeights(pathToDir+customDirName+"/susceptibilities/ChispspWeights_IPT2_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat");
+    std::string strOutputChispspBubble(pathToDir+customDirName+"/susceptibilities/ChispspBubble_IPT2_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat");
+    std::string strOutputChispspBubbleCorr(pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_IPT2_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat");
+    for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
+        std::cout << "ktilde: " << ktilde << "\n";
+        for (size_t kbar=0; kbar<vecK.size(); kbar++){
+            std::cout << "kbar: " << kbar << "\n";
+            std::complex<double> tmp_val_kt_kb(0.0,0.0), tmp_val_kt_kb_bubble(0.0,0.0), tmp_val_weights(0.0,0.0), tmp_val_bubble_corr(0.0,0.0);
+            for (size_t wtilde=static_cast<size_t>(iwnArr_l.size()/2); wtilde<iwnArr_l.size(); wtilde++){
+                for (size_t wbar=static_cast<size_t>(iwnArr_l.size()/2); wbar<iwnArr_l.size(); wbar++){
+                    std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > gammaStuffFull;
+                    std::tuple< std::complex<double>, std::complex<double> > gammaStuff;
+                    if ( (wtilde==static_cast<size_t>(iwnArr_l.size()/2)) && (wbar==static_cast<size_t>(iwnArr_l.size()/2)) ){
+                        if (!is_full){
+                            if (is_jj) 
+                                gammaStuff=susObj.gamma_oneD_jj_plotting(sublatt1,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)),splInlineObj);
+                            else 
+                                gammaStuff=susObj.gamma_oneD_spsp_plotting(sublatt1,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)),splInlineObj);
+                            tmp_val_kt_kb+=std::get<0>(gammaStuff);
+                            tmp_val_kt_kb_bubble+=std::get<1>(gammaStuff);
+                        } else{
+                            if (is_jj)
+                                gammaStuffFull=susObj.gamma_oneD_jj_full_middle_plotting(sublatt1,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)),splInlineObj);
+                            else
+                                gammaStuffFull=susObj.gamma_oneD_spsp_full_middle_plotting(sublatt1,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)),splInlineObj);
+                            tmp_val_kt_kb+=std::get<0>(gammaStuffFull);
+                            tmp_val_kt_kb_bubble+=std::get<1>(gammaStuffFull);
+                            tmp_val_bubble_corr+=std::get<2>(gammaStuffFull);
+                        }
+                        tmp_val_weights+=susObj.get_weights(sublatt1,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)),splInlineObj);
+                    }
+                }
+            }
+            outputChispspWeights.open(strOutputChispspWeights, std::ofstream::in | std::ofstream::app);
+            outputChispspGamma.open(strOutputChispspGamma, std::ofstream::in | std::ofstream::app);
+            outputChispspBubble.open(strOutputChispspBubble, std::ofstream::in | std::ofstream::app);
+            outputChispspWeights << tmp_val_weights << " ";
+            outputChispspGamma << tmp_val_kt_kb << " ";
+            outputChispspBubble << tmp_val_kt_kb_bubble << " ";
+            if (is_full){
+                outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::in | std::ofstream::app);
+                outputChispspBubbleCorr << tmp_val_bubble_corr << " ";
+                outputChispspBubbleCorr.close();
+            }
+            outputChispspWeights.close();
+            outputChispspGamma.close();
+            outputChispspBubble.close();
+        }
+        outputChispspWeights.open(strOutputChispspWeights, std::ofstream::in | std::ofstream::app);
+        outputChispspGamma.open(strOutputChispspGamma, std::ofstream::in | std::ofstream::app);
+        outputChispspBubble.open(strOutputChispspBubble, std::ofstream::in | std::ofstream::app);
+        outputChispspWeights << "\n";
+        outputChispspGamma << "\n";
+        outputChispspBubble << "\n";
+        if (is_full){
+            outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::in | std::ofstream::app);
+            outputChispspBubbleCorr << "\n";
+            outputChispspBubbleCorr.close();
+        }
+        outputChispspWeights.close();
+        outputChispspGamma.close();
+        outputChispspBubble.close();
+    }
+}
+
+template<>
+inline void calculateSusceptibilities<HF::FunctorBuildGk>(HF::FunctorBuildGk& Gk,const std::string& pathToDir,const std::string& customDirName,const bool& is_full,const bool& is_jj){
+    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspBubble, outputChispspBubbleCorr;
+    std::string trailingStr = is_full ? "_full" : ""; // Important for the data is loaded with colormap.py.
+    std::string frontStr = is_jj ? "jj_" : "";
+    std::string strOutputChispspGamma(pathToDir+customDirName+"/susceptibilities/ChispspGamma_HF_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
+    std::string strOutputChispspWeights(pathToDir+customDirName+"/susceptibilities/ChispspWeights_HF_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
+    std::string strOutputChispspBubble(pathToDir+customDirName+"/susceptibilities/ChispspBubble_HF_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
+    std::string strOutputChispspBubbleCorr(pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_HF_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
+    Susceptibility< HF::FunctorBuildGk > susObj;
+    for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
+        std::cout << "ktilde: " << ktilde << "\n";
+        for (size_t kbar=0; kbar<vecK.size(); kbar++){
+            std::cout << "kbar: " << kbar << "\n";
+            std::complex<double> tmp_val_kt_kb(0.0,0.0), tmp_val_kt_kb_bubble(0.0,0.0), tmp_val_weights(0.0,0.0), tmp_val_bubble_corr(0.0,0.0);
+            for (size_t wtilde=static_cast<size_t>(iwnArr_l.size()/2); wtilde<iwnArr_l.size(); wtilde++){
+                for (size_t wbar=static_cast<size_t>(iwnArr_l.size()/2); wbar<iwnArr_l.size(); wbar++){
+                    std::tuple< std::complex<double>, std::complex<double>, std::complex<double> > gammaStuffFull;
+                    std::tuple< std::complex<double>, std::complex<double> > gammaStuff;
+                    if ( (wtilde==static_cast<size_t>(iwnArr_l.size()/2)) && (wbar==static_cast<size_t>(iwnArr_l.size()/2)) ){
+                        if (!is_full){
+                            if (is_jj)
+                                gammaStuff=susObj.gamma_oneD_jj_plotting( Gk,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)) );
+                            else
+                                gammaStuff=susObj.gamma_oneD_spsp_plotting( Gk,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)) );
+                            tmp_val_kt_kb+=std::get<0>(gammaStuff);
+                            tmp_val_kt_kb_bubble+=std::get<1>(gammaStuff);
+                        } else{
+                            if (is_jj)
+                                gammaStuffFull=susObj.gamma_oneD_jj_full_middle_plotting( Gk,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)) );
+                            else
+                                gammaStuffFull=susObj.gamma_oneD_spsp_full_middle_plotting( Gk,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)) );
+                            tmp_val_kt_kb+=std::get<0>(gammaStuffFull);
+                            tmp_val_kt_kb_bubble+=std::get<1>(gammaStuffFull);
+                            tmp_val_bubble_corr+=std::get<2>(gammaStuffFull);
+                        }
+                        tmp_val_weights+=susObj.get_weights( Gk,vecK[ktilde],iwnArr_l[wtilde],vecK[kbar],iwnArr_l[wbar],HF::K_1D(0.0,std::complex<double>(0.0,0.0)) );
+                    }
+                }
+            }
+            outputChispspWeights.open(strOutputChispspWeights, std::ofstream::in | std::ofstream::app);
+            outputChispspGamma.open(strOutputChispspGamma, std::ofstream::in | std::ofstream::app);
+            outputChispspBubble.open(strOutputChispspBubble, std::ofstream::in | std::ofstream::app);
+            outputChispspWeights << tmp_val_weights << " ";
+            outputChispspGamma << tmp_val_kt_kb << " ";
+            outputChispspBubble << tmp_val_kt_kb_bubble << " ";
+            if (is_full){
+                outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::in | std::ofstream::app);
+                outputChispspBubbleCorr << tmp_val_bubble_corr << " ";
+                outputChispspBubbleCorr.close();
+            }
+            outputChispspWeights.close();
+            outputChispspGamma.close();
+            outputChispspBubble.close();
+        }
+        outputChispspWeights.open(strOutputChispspWeights, std::ofstream::in | std::ofstream::app);
+        outputChispspGamma.open(strOutputChispspGamma, std::ofstream::in | std::ofstream::app);
+        outputChispspBubble.open(strOutputChispspBubble, std::ofstream::in | std::ofstream::app);
+        outputChispspWeights << "\n";
+        outputChispspGamma << "\n";
+        outputChispspBubble << "\n";
+        if (is_full){
+            outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::in | std::ofstream::app);
+            outputChispspBubbleCorr << "\n";
+            outputChispspBubbleCorr.close();
+        }
+        outputChispspWeights.close();
+        outputChispspGamma.close();
+        outputChispspBubble.close();
+    }
 }
 
 /*************************************************************** 2D methods ***************************************************************/

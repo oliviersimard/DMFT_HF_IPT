@@ -5,4 +5,5 @@ obj
 build
 *.py
 !pade.py
+!colormap.py
 mea

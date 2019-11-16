@@ -81,7 +81,7 @@ std::ostream& operator<<(std::ostream& os, const HF::FunctorBuildGk& obj){
 
 namespace HF{
 
-    FunctorBuildGk::FunctorBuildGk(double mu,int beta,double u,double ndo,std::vector<double>& kArr_l,int Nit,int Nk,std::vector< std::complex<double> >& Gup_k) : 
+    FunctorBuildGk::FunctorBuildGk(double mu,double beta,double u,double ndo,std::vector<double>& kArr_l,unsigned int Nit,unsigned int Nk,std::vector< std::complex<double> >& Gup_k) : 
                                 _mu(mu), _u(u), _ndo(ndo), _beta(beta), _Nit(Nit), _Nk(Nk), _kArr_l(kArr_l){
         this->_Gup_k = &Gup_k.front(); 
         this->_size = Gup_k.size();
@@ -100,11 +100,11 @@ namespace HF{
     }
 
     inline std::complex<double> FunctorBuildGk::w(int n, double mu) const{
-        return std::complex<double>(0.0,1.0)*(2.0*(double)n+1.0)*M_PI/(double)_beta + mu;
+        return std::complex<double>(0.0,1.0)*(2.0*(double)n+1.0)*M_PI/_beta + mu;
     }
 
     inline std::complex<double> FunctorBuildGk::q(int n) const{
-        return std::complex<double>(0.0,1.0)*(2.0*(double)n)*M_PI/(double)_beta;
+        return std::complex<double>(0.0,1.0)*(2.0*(double)n)*M_PI/_beta;
     }
 
     arma::Mat< std::complex<double> > FunctorBuildGk::buildGkAA_2D(int j, double kx, double ky) const{
@@ -145,18 +145,18 @@ namespace HF{
 
     void FunctorBuildGk::update_ndo_1D(){
         
-        for (int i=0; i<_Nit; i++) {
+        for (size_t i=0; i<_Nit; i++) {
             double ndo_av=0.0;
-            for (int kkx=0; kkx<=_Nk; kkx++) {
+            for (size_t kkx=0; kkx<=_Nk; kkx++) {
                 // calculate Gup_k in Matsubara space (AFM)
-                for (int jj=0; jj<_size; jj++){
+                for (size_t jj=0; jj<_size; jj++){
                     *(_Gup_k+jj) = buildGkAA_1D(jj,_kArr_l[kkx])(0,0);
                     //*(_Gup_k+jj) = buildGkBB_1D(jj,_mu,_beta,_u,_ndo,_kArr[kkx])(0,0); // Modified here to BB
                 }
 
                 // calculate ndo_k
-                double ndo_k=0;
-                for (int jj=0; jj<_size; jj++)
+                double ndo_k=0.0;
+                for (size_t jj=0; jj<_size; jj++)
                     ndo_k += (2./_beta)*( *(_Gup_k+jj)-1./w(jj,0.0) ).real();
                 ndo_k -= 0.5;
                 ndo_k *= (-1);
@@ -175,16 +175,16 @@ namespace HF{
 
     void FunctorBuildGk::update_ndo_2D(){
         
-        for (int i=0; i<_Nit; i++) {
+        for (size_t i=0; i<_Nit; i++) {
             double ndo_av=0.0;
-            for (int kkx=0; kkx<=_Nk; kkx++) {
-                for (int kky=0; kky<=_Nk; kky++){
+            for (size_t kkx=0; kkx<=_Nk; kkx++) {
+                for (size_t kky=0; kky<=_Nk; kky++){
                     // calculate Gup_k in Matsubara space (AFM)
-                    for (int jj=0; jj<_size; jj++)
+                    for (size_t jj=0; jj<_size; jj++)
                         *(_Gup_k+jj) = buildGkAA_2D(jj,_kArr_l[kkx],_kArr_l[kky])(0,0);
                         // calculate ndo_k
-                    double ndo_k=0;
-                    for (int jj=0; jj<_size; jj++)
+                    double ndo_k=0.0;
+                    for (size_t jj=0; jj<_size; jj++)
                         ndo_k += (2./_beta)*( *(_Gup_k+jj)-1./w(jj,0.0) ).real();
                     ndo_k -= 0.5;
                     ndo_k *= (-1);

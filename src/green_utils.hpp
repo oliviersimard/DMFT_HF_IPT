@@ -10,10 +10,12 @@
 #define DIM 1
 #define SPINDEG 2
 
+// Some declarations
 namespace IPT2{ class DMFTproc; };
+namespace IPT2{ template<class T> class SplineInline; };
 namespace HF{ class FunctorBuildGk; };
 namespace ThreadFunctor{ class ThreadWrapper; };
-class FFTtools;
+//class FFTtools;
 template<class T> class Susceptibility;
 
 extern std::vector<double> vecK;
@@ -26,12 +28,16 @@ extern arma::Mat< std::complex<double> > statMat;
 extern double epsilonk(double,double);
 extern double epsilonk(double);
 
+template<typename T>
+inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
     friend class IPT2::DMFTproc;
     template<class T>
     friend class Susceptibility;
+    template<typename T>
+    friend void calculateSusceptibilities(T&,const IPT2::SplineInline< std::complex<double> >&,const std::string&,const std::string&,const bool&,const bool&);
     protected:
         static double beta;
         static double hyb_c;
@@ -96,8 +102,10 @@ namespace HF{
         friend class ::ThreadFunctor::ThreadWrapper;
         template<class T>
         friend class ::Susceptibility;
+        template<typename T>
+        friend void ::calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
         public:
-            FunctorBuildGk(double,int,double,double,std::vector<double>&,int,int,std::vector< std::complex<double> >&);
+            FunctorBuildGk(double,double,double,double,std::vector<double>&,unsigned int,unsigned int,std::vector< std::complex<double> >&);
             FunctorBuildGk()=default;
             ~FunctorBuildGk()=default;
         
@@ -127,8 +135,8 @@ namespace HF{
             } // Called in main.
 
         private:
-            double _mu, _u, _ndo;
-            int _beta, _Nit, _Nk;
+            double _mu, _u, _ndo, _beta;
+            unsigned int _Nit, _Nk;
             std::vector<double> _kArr_l;
             std::complex<double>* _Gup_k;
             size_t _size;

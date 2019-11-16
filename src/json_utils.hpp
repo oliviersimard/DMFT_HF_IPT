@@ -10,7 +10,8 @@
 #define VERBOSE 0
 #define MAX_DOUBLE_SIZE 10
 #define MAX_INT_SIZE 5
-#define MAX_BOOL_SIZE 3
+#define MAX_BOOL_SIZE 4
+#define MAX_CHR_SIZE 3
 
 struct MembCarrier;
 class Json_utils{
@@ -29,7 +30,8 @@ struct MembCarrier{
     double db_arr2[2]; // db_ptr2 is meant to contain the k-space vector for 2D case!
     int int_arr[MAX_INT_SIZE];
     bool boo_arr[MAX_BOOL_SIZE];
-    explicit MembCarrier(double[], double[], int[], bool[]);
+    char* char_arr[MAX_CHR_SIZE];
+    explicit MembCarrier(double[], double[], int[], bool[], char*[]);
     MembCarrier& operator=(const MembCarrier&)=delete;
 };
 
