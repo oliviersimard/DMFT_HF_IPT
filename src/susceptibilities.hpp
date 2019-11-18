@@ -69,7 +69,7 @@ inline std::complex<double> Susceptibility<T>::gamma_oneD_spsp_full_lower(T& Typ
 template<>
 inline std::complex<double> Susceptibility<HF::FunctorBuildGk>::gamma_oneD_spsp(HF::FunctorBuildGk& Gk,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const{ // q's contain bosonic Matsubara frequencies.
     std::complex<double> lower_level(0.0,0.0);
-    for (int wttilde=0; wttilde<Gk._size; wttilde++){
+    for (size_t wttilde=0; wttilde<Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<Gk._kArr_l.size(); qttilde++){
             lower_level += Gk(wtilde-Gk._precomp_qn[wttilde],ktilde-Gk._kArr_l[qttilde])(0,0)*Gk(wbar-Gk._precomp_qn[wttilde],kbar-Gk._kArr_l[qttilde])(1,1);
         }
@@ -82,7 +82,7 @@ template<class T>
 inline std::complex<double> Susceptibility<T>::gamma_oneD_spsp(T& Type,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar,const IPT2::SplineInline< std::complex<double> >& splInline) const{ // q's contain bosonic Matsubara frequencies.
     static_assert(std::is_same<T, IPT2::DMFTproc>::value, "Designed only for IPT2::DMFTproc!");
     std::complex<double> lower_level(0.0,0.0);
-    for (int wttilde=static_cast<size_t>(iwnArr_l.size()/2); wttilde<iwnArr_l.size(); wttilde++){
+    for (size_t wttilde=static_cast<size_t>(iwnArr_l.size()/2); wttilde<iwnArr_l.size(); wttilde++){
         for (size_t qttilde=0; qttilde<vecK.size(); qttilde++){
             lower_level += 1.0/( (wtilde-iqnArr_l[wttilde]) + GreenStuff::mu - epsilonk(ktilde-vecK[qttilde]) - splInline.calculateSpline( (wtilde-iqnArr_l[wttilde]).imag() ) ) * 1.0/( (wbar-iqnArr_l[wttilde]) + GreenStuff::mu - epsilonk(kbar-vecK[qttilde]) - splInline.calculateSpline( (wbar-iqnArr_l[wttilde]).imag() ) );
         }
@@ -204,7 +204,7 @@ inline std::tuple< std::complex<double>, std::complex<double>, std::complex<doub
 template<>
 inline std::tuple< std::complex<double>, std::complex<double> > Susceptibility<HF::FunctorBuildGk>::gamma_oneD_spsp_plotting(HF::FunctorBuildGk& Gk,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar,HF::K_1D q) const{ // q's contain bosonic Matsubara frequencies.
     std::complex<double> lower_level(0.0,0.0), chi_bubble(0.0,0.0); // chi_bubble represents the lower bubble in the vertex function, not the total vertex function.
-    for (int wttilde=0; wttilde<Gk._size; wttilde++){
+    for (size_t wttilde=0; wttilde<Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<Gk._kArr_l.size(); qttilde++){
             lower_level += Gk(wtilde+q._iwn-Gk._precomp_qn[wttilde],ktilde+q._qx-Gk._kArr_l[qttilde])(0,0)*Gk(wbar+q._iwn-Gk._precomp_qn[wttilde],kbar+q._qx-Gk._kArr_l[qttilde])(1,1);
             //lower_level += Gk(-(wtilde+q._iwn-Gk._precomp_qn[wttilde]),-Gk._kArr_l[qttilde])(0,0)*Gk(-(wbar+q._iwn-Gk._precomp_qn[wttilde]),-(Gk._kArr_l[qttilde]+kbar-ktilde))(1,1);
@@ -236,7 +236,7 @@ inline std::tuple< std::complex<double>, std::complex<double> > Susceptibility<T
 template<>
 inline std::tuple< std::complex<double>,std::complex<double> > Susceptibility<HF::FunctorBuildGk>::gamma_oneD_spsp_crossed_plotting(HF::FunctorBuildGk& Gk,double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar, HF::K_1D q) const{ // q's contain bosonic Matsubara frequencies.
     std::complex<double> lower_level(0.0,0.0),chi_bubble(0.0,0.0);
-    for (int wttilde=0; wttilde<Gk._size; wttilde++){
+    for (size_t wttilde=0; wttilde<Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<Gk._kArr_l.size(); qttilde++){
             lower_level += Gk(wtilde+wbar-Gk._precomp_qn[wttilde]-q._iwn,ktilde+kbar-Gk._kArr_l[qttilde]-q._qx)(0,0)*Gk(Gk._precomp_qn[wttilde],Gk._kArr_l[qttilde])(1,1);
         }

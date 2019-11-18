@@ -11,6 +11,7 @@ extern "C" {
 #include<string>
 #include<iostream>
 #include<sstream>
+#include<cstring> // For memset()
 
 inline bool file_exists(const std::string& name);
 std::vector<std::string> glob(const std::string& pattern) noexcept(false);

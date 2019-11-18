@@ -6,6 +6,7 @@
 #include <exception>
 #include <armadillo>
 #include <iostream>
+#include <assert.h> // For assert()
 
 #define DIM 1
 #define SPINDEG 2
