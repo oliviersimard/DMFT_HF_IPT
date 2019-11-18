@@ -15,7 +15,7 @@ extern "C" {
 
 #define TOL 0.000000001
 
-namespace IPT2{ class DMFTproc; };
+//namespace IPT2{ class DMFTproc; };
 struct GreenStuff;
 
 // Prototypes
@@ -47,7 +47,7 @@ class DMFTproc{
     template<class T>
     friend class ::Susceptibility;
     public:
-        DMFTproc(GreenStuff&,GreenStuff&,GreenStuff&,GreenStuff&, arma::Cube<double>&, arma::Cube<double>&,
+        explicit DMFTproc(GreenStuff&,GreenStuff&,GreenStuff&,GreenStuff&, arma::Cube<double>&, arma::Cube<double>&,
                                                         const std::vector<double>&, const double);
         DMFTproc(const DMFTproc&)=delete;
         DMFTproc& operator=(const DMFTproc&)=delete;
@@ -73,20 +73,22 @@ class DMFTproc{
 
 template<class T>
 class SplineInline{
+    friend class ::ThreadFunctor::ThreadWrapper;
     public:
         void loadFileSpline(const std::string&) noexcept(false);
         T calculateSpline(double) const;
         //SplineInline(const size_t,const std::vector<double>&);
-        SplineInline(const size_t,std::vector<double>);
+        SplineInline(const size_t,std::vector<double>,std::vector<double>,std::vector< std::complex<double> >,std::vector< std::complex<double> >);
+        SplineInline()=default;
+        SplineInline<T>& operator=(const SplineInline<T>& obj);
     private:
-        const size_t N_tau_size;
-        std::vector<double> iwn;
-        std::vector<double> iwn_re;
-        std::vector<double> iwn_im;
+        const size_t N_tau_size {0};
+        std::vector<double> iwn={}, iwn_re={}, iwn_im={}, k_array={};
+        std::vector< std::complex<double> > iwn_array={}, iqn_array={};
         static spline<T> spl;
 };
 
-template<class T> spline<T> SplineInline<T>::spl;
+template<class T> spline<T> SplineInline<T>::spl=spline<T>();
 
 }
 
@@ -95,8 +97,20 @@ template<class T> spline<T> SplineInline<T>::spl;
 //                                             iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
 
 template<typename T>
-IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec) : N_tau_size(sizeArr),
-                                                                iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
+IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec,std::vector<double> k_arr,std::vector< std::complex<double> > iwn_arr,std::vector< std::complex<double> > iqn_arr) : N_tau_size(sizeArr),
+                                                                iwn(initVec),iwn_re(initVec),iwn_im(initVec),k_array(k_arr),iwn_array(iwn_arr),iqn_array(iqn_arr){}
+
+template<typename T>
+IPT2::SplineInline<T>& IPT2::SplineInline<T>::operator=(const IPT2::SplineInline<T>& obj){
+    *(const_cast<size_t*>(&this->N_tau_size)) = obj.N_tau_size;
+    this->iwn=obj.iwn;
+    this->iwn_re=obj.iwn_re;
+    this->iwn_im=obj.iwn_im;
+    this->k_array=obj.k_array;
+    this->iwn_array=obj.iwn_array;
+    this->iqn_array=obj.iqn_array;
+    return *this;
+}
 
 template<>
 inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std::string& filename) noexcept(false){

@@ -28,18 +28,18 @@ extern arma::Mat< std::complex<double> > statMat;
 extern double epsilonk(double,double);
 extern double epsilonk(double);
 
-template<typename T>
-inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
-template<typename T>
-inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double);
+template<typename T> inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
+template<typename T> inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
     friend class IPT2::DMFTproc;
+    friend class ThreadFunctor::ThreadWrapper;
     template<class T>
     friend class Susceptibility;
     template<typename T>
     friend void calculateSusceptibilities(T&,const IPT2::SplineInline< std::complex<double> >&,const std::string&,const std::string&,const bool&,const bool&);
+    template<typename T> friend void calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool);
     protected:
         static double beta;
         static double hyb_c;
@@ -109,10 +109,9 @@ namespace HF{
         template<typename T>
         friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double);
         public:
-            FunctorBuildGk(double,double,double,double,std::vector<double>&,unsigned int,unsigned int,std::vector< std::complex<double> >&);
+            explicit FunctorBuildGk(double,double,double,double,std::vector<double>&,unsigned int,unsigned int,std::vector< std::complex<double> >&);
             FunctorBuildGk()=default;
-            ~FunctorBuildGk()=default;
-        
+
             arma::Mat< std::complex<double> > operator()(int, double, double) const;
             void update_ndo_2D();
             arma::Mat< std::complex<double> > operator()(std::complex<double>, double, double) const;
@@ -139,27 +138,27 @@ namespace HF{
             } // Called in main.
 
         private:
-            double _mu, _u, _ndo, _beta;
-            unsigned int _Nit, _Nk;
-            std::vector<double> _kArr_l;
-            std::complex<double>* _Gup_k;
-            size_t _size;
-            std::vector< std::complex<double> > _precomp_wn, _precomp_qn;
+            double _mu {0.0}, _u {0.0}, _ndo {0.0}, _beta {0.0};
+            unsigned int _Nit {0}, _Nk {0};
+            std::vector<double> _kArr_l={};
+            std::complex<double>* _Gup_k=nullptr;
+            size_t _size {0};
+            std::vector< std::complex<double> > _precomp_wn={}, _precomp_qn={};
     };
 
     struct K_1D{
-        K_1D(double qx, std::complex<double> iwn) : _qx(qx), _iwn(iwn){};
+        explicit K_1D(double qx, std::complex<double> iwn) : _qx(qx), _iwn(iwn){};
         K_1D()=default;
         ~K_1D()=default;
         K_1D operator+(const K_1D& rhs) const;
         K_1D operator-(const K_1D& rhs) const;
 
-        double _qx;
-        std::complex<double> _iwn;
+        double _qx {0.0};
+        std::complex<double> _iwn={};
     };
 
     struct K_2D : K_1D{
-        K_2D(double qx, double qy, std::complex<double> iwn) : K_1D(qx,iwn){
+        explicit K_2D(double qx, double qy, std::complex<double> iwn) : K_1D(qx,iwn){
             this->_qy = qy;
         }
         K_2D()=default;
@@ -167,8 +166,8 @@ namespace HF{
         K_2D operator+(const K_2D& rhs) const;
         K_2D operator-(const K_2D& rhs) const;
     
-        double _qx, _qy;
-        std::complex<double> _iwn;
+        double _qx {0.0}, _qy {0.0};
+        std::complex<double> _iwn={};
     };
 
 } /* end of namespace HF */

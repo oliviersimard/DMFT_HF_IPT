@@ -1,7 +1,6 @@
-#include "src/susceptibilities.hpp"
+#include "src/thread_utils.hpp"
 #include "src/json_utils.hpp"
 
-#define MULT_N_TAU 4
 #define PARALLEL
 //enum SolverType{ HF, IPT } SolverType;  // Include in params.json. OPT takes in "IPT" and "HF" as parameters.
 
@@ -117,7 +116,7 @@ int main(int argc, char** argv){
 
                 if (load_self){ // The file containing wider Matsubara frequency domain is loaded for spline.
                     std::vector<double> initVec(2*MULT_N_TAU*N_tau,0.0); // Important that it is 2*MULT_N_TAU
-                    IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec);
+                    IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec,vecK,iwnArr_l,iqnArr_l);
                     try{
                         splInlineObj.loadFileSpline(filenameToLoad); // Spline is ready for use by calling function calculateSpline()-
                     } catch(const std::exception& err){ // If filenameToLoad is not found...
@@ -129,10 +128,18 @@ int main(int argc, char** argv){
                     //std::cout << test << std::endl;
 
                     /* Calculation Susceptibilities. The second template argument specifies the type of the SplineInline object. */
+                    #ifdef PARALLEL
+                    #if DIM == 1
+                    calculateSusceptibilitiesParallel< IPT2::DMFTproc >(splInlineObj,pathToDir,customDirName,is_full,is_jj);
+                    #elif DIM == 2
+
+                    #endif
+                    #else
                     #if DIM == 1
                     calculateSusceptibilities< IPT2::DMFTproc >(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
                     #elif DIM == 2
 
+                    #endif
                     #endif
                 } else{
                     std::cout << "To compute the susceptibilities, you must load a self-energy defined on a wider Matsubara frequency" << "\n";

@@ -3,7 +3,7 @@
 
 #include<gsl/gsl_errno.h>
 #include<gsl/gsl_fft_complex.h>
-#include "thread_utils.hpp"
+#include "green_utils.hpp"
 
 // Inspired from http://www.mymathlib.com/matrices/linearsystems/tridiagonal.html
 // and https://kluge.in-chemnitz.de/opensource/spline/
@@ -26,26 +26,26 @@ class spline{
         };
 
     protected:
-        arma::Cube< T > m_y;            // x,y coordinates of points
-        std::vector<double> m_x;
+        arma::Cube< T > m_y={};            // x,y coordinates of points
+        std::vector<double> m_x={};
         // interpolation parameters
         // f(x) = a*(x-x_i)^3 + b*(x-x_i)^2 + c*(x-x_i) + y_i
-        std::vector< T > m_a,m_b,m_c;        // spline coefficients
-        T  m_b0, m_c0;                     // for left extrapol
-        bd_type m_left, m_right;
-        T  m_left_value, m_right_value;
-        bool    m_force_linear_extrapolation;
+        std::vector< T > m_a={},m_b={},m_c={};        // spline coefficients
+        T  m_b0 {0.0}, m_c0 {0.0};                     // for left extrapol
+        bd_type m_left=second_deriv, m_right=second_deriv;
+        T  m_left_value {0.0}, m_right_value {0.0};
+        bool m_force_linear_extrapolation=false;
         //
-        T _S_1_0, _Sp_1_0, _Spp_1_0;
-        T _S_N_beta, _Sp_N_beta, _Spp_N_beta;
-        std::vector< T > _Sppp;
+        T _S_1_0 {0.0}, _Sp_1_0 {0.0}, _Spp_1_0 {0.0};
+        T _S_N_beta {0.0}, _Sp_N_beta {0.0}, _Spp_N_beta {0.0};
+        std::vector< T > _Sppp={};
 
     public:
         // set default boundary condition to be zero curvature at both ends
-        spline(): m_left(second_deriv), m_right(second_deriv),
-            m_left_value(0.0), m_right_value(0.0),
-            m_force_linear_extrapolation(false){}
-
+        // spline(): m_left(second_deriv), m_right(second_deriv),
+        //     m_left_value(0.0), m_right_value(0.0),
+        //     m_force_linear_extrapolation(false), m_b0(0.0), m_c0(0.0){}
+        spline()=default;
         // optional, but if called it has to come be before set_points()
         void set_boundary(bd_type left, T left_value,
                       bd_type right, T right_value,

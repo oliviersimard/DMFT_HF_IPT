@@ -49,6 +49,7 @@ arma::Cube<double> GreenStuff::dblVec_pos(2,2,1+1,arma::fill::zeros), GreenStuff
 arma::Cube< std::complex<double> > GreenStuff::cplxVec(2,2,1,arma::fill::zeros);
 
 inline GreenStuff::GreenStuff() : Data(), matsubara_t_pos(dblVec_pos), matsubara_t_neg(dblVec_neg), matsubara_w(cplxVec){
+    //this->iwnArr=std::vector< std::complex<double> >(1+1,0.0);
     std::cerr << "Constructor GreenStuff()\n";
 }
 
