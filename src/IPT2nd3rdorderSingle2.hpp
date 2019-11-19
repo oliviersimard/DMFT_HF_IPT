@@ -102,13 +102,15 @@ IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> ini
 
 template<typename T>
 IPT2::SplineInline<T>& IPT2::SplineInline<T>::operator=(const IPT2::SplineInline<T>& obj){
-    *(const_cast<size_t*>(&this->N_tau_size)) = obj.N_tau_size;
-    this->iwn=obj.iwn;
-    this->iwn_re=obj.iwn_re;
-    this->iwn_im=obj.iwn_im;
-    this->k_array=obj.k_array;
-    this->iwn_array=obj.iwn_array;
-    this->iqn_array=obj.iqn_array;
+    if (this!=&obj){
+        *(const_cast<size_t*>(&this->N_tau_size)) = obj.N_tau_size;
+        this->iwn=obj.iwn;
+        this->iwn_re=obj.iwn_re;
+        this->iwn_im=obj.iwn_im;
+        this->k_array=obj.k_array;
+        this->iwn_array=obj.iwn_array;
+        this->iqn_array=obj.iqn_array;
+    }
     return *this;
 }
 
