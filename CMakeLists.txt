@@ -2,12 +2,23 @@ cmake_minimum_required(VERSION 3.02 FATAL_ERROR)
 
 project(HubbardIPT)
 
+set(CMPLR "clang" CACHE STRING "Some user-specified option") # Use for instance cmake -DCMPLR:STRING=gcc ..
+message("Compiler chosen is: " ${CMPLR})
+
 # important for the use of tuples
-set(CMAKE_CXX_FLAGS "-std=c++14")
+if (${CMPLR} STREQUAL "clang")
+        set(CMAKE_CXX_FLAGS "-Wall -std=c++14")
+elseif (${CMPLR} STREQUAL "gcc")
+        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive")
+endif()
 set(CMAKE_SOURCE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/cmake_source")
 message("CMAKE_SOURCE_PREFIX for GMock setup: " ${CMAKE_SOURCE_PREFIX})
 
-set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
+if (${CMPLR} STREQUAL "clang")
+        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
+elseif (${CMPLR} STREQUAL "gcc")
+        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit pthread)
+endif()
 
 set(SOURCES_COMMON
         src/IPT2nd3rdorderSingle2
