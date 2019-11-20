@@ -1,8 +1,7 @@
 #include "src/thread_utils.hpp"
 #include "src/json_utils.hpp"
 
-#define PARALLEL
-//enum SolverType{ HF, IPT } SolverType;  // Include in params.json. OPT takes in "IPT" and "HF" as parameters.
+//#define PARALLEL
 
 int main(int argc, char** argv){
     // Loading parameters from Json file
@@ -129,17 +128,9 @@ int main(int argc, char** argv){
 
                     /* Calculation Susceptibilities. The second template argument specifies the type of the SplineInline object. */
                     #ifdef PARALLEL
-                    #if DIM == 1
-                    calculateSusceptibilitiesParallel< IPT2::DMFTproc >(splInlineObj,pathToDir,customDirName,is_full,is_jj);
-                    #elif DIM == 2
-
-                    #endif
+                    calculateSusceptibilitiesParallel<IPT2::DMFTproc>(splInlineObj,pathToDir,customDirName,is_full,is_jj,ThreadFunctor::solver_prototype::IPT2_prot);
                     #else
-                    #if DIM == 1
-                    calculateSusceptibilities< IPT2::DMFTproc >(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
-                    #elif DIM == 2
-
-                    #endif
+                    calculateSusceptibilities<IPT2::DMFTproc>(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
                     #endif
                 } else{
                     std::cout << "To compute the susceptibilities, you must load a self-energy defined on a wider Matsubara frequency" << "\n";
@@ -167,17 +158,9 @@ int main(int argc, char** argv){
                     exit(1);
                 }
                 #ifdef PARALLEL
-                #if DIM == 1
-                calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj,ndo_converged);
-                #elif DIM == 2
-
-                #endif
+                calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj,ndo_converged,ThreadFunctor::solver_prototype::HF_prot);
                 #else
-                #if DIM == 1
                 calculateSusceptibilities<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj);
-                #elif DIM == 2
-
-                #endif // DIM
                 #endif // PARALLEL
             }
         }

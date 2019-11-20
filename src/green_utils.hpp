@@ -8,7 +8,7 @@
 #include <iostream>
 #include <assert.h> // For assert()
 
-#define DIM 1
+#define DIM 2
 #define SPINDEG 2
 
 // Some declarations
@@ -16,6 +16,7 @@ namespace IPT2{ class DMFTproc; };
 namespace IPT2{ template<class T> class SplineInline; };
 namespace HF{ class FunctorBuildGk; };
 namespace ThreadFunctor{ class ThreadWrapper; };
+namespace ThreadFunctor{ enum solver_prototype : short; };
 //class FFTtools;
 template<class T> class Susceptibility;
 
@@ -30,7 +31,7 @@ extern double epsilonk(double,double);
 extern double epsilonk(double);
 
 template<typename T> inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
-template<typename T> inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double);
+template<typename T> inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
@@ -40,7 +41,7 @@ struct Data{
     friend class Susceptibility;
     template<typename T>
     friend void calculateSusceptibilities(T&,const IPT2::SplineInline< std::complex<double> >&,const std::string&,const std::string&,const bool&,const bool&);
-    template<typename T> friend void calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool);
+    template<typename T> friend void calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool,ThreadFunctor::solver_prototype);
     protected:
         static double beta;
         static double hyb_c;
@@ -108,7 +109,7 @@ namespace HF{
         template<typename T>
         friend void ::calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
         template<typename T>
-        friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double);
+        friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
         public:
             explicit FunctorBuildGk(double,double,double,double,std::vector<double>&,unsigned int,unsigned int,std::vector< std::complex<double> >&);
             FunctorBuildGk()=default;

@@ -29,10 +29,18 @@ fi
 # Which compiler's instructions to launch...
 if [ ${OPT} == "clang" ]; then # Makefile are mainly for debugging with VSCode.
         echo "clang"
-        mkdir build && cd build && cmake .. && make -j 2
+        if [ ! -d "./build" ]; then
+                mkdir build && cd build && cmake .. && make -j 2
+        else
+                rm -rf build && mkdir build && cd build && cmake .. && make -j 2
+        fi
 elif [ ${OPT} == "gcc" ]; then
         echo "gcc"
-        mkdir build && cd build && cmake -DCMPLR:STRING=${OPT} .. && make -j 2
+        if [ ! -d "./build" ]; then
+                mkdir build && cd build && cmake -DCMPLR:STRING=${OPT} .. && make -j 2
+        else
+                rm -rf build && cd build && cmake -DCMPLR:STRING=${OPT} .. && make -j 2
+        fi
         #make --file=Makefile_GCC -j 2
 else
         echo -e "You must choose between clang or gcc compilers. Not tested against other compilers."
