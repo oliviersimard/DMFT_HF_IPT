@@ -58,6 +58,21 @@ struct Data{
     Data& operator=(const Data& obj);
 };
 
+inline Data::Data(const unsigned int N_tau_, const unsigned int N_k_, const double beta_, const double U_, const double hyb_c){
+    if (objectCount<1){ // Maybe try to implement it as a singleton.
+        this->N_k=N_k_;
+        this->hyb_c=hyb_c;
+        this->N_tau=N_tau_;
+        this->beta=beta_;
+        this->U=U_;
+        this->dtau=beta/N_tau;
+        this->mu=U/2.0; // starting at half-filling
+    }
+    objectCount++;    
+}
+
+inline Data::Data(const Data& obj){}
+
 struct GreenStuff final : Data{ // Non-subclassable
     friend class IPT2::DMFTproc; // Important to access the private static variables from this struct.
     friend void get_tau_obj(GreenStuff&,GreenStuff&); // Spits out tau-defined object.
@@ -99,6 +114,11 @@ struct GreenStuff final : Data{ // Non-subclassable
         static arma::Cube< std::complex<double> > cplxVec;
 };
 
+inline GreenStuff::GreenStuff() : Data(), matsubara_t_pos(dblVec_pos), matsubara_t_neg(dblVec_neg), matsubara_w(cplxVec){
+    //this->iwnArr=std::vector< std::complex<double> >(1+1,0.0);
+    std::cerr << "Constructor GreenStuff()\n";
+}
+
 namespace HF{
 
     class FunctorBuildGk{
@@ -113,10 +133,7 @@ namespace HF{
         public:
             explicit FunctorBuildGk(double,double,double,double,std::vector<double>&,unsigned int,unsigned int,std::vector< std::complex<double> >&);
             FunctorBuildGk()=default;
-
-            arma::Mat< std::complex<double> > operator()(int, double, double) const;
-            void update_ndo_2D();
-            arma::Mat< std::complex<double> > operator()(std::complex<double>, double, double) const;
+            #if DIM == 1
             arma::Mat< std::complex<double> > operator()(int j, double kx) const{
                 return buildGkAA_1D(j,kx);
             } // This inline function is called in other translation units!
@@ -124,15 +141,25 @@ namespace HF{
             arma::Mat< std::complex<double> > operator()(std::complex<double> w, double kx) const{
                 return buildGkAA_1D_w(w,kx);
             } // This inline functions are called in other translation units!
-
+            #elif DIM == 2
+            arma::Mat< std::complex<double> > operator()(int j, double kx, double ky) const{
+                return buildGkAA_2D(j,kx,ky);
+            };
+            void update_ndo_2D();
+            arma::Mat< std::complex<double> > operator()(std::complex<double> w, double kx, double ky) const{
+                return buildGkAA_2D_w(w,kx,ky);
+            };
+            #endif
             std::complex<double> w(int,double) const;
             std::complex<double> q(int) const;
             arma::Mat< std::complex<double> >& swap(arma::Mat< std::complex<double> >&) const;
-
-            arma::Mat< std::complex<double> > buildGkAA_2D(int,double,double) const;
-            arma::Mat< std::complex<double> > buildGkAA_2D_w(std::complex<double>,double,double) const;
+            #if DIM == 1
             arma::Mat< std::complex<double> > buildGkAA_1D(int,double) const;
             arma::Mat< std::complex<double> > buildGkAA_1D_w(std::complex<double>,double) const;
+            #elif DIM == 2
+            arma::Mat< std::complex<double> > buildGkAA_2D(int,double,double) const;
+            arma::Mat< std::complex<double> > buildGkAA_2D_w(std::complex<double>,double,double) const;
+            #endif
             
             double get_double_occupancy_AA() const;
             double get_ndo() const{
@@ -147,6 +174,14 @@ namespace HF{
             size_t _size {0};
             std::vector< std::complex<double> > _precomp_wn={}, _precomp_qn={};
     };
+
+    inline std::complex<double> FunctorBuildGk::w(int n, double mu) const{
+        return std::complex<double>(0.0,1.0)*(2.0*(double)n+1.0)*M_PI/_beta + mu;
+    }
+
+    inline std::complex<double> FunctorBuildGk::q(int n) const{
+        return std::complex<double>(0.0,1.0)*(2.0*(double)n)*M_PI/_beta;
+    }
 
     struct K_1D{
         explicit K_1D(double qx, std::complex<double> iwn) : _qx(qx), _iwn(iwn){};

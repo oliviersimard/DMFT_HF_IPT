@@ -1,10 +1,5 @@
 #include "file_utils.hpp"
 
-inline bool file_exists(const std::string& name) {
-  struct stat buffer;   
-  return (stat(name.c_str(), &buffer) == 0); // string null terminateds
-}
-
 std::vector<std::string> glob(const std::string& pattern) noexcept(false){
     using namespace std;
 

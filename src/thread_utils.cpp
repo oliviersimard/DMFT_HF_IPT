@@ -8,22 +8,6 @@ arma::Mat< std::complex<double> > matTotSus;
 arma::Mat< std::complex<double> > matCorr;
 arma::Mat< std::complex<double> > matMidLev;
 
-
-ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_1D q,double ndo_converged) : _q(q){
-    this->_ndo_converged=ndo_converged;
-    this->_Gk=Gk;
-}
-
-ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_2D q,double ndo_converged) : _q(q){
-    this->_ndo_converged=ndo_converged;
-    this->_Gk=Gk;
-}
-
-ThreadWrapper::ThreadWrapper(HF::K_1D q,IPT2::SplineInline< std::complex<double> > splInline){
-    this->_q=q;
-    this->_splInline=splInline;
-}
-
 #if DIM == 1
 void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_prototype sp) const{ 
     std::complex<double> tmp_val_kt_kb(0.0,0.0);
@@ -137,20 +121,11 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_IPT(double ktilde,std::compl
     return GreenStuff::U/lower_level;
 }
 
-inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D(std::complex<double> ik, double k) const{
-    std::vector< std::complex<double> > GK = { 1.0/( ik + _Gk._mu - epsilonk(k) - _Gk._u*_ndo_converged ), 1.0/( ik + _Gk._mu - epsilonk(k) - _Gk._u*(1.0-_ndo_converged) ) }; // UP, DOWN
-    return GK;
-}
-
-inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D_IPT(std::complex<double> ik, double k) const{
-    std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ), 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ) }; // UP, DOWN
-    return GK;
-}
-
 #elif DIM == 2
 void ThreadWrapper::operator()(solver_prototype sp, int kbarx_m_tildex, int kbary_m_tildey, bool is_jj) const{
 /* In 2D, calculating the weights implies computing whilst dismissing the translational invariance of the vertex function (Gamma). */
     std::complex<double> tmp_val_kt_kb(0.0,0.0);
+    double kbarx;
     switch(sp){
     case solver_prototype::HF_prot:
         // cout << beta << " " << _Gk._kArr_l[ktilde] << " " << _q._iwn << " " << _q._qx << " " << _Gk._kArr_l[kbar] << endl;
@@ -169,7 +144,7 @@ void ThreadWrapper::operator()(solver_prototype sp, int kbarx_m_tildex, int kbar
         if (!is_jj) matGamma(kbary_m_tildey,kbarx_m_tildex) = (1.0/_Gk._beta)*(1.0/_Gk._beta)*tmp_val_kt_kb; // These matrices are static variables.
         else if (is_jj){
             for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
-                double kbarx = (_Gk._kArr_l[ktildex]-_Gk._kArr_l[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
+                kbarx = (_Gk._kArr_l[ktildex]-_Gk._kArr_l[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
                 matGamma(kbary_m_tildey,kbarx_m_tildex) += -1.0*(-2.0*std::sin(_Gk._kArr_l[ktildex]))*tmp_val_kt_kb*(-2.0*std::sin(kbarx))*(1.0/_Gk._Nk)*(1.0/_Gk._beta)*(1.0/_Gk._beta);
             }
         }
@@ -190,8 +165,8 @@ void ThreadWrapper::operator()(solver_prototype sp, int kbarx_m_tildex, int kbar
         if (!is_jj) matGamma(kbary_m_tildey,kbarx_m_tildex) = (1.0/GreenStuff::beta)*(1.0/GreenStuff::beta)*tmp_val_kt_kb; // These matrices are static variables.
         else if (is_jj){
             for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
-                double kbarx = (_splInline.k_array[ktildex]-_splInline.k_array[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
-                matGamma(kbary_m_tildey,kbarx_m_tildex) += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_kt_kb*(-2.0*std::sin(kbarx))*(1.0/_Gk._Nk)*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
+                kbarx = (_splInline.k_array[ktildex]-_splInline.k_array[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
+                matGamma(kbary_m_tildey,kbarx_m_tildex) += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_kt_kb*(-2.0*std::sin(kbarx))*(1.0/GreenStuff::N_k)*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
             }
         }
         break;
@@ -254,16 +229,6 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower_IPT(double kpx,do
     lower_level *= SPINDEG*GreenStuff::U/(GreenStuff::beta*(GreenStuff::N_k)*(GreenStuff::N_k)); /// No minus sign at ground level. Factor 2 for spin.
     lower_level += 1.0;
     return GreenStuff::U/lower_level; // Means that we have to multiply the middle level of this component by the two missing Green's functions.
-}
-
-inline std::vector< std::complex<double> > ThreadWrapper::buildGK2D(std::complex<double> ik, double kx, double ky) const{
-    std::vector< std::complex<double> > GK = { 1.0/( ik + _Gk._mu - epsilonk(kx,ky) - _Gk._u*_ndo_converged ), 1.0/( ik + _Gk._mu - epsilonk(kx,ky) - _Gk._u*(1.0-_ndo_converged) ) }; // UP, DOWN
-    return GK;
-}
-
-inline std::vector< std::complex<double> > ThreadWrapper::buildGK2D_IPT(std::complex<double> ik, double kx, double ky) const{
-    std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(kx,ky) - _splInline.calculateSpline( ik.imag() ) ), 1.0/( ik + GreenStuff::mu - epsilonk(kx,ky) - _splInline.calculateSpline( ik.imag() ) ) }; // UP, DOWN
-    return GK;
 }
 
 #endif /* DIM */

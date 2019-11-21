@@ -15,22 +15,6 @@ double epsilonk(double kx, double ky){
     return -2.0*(std::cos(kx)+std::cos(ky));
 }
 
-
-inline Data::Data(const unsigned int N_tau_, const unsigned int N_k_, const double beta_, const double U_, const double hyb_c){
-    if (objectCount<1){ // Maybe try to implement it as a singleton.
-        this->N_k=N_k_;
-        this->hyb_c=hyb_c;
-        this->N_tau=N_tau_;
-        this->beta=beta_;
-        this->U=U_;
-        this->dtau=beta/N_tau;
-        this->mu=U/2.0; // starting at half-filling
-    }
-    objectCount++;    
-}
-
-inline Data::Data(const Data& obj){}
-
 Data& Data::operator=(const Data& obj){
     if (&obj == this) return *this;
     else{
@@ -47,11 +31,6 @@ double Data::mu=0.0, Data::dtau=0.0, Data::U=0.0, Data::beta=0.0, Data::hyb_c=0.
 // Static variables
 arma::Cube<double> GreenStuff::dblVec_pos(2,2,1+1,arma::fill::zeros), GreenStuff::dblVec_neg(2,2,1+1,arma::fill::zeros);
 arma::Cube< std::complex<double> > GreenStuff::cplxVec(2,2,1,arma::fill::zeros);
-
-inline GreenStuff::GreenStuff() : Data(), matsubara_t_pos(dblVec_pos), matsubara_t_neg(dblVec_neg), matsubara_w(cplxVec){
-    //this->iwnArr=std::vector< std::complex<double> >(1+1,0.0);
-    std::cerr << "Constructor GreenStuff()\n";
-}
 
 GreenStuff::GreenStuff(const unsigned int N_tau, const unsigned int N_k, const double beta, const double U, const double hyb_c, std::vector< std::complex<double> > iwnArr_,
                                                 arma::Cube<double>& matsubara_t_pos, arma::Cube<double>& matsubara_t_neg, arma::Cube< std::complex<double> >& matsubara_w) noexcept(false) : Data(N_tau,N_k,beta,U,hyb_c), 
@@ -91,37 +70,7 @@ namespace HF{
             this->_precomp_qn.push_back(q(j));
         }
     }
-
-    inline arma::Mat< std::complex<double> > FunctorBuildGk::operator()(int j, double kx, double ky) const{
-        return buildGkAA_2D(j,kx,ky);
-    }
-
-    inline arma::Mat< std::complex<double> > FunctorBuildGk::operator()(std::complex<double> w, double kx, double ky) const{
-        return buildGkAA_2D_w(w,kx,ky);
-    }
-
-    inline std::complex<double> FunctorBuildGk::w(int n, double mu) const{
-        return std::complex<double>(0.0,1.0)*(2.0*(double)n+1.0)*M_PI/_beta + mu;
-    }
-
-    inline std::complex<double> FunctorBuildGk::q(int n) const{
-        return std::complex<double>(0.0,1.0)*(2.0*(double)n)*M_PI/_beta;
-    }
-
-    arma::Mat< std::complex<double> > FunctorBuildGk::buildGkAA_2D(int j, double kx, double ky) const{
-        statMat(0,0) = 1.0/( w(j,_mu) - _u*_ndo - epsilonk(kx,ky)*epsilonk(kx,ky)/( w(j,_mu) - _u*(1.0-_ndo) ) ); // G^{AA}_{up} or G^{BB}_{down}
-        statMat(1,1) = 1.0/( w(j,_mu) - _u*(1.0-_ndo) - epsilonk(kx,ky)*epsilonk(kx,ky)/( w(j,_mu) - _u*(_ndo) ) ); // G^{AA}_{down} or G^{BB}_{up}
-        statMat(0,1) = 0.0; statMat(1,0) = 0.0;
-        return statMat;
-    }
-
-    arma::Mat< std::complex<double> > FunctorBuildGk::buildGkAA_2D_w(std::complex<double> w, double kx, double ky) const{
-        statMat(0,0) = 1.0/( w + _mu - _u*_ndo - epsilonk(kx,ky) ); // G^{AA}_{up} or G^{BB}_{down}
-        statMat(1,1) = 1.0/( w + _mu - _u*(1.0-_ndo) - epsilonk(kx,ky) ); // G^{AA}_{down} or G^{BB}_{up}
-        statMat(0,1) = 0.0; statMat(1,0) = 0.0;
-        return statMat;
-    }
-
+    #if DIM == 1
     arma::Mat< std::complex<double> > FunctorBuildGk::buildGkAA_1D(int j, double kx) const{
         statMat(0,0) = 1.0/( w(j,_mu) - _u*_ndo - epsilonk(kx)*epsilonk(kx)/( w(j,_mu) - _u*(1.0-_ndo) ) ); // G^{AA}_{up}
         statMat(1,1) = 1.0/( w(j,_mu) - _u*(1.0-_ndo) - epsilonk(kx)*epsilonk(kx)/( w(j,_mu) - _u*(_ndo) ) ); // G^{AA}_{down}
@@ -135,7 +84,21 @@ namespace HF{
         statMat(0,1) = 0.0; statMat(1,0) = 0.0;
         return statMat;
     }
+    #elif DIM == 2
+    arma::Mat< std::complex<double> > FunctorBuildGk::buildGkAA_2D(int j, double kx, double ky) const{
+        statMat(0,0) = 1.0/( w(j,_mu) - _u*_ndo - epsilonk(kx,ky)*epsilonk(kx,ky)/( w(j,_mu) - _u*(1.0-_ndo) ) ); // G^{AA}_{up} or G^{BB}_{down}
+        statMat(1,1) = 1.0/( w(j,_mu) - _u*(1.0-_ndo) - epsilonk(kx,ky)*epsilonk(kx,ky)/( w(j,_mu) - _u*(_ndo) ) ); // G^{AA}_{down} or G^{BB}_{up}
+        statMat(0,1) = 0.0; statMat(1,0) = 0.0;
+        return statMat;
+    }
 
+    arma::Mat< std::complex<double> > FunctorBuildGk::buildGkAA_2D_w(std::complex<double> w, double kx, double ky) const{
+        statMat(0,0) = 1.0/( w + _mu - _u*_ndo - epsilonk(kx,ky) ); // G^{AA}_{up} or G^{BB}_{down}
+        statMat(1,1) = 1.0/( w + _mu - _u*(1.0-_ndo) - epsilonk(kx,ky) ); // G^{AA}_{down} or G^{BB}_{up}
+        statMat(0,1) = 0.0; statMat(1,0) = 0.0;
+        return statMat;
+    }
+    #endif
     arma::Mat< std::complex<double> >& FunctorBuildGk::swap(arma::Mat< std::complex<double> >& M) const{
         arma::Mat< std::complex<double> > tmp_mat = ZEROS_;
         tmp_mat(0,0) = M(1,1);
@@ -143,7 +106,7 @@ namespace HF{
         M = tmp_mat;
         return M;
     }
-
+    #if DIM == 1
     void FunctorBuildGk::update_ndo_1D(){
         
         for (size_t i=0; i<_Nit; i++) {
@@ -173,7 +136,7 @@ namespace HF{
             _ndo = ndo_av;
         }
     }
-
+    #elif DIM == 2
     void FunctorBuildGk::update_ndo_2D(){
         
         for (size_t i=0; i<_Nit; i++) {
@@ -205,7 +168,7 @@ namespace HF{
             _ndo = ndo_av;
         }
     }
-
+    #endif
 
     /***************   K's   ******************/
 

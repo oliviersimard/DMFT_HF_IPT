@@ -1,8 +1,6 @@
 #include "src/thread_utils.hpp"
 #include "src/json_utils.hpp"
 
-//#define PARALLEL
-
 int main(int argc, char** argv){
     // Loading parameters from Json file
     #ifndef DEBUG
@@ -138,12 +136,16 @@ int main(int argc, char** argv){
                 }
             }
             else if ( (solver_type_s.compare("HF")==0) ){
-                double mu_HF=U/2.0;
+                double mu_HF=U/2.0; // Half-filling
                 double ndo=0.6;
                 std::vector< std::complex<double> > Gk_up(N_tau,0.0);
                 HF::FunctorBuildGk Gk(mu_HF,beta,U,ndo,vecK,N_it,N_k,Gk_up);
                 /* Computing the corresponding HF self-energy. */
+                #if DIM == 1
                 Gk.update_ndo_1D();
+                #elif DIM == 2
+                Gk.update_ndo_2D();
+                #endif
                 double ndo_converged=Gk.get_ndo();
                 std::cout << "The final density on impurity is: " << ndo_converged << "\n";
                 std::string customDirName(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(ndo_converged)+trailingStr+"_N_tau_"+std::to_string(N_tau));

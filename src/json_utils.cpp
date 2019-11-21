@@ -13,16 +13,6 @@ const std::streampos Json_utils::getSize(const std::string& filename) const{
     return end-begin;
 }
 
-inline const json_spirit::mValue& Json_utils::get_object_item(const json_spirit::mValue& element, const std::string& name) const{
-
-    return element.get_obj().at(name);
-}
-
-inline const json_spirit::mValue& Json_utils::get_array_item(const json_spirit::mValue& element, size_t index) const{
-
-    return element.get_array().at(index);
-}
-
 MembCarrier::MembCarrier(double dp[], double dp2[], int ip[], bool bp[], char* chp[]){
     size_t i;
     for (i=0; i<MAX_DOUBLE_SIZE; i++) this->db_arr[i]=*(dp+i);

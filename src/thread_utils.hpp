@@ -5,6 +5,7 @@
 #include<thread>
 #include "susceptibilities.hpp"
 
+#define PARALLEL
 #define NUM_THREADS 4
 
 
@@ -49,8 +50,47 @@ namespace ThreadFunctor{
             IPT2::SplineInline< std::complex<double> > _splInline={};
     };
 
+    inline ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_1D q,double ndo_converged) : _q(q){
+        this->_ndo_converged=ndo_converged;
+        this->_Gk=Gk;
+    }
+    inline ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_2D q,double ndo_converged) : _q(q){
+        this->_ndo_converged=ndo_converged;
+        this->_Gk=Gk;
+    }
+    inline ThreadWrapper::ThreadWrapper(HF::K_1D q,IPT2::SplineInline< std::complex<double> > splInline){
+        this->_q=q;
+        this->_splInline=splInline;
+    }
+    inline ThreadWrapper::ThreadWrapper(HF::K_2D qq,IPT2::SplineInline< std::complex<double> > splInline){
+        this->_qq=qq;
+        this->_splInline=splInline;
+    }
+    #if DIM == 1
+    inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D(std::complex<double> ik, double k) const{
+        std::vector< std::complex<double> > GK = { 1.0/( ik + _Gk._mu - epsilonk(k) - _Gk._u*_ndo_converged ), 1.0/( ik + _Gk._mu - epsilonk(k) - _Gk._u*(1.0-_ndo_converged) ) }; // UP, DOWN
+        return GK;
+    }
+
+    inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D_IPT(std::complex<double> ik, double k) const{
+        std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ), 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ) }; // UP, DOWN
+        return GK;
+    }
+    #elif DIM == 2
+    inline std::vector< std::complex<double> > ThreadWrapper::buildGK2D(std::complex<double> ik, double kx, double ky) const{
+        std::vector< std::complex<double> > GK = { 1.0/( ik + _Gk._mu - epsilonk(kx,ky) - _Gk._u*_ndo_converged ), 1.0/( ik + _Gk._mu - epsilonk(kx,ky) - _Gk._u*(1.0-_ndo_converged) ) }; // UP, DOWN
+        return GK;
+    }
+
+    inline std::vector< std::complex<double> > ThreadWrapper::buildGK2D_IPT(std::complex<double> ik, double kx, double ky) const{
+        std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(kx,ky) - _splInline.calculateSpline( ik.imag() ) ), 1.0/( ik + GreenStuff::mu - epsilonk(kx,ky) - _splInline.calculateSpline( ik.imag() ) ) }; // UP, DOWN
+        return GK;
+    }
+    #endif
+
 } /* end of namespace ThreadFunctor */
 
+#ifdef PARALLEL
 template<>
 inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBuildGk Gk,std::string pathToDir,std::string customDirName,bool is_full,bool is_jj,double ndo_converged,ThreadFunctor::solver_prototype sp){
     std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus;// outputChispspBubbleCorr;
@@ -64,8 +104,8 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
     size_t ltot,lkt,lkb;
     #if DIM == 1
-    HF::K_1D qq(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
-    ThreadFunctor::ThreadWrapper threadObj(Gk,qq,ndo_converged);
+    HF::K_1D q(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
+    ThreadFunctor::ThreadWrapper threadObj(Gk,q,ndo_converged);
     while (it<totSize){
         if (totSize % NUM_THREADS != 0){
             if ( (totSize-it)<NUM_THREADS ){
@@ -135,7 +175,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
                     lkt = static_cast<size_t>(floor(ltot/vecK.size()));
                     lkb = (ltot % vecK.size());
                     std::cout << "lkt: " << lkt << " lkb: " << lkb << "\n";
-                    std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj,sp);
+                    std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
                     tt[l]=std::move(t);
                     //tt.push_back(static_cast<thread&&>(t));
                 }
@@ -149,7 +189,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
                 lkt = static_cast<int>(floor(ltot/vecK.size()));
                 lkb = (ltot % vecK.size());
                 std::cout << "lkt: " << lkt << " lkb: " << lkb << "\n";
-                std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj,sp);
+                std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
                 tt[l]=std::move(t);
                 // tt[l]=thread(threadObj,lkt,lkb,beta);
             }
@@ -189,8 +229,8 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
     size_t ltot,lkt,lkb;
     #if DIM == 1
-    HF::K_1D qq(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
-    ThreadFunctor::ThreadWrapper threadObj(qq,splInline);
+    HF::K_1D q(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
+    ThreadFunctor::ThreadWrapper threadObj(q,splInline);
     while (it<totSize){
         if (totSize % NUM_THREADS != 0){
             if ( (totSize-it)<NUM_THREADS ){
@@ -300,7 +340,6 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     outputChispspWeights.close();
     outputChispspTotSus.close();
 }
-
-
+#endif /* PARALLEL */
 
 #endif /* end of Thread_Utils_H_ */

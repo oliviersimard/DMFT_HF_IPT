@@ -20,5 +20,9 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
 int extractIntegerLastWords(std::string str);
 std::string eraseAllSubStr(std::string,const std::string&);
 
+inline bool file_exists(const std::string& name) {
+  struct stat buffer;   
+  return (stat(name.c_str(), &buffer) == 0); // string null terminateds
+}
 
 #endif /* end of File_Utils_ */

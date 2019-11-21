@@ -25,6 +25,17 @@ class Json_utils{
         Json_utils& operator=(const Json_utils&)=delete;
 };
 
+inline const json_spirit::mValue& Json_utils::get_object_item(const json_spirit::mValue& element, const std::string& name) const{
+
+    return element.get_obj().at(name);
+}
+
+inline const json_spirit::mValue& Json_utils::get_array_item(const json_spirit::mValue& element, size_t index) const{
+
+    return element.get_array().at(index);
+}
+
+
 struct MembCarrier{
     double db_arr[MAX_DOUBLE_SIZE];
     double db_arr2[2]; // db_ptr2 is meant to contain the k-space vector for 2D case!
