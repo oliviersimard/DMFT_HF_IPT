@@ -247,7 +247,7 @@ inline std::tuple< std::complex<double>, std::complex<double> > Susceptibility<H
     lower_level += 1.0;
     if (is_jj){
         double current_vertices=0.0,kbarx;
-        for (size_t ktildex=0; ktildex<vecK.size(); ktildex++){ // Many compbinations of ktildex (y) and kbarx (y) give within [-pi,pi] give the same difference. 
+        for (size_t ktildex=0; ktildex<vecK.size(); ktildex++){ // Many combinations of ktildex (y) and kbarx (y) give within [-pi,pi] the same difference. 
             kbarx = vecK[ktildex] - kbarx_m_tildex;
             current_vertices+=-2.0*std::sin(vecK[ktildex])*-2.0*std::sin(kbarx);
         }
@@ -275,7 +275,7 @@ inline std::tuple< std::complex<double>, std::complex<double> > Susceptibility<T
     lower_level += 1.0;
     if (is_jj){
         double current_vertices=0.0, kbarx;
-        for (size_t ktildex=0; ktildex<vecK.size(); ktildex++){ // Many compbinations of ktildex (y) and kbarx (y) give within [-pi,pi] give the same difference. 
+        for (size_t ktildex=0; ktildex<vecK.size(); ktildex++){ // Many combinations of ktildex (y) and kbarx (y) give within [-pi,pi] the same difference. 
             kbarx = vecK[ktildex] - kbarx_m_tildex;
             current_vertices+=-2.0*std::sin(vecK[ktildex])*-2.0*std::sin(kbarx);
         }
@@ -583,7 +583,7 @@ inline void calculateSusceptibilities<HF::FunctorBuildGk>(HF::FunctorBuildGk& Gk
             std::cout << "kbar: " << kbar << "\n";
     #elif DIM == 2
         for (size_t kbarx_m_tildex=0; kbarx_m_tildex<vecK.size(); kbarx_m_tildex++){
-            std::cout << "ktildex_m_barx: " << kbarx_m_tildex << "\n";
+            //std::cout << "ktildex_m_barx: " << kbarx_m_tildex << "\n";
     #endif
             std::complex<double> tmp_val_kt_kb(0.0,0.0), tmp_val_kt_kb_bubble(0.0,0.0), tmp_val_weights(0.0,0.0), tmp_val_bubble_corr(0.0,0.0);
             for (size_t wtilde=static_cast<size_t>(iwnArr_l.size()/2); wtilde<iwnArr_l.size(); wtilde++){

@@ -5,7 +5,7 @@
 #include<thread>
 #include "susceptibilities.hpp"
 
-#define PARALLEL
+//#define PARALLEL
 #define NUM_THREADS 4
 
 
