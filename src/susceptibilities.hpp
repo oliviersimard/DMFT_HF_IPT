@@ -488,7 +488,7 @@ inline void calculateSusceptibilities< IPT2::DMFTproc >(IPT2::DMFTproc& sublatt1
             std::cout << "kbar: " << kbar << "\n";
     #elif DIM == 2
         for (size_t kbarx_m_tildex=0; kbarx_m_tildex<vecK.size(); kbarx_m_tildex++){
-            std::cout << "ktildex_m_barx: " << kbarx_m_tildex << "\n";
+            //std::cout << "ktildex_m_barx: " << kbarx_m_tildex << "\n";
     #endif
             std::complex<double> tmp_val_kt_kb(0.0,0.0), tmp_val_kt_kb_bubble(0.0,0.0), tmp_val_weights(0.0,0.0), tmp_val_bubble_corr(0.0,0.0);
             for (size_t wtilde=static_cast<size_t>(iwnArr_l.size()/2); wtilde<iwnArr_l.size(); wtilde++){

@@ -30,7 +30,7 @@ namespace ThreadFunctor{
             explicit ThreadWrapper(HF::K_2D qq,IPT2::SplineInline< std::complex<double> > splInline);
             ThreadWrapper()=default;
             void operator()(size_t ktilde, size_t kbar, bool is_jj, solver_prototype sp) const; // 1D IPT/HF
-            void operator()(solver_prototype sp, int kbarx_m_tildex, int kbary_m_tildey, bool is_jj) const; // 2D IPT/HF
+            void operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj) const; // 2D IPT/HF
             std::complex<double> gamma_oneD_spsp(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
             std::complex<double> gamma_oneD_spsp_IPT(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
             std::complex<double> gamma_twoD_spsp(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;

@@ -122,7 +122,7 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_IPT(double ktilde,std::compl
 }
 
 #elif DIM == 2
-void ThreadWrapper::operator()(solver_prototype sp, int kbarx_m_tildex, int kbary_m_tildey, bool is_jj) const{
+void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj) const{
 /* In 2D, calculating the weights implies computing whilst dismissing the translational invariance of the vertex function (Gamma). */
     std::complex<double> tmp_val_kt_kb(0.0,0.0);
     double kbarx;
