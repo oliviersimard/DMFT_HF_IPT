@@ -40,8 +40,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
             } 
         }
         // lock_guard<mutex> guard(mutx); 
-        matGamma(kbar,ktilde) = tmp_val_kt_kb; // These matrices are static variables.
-        matWeigths(kbar,ktilde) = tmp_val_weights;
+        matGamma(kbar,ktilde) = tmp_val_kt_kb*1.0/(_Gk._beta)/(_Gk._beta); // These matrices are static variables.
+        matWeigths(kbar,ktilde) = tmp_val_weights*1.0/(_Gk._beta)/(_Gk._beta);
         if (!is_jj){
             matTotSus(kbar,ktilde) = 1.0/(_Gk._beta)/(_Gk._beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
         }
@@ -75,8 +75,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
             } 
         }
         // lock_guard<mutex> guard(mutx); 
-        matGamma(kbar,ktilde) = tmp_val_kt_kb; // These matrices are static variables.
-        matWeigths(kbar,ktilde) = tmp_val_weights;
+        matGamma(kbar,ktilde) = tmp_val_kt_kb*1.0/(GreenStuff::beta)/(GreenStuff::beta); // These matrices are static variables.
+        matWeigths(kbar,ktilde) = tmp_val_weights*1.0/(GreenStuff::beta)/(GreenStuff::beta);
         if (!is_jj){
             matTotSus(kbar,ktilde) = 1.0/(GreenStuff::beta)/(GreenStuff::beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
         }
