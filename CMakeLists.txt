@@ -2,14 +2,42 @@ cmake_minimum_required(VERSION 3.02 FATAL_ERROR)
 
 project(HubbardIPT)
 
-set(CMPLR "clang" CACHE STRING "Some user-specified option") # Use for instance cmake -DCMPLR:STRING=gcc ..
-message("Compiler chosen is: " ${CMPLR})
+# Setting c++ custom preprocessing flags
+set(CMPLR "clang" CACHE STRING "Determines the compiler.") # Use for instance cmake -DCMPLR:STRING=gcc ..
+message(WARNING "Compiler chosen is: " ${CMPLR})
+set(DIM "oneD" CACHE STRING "Determines the dimensions for calculations.") # Use for instance cmake -DDIM:STRING=twoD ..
+message(WARNING "Dimension: " ${DIM})
+set(PRLL OFF CACHE STRING "Determines whether the program is parallelized or not.") # Use for instance cmake -DDIM:BOOL=ON ..
+message(WARNING "Parallelization: " ${PRLL})
 
-# important for the use of tuples
 if (${CMPLR} STREQUAL "clang")
-        set(CMAKE_CXX_FLAGS "-Wall -std=c++14")
+        if (${DIM} STREQUAL "oneD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=1 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=1")
+                endif()
+        elseif (${DIM} STREQUAL "twoD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=2 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=2")
+                endif()
+        endif()
 elseif (${CMPLR} STREQUAL "gcc")
-        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive")
+        if (${DIM} STREQUAL "oneD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=1 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=1")
+                endif()
+        elseif (${DIM} STREQUAL "twoD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=2 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=2")
+                endif()
+        endif()
 endif()
 set(CMAKE_SOURCE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/cmake_source")
 message("CMAKE_SOURCE_PREFIX for GMock setup: " ${CMAKE_SOURCE_PREFIX})

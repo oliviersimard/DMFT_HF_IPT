@@ -1,18 +1,18 @@
 {
     "n_t_spin": 0.5,
-    "Umax": 0.5,
+    "Umax": 8.0,
     "Ustep": 1.0,
-    "Umin": 0.5,
-    "betamax": 100.0,
+    "Umin": 8.0,
+    "betamax": 50.0,
     "betastep": 10.0,
-    "betamin": 100.0,
-    "Ntau": 100,
+    "betamin": 50.0,
+    "Ntau": 256,
     "N_it": 100,
-    "gridK": 100,
+    "gridK": 200,
     "q_1D": 0.0,
     "q_2D": [0.0,0.0],
     "dGdPhi": false,
-    "load_self": false,
-    "is_jj": false,
-    "solver_type": "HF"
+    "load_self": true,
+    "is_jj": true,
+    "solver_type": "IPT"
 }

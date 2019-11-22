@@ -148,7 +148,7 @@ inline std::tuple< std::complex<double>,std::complex<double>,std::complex<double
     static_assert(std::is_same<T, IPT2::DMFTproc>::value, "Designed only for IPT2::DMFTproc!");
     std::complex<double> middle_level(0.0,0.0),middle_level_inf(0.0,0.0),middle_level_corr(0.0,0.0);
     for (size_t kp=0; kp<vecK.size(); kp++){
-        std::cout << "kp: " << kp << "\n";
+        //std::cout << "kp: " << kp << "\n";
         for (size_t iknp=static_cast<size_t>(iwnArr_l.size()/2); iknp<iwnArr_l.size(); iknp++){
             middle_level_inf += 1.0/( iwnArr_l[iknp] + GreenStuff::mu - epsilonk(vecK[kp]) - splInline.calculateSpline( iwnArr_l[iknp].imag() ) 
             ) * gamma_oneD_spsp_full_lower(Type,vecK[kp],kbar,iwnArr_l[iknp],wbar,splInline
@@ -485,7 +485,7 @@ inline void calculateSusceptibilities< IPT2::DMFTproc >(IPT2::DMFTproc& sublatt1
     #endif
     #if DIM == 1
         for (size_t kbar=0; kbar<vecK.size(); kbar++){
-            std::cout << "kbar: " << kbar << "\n";
+            //std::cout << "kbar: " << kbar << "\n";
     #elif DIM == 2
         for (size_t kbarx_m_tildex=0; kbarx_m_tildex<vecK.size(); kbarx_m_tildex++){
             //std::cout << "ktildex_m_barx: " << kbarx_m_tildex << "\n";
