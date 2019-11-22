@@ -1,10 +1,5 @@
 #include "file_utils.hpp"
 
-inline bool file_exists(const std::string& name) {
-  struct stat buffer;   
-  return (stat(name.c_str(), &buffer) == 0); // string null terminateds
-}
-
 std::vector<std::string> glob(const std::string& pattern) noexcept(false){
     using namespace std;
 
@@ -17,7 +12,7 @@ std::vector<std::string> glob(const std::string& pattern) noexcept(false){
     if(return_value != 0){
         globfree(&glob_result);
         stringstream ss;
-        ss << "glob() failed with return_value " << return_value;
+        ss << "glob() failed with return_value " << return_value << " for "+pattern << "\n";
         throw std::runtime_error(ss.str());
     }
 
@@ -58,8 +53,9 @@ void mkdirTree(std::string sub, std::string dir) noexcept(false){
     }
 }
 
-void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir) noexcept(false){
-    mkdirTree(pathToDir,"");
+void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir1, std::string pathToDir2) noexcept(false){
+    mkdirTree(pathToDir1,"");
+    mkdirTree(pathToDir2,"");
     // Now looking if files exist
     std::string globsearch0(filenamesToSave[0]+"*");
     std::string globsearch1(filenamesToSave[1]+"*");
@@ -71,10 +67,35 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
         search2=glob(globsearch2);
     }
     catch(const std::runtime_error& e){
-        std::cerr << e.what() << std::endl;
+        std::cerr << e.what() << "\n";
     }
 
     if ( search0.size() > 0 || search1.size() > 0 || search2.size() > 0 ){
+        #ifndef DEBUG
         throw std::runtime_error("Files "+filenamesToSave[0]+" and "+filenamesToSave[1]+" and "+filenamesToSave[2]+" already exist!!");
+        #else
+        std::cerr << "Warning: Files "+filenamesToSave[0]+" and "+filenamesToSave[1]+" and "+filenamesToSave[2]+" already exist!!" << "\n";
+        #endif
     }
 }
+
+std::string eraseAllSubStr(std::string mainStr, const std::string& toErase){
+	size_t pos = std::string::npos;
+	// Search for the substring in string in a loop until nothing is found
+	while( (pos = mainStr.find(toErase) ) != std::string::npos){
+		// If found then erase it from string
+		mainStr.erase(pos, toErase.length());
+	}
+    return mainStr;
+}
+
+int extractIntegerLastWords(std::string str){ 
+    //std::regex r("[0-9]*\\.[0-9]+|[0-9]+");
+    std::vector<double> intContainer;
+    std::string toDel(".dat");
+    str = eraseAllSubStr(str,toDel);
+    size_t last_index = str.find_last_not_of("0123456789");
+    std::string result = str.substr(last_index + 1);
+    double integerStr = static_cast<int>(atof(result.c_str()));
+    return integerStr;
+} 

@@ -1,6 +1,12 @@
+#ifndef Tridiagonal_H_
+#define Tridiagonal_H_
+
+#include<gsl/gsl_errno.h>
+#include<gsl/gsl_fft_complex.h>
 #include "green_utils.hpp"
 
 // Inspired from http://www.mymathlib.com/matrices/linearsystems/tridiagonal.html
+// and https://kluge.in-chemnitz.de/opensource/spline/
 
 template<class T>
 class LUtools{
@@ -20,26 +26,26 @@ class spline{
         };
 
     protected:
-        arma::Cube< T > m_y;            // x,y coordinates of points
-        std::vector<double> m_x;
+        arma::Cube< T > m_y={};            // x,y coordinates of points
+        std::vector<double> m_x={};
         // interpolation parameters
         // f(x) = a*(x-x_i)^3 + b*(x-x_i)^2 + c*(x-x_i) + y_i
-        std::vector< T > m_a,m_b,m_c;        // spline coefficients
-        T  m_b0, m_c0;                     // for left extrapol
-        bd_type m_left, m_right;
-        T  m_left_value, m_right_value;
-        bool    m_force_linear_extrapolation;
+        std::vector< T > m_a={},m_b={},m_c={};        // spline coefficients
+        T  m_b0 {0.0}, m_c0 {0.0};                     // for left extrapol
+        bd_type m_left=second_deriv, m_right=second_deriv;
+        T  m_left_value {0.0}, m_right_value {0.0};
+        bool m_force_linear_extrapolation=false;
         //
-        T _S_1_0, _Sp_1_0, _Spp_1_0;
-        T _S_N_beta, _Sp_N_beta, _Spp_N_beta;
-        std::vector< T > _Sppp;
+        T _S_1_0 {0.0}, _Sp_1_0 {0.0}, _Spp_1_0 {0.0};
+        T _S_N_beta {0.0}, _Sp_N_beta {0.0}, _Spp_N_beta {0.0};
+        std::vector< T > _Sppp={};
 
     public:
         // set default boundary condition to be zero curvature at both ends
-        spline(): m_left(second_deriv), m_right(second_deriv),
-            m_left_value(0.0), m_right_value(0.0),
-            m_force_linear_extrapolation(false){}
-
+        // spline(): m_left(second_deriv), m_right(second_deriv),
+        //     m_left_value(0.0), m_right_value(0.0),
+        //     m_force_linear_extrapolation(false), m_b0(0.0), m_c0(0.0){}
+        spline()=default;
         // optional, but if called it has to come be before set_points()
         void set_boundary(bd_type left, T left_value,
                       bd_type right, T right_value,
@@ -167,13 +173,12 @@ void spline<T>::set_points(const std::vector<double>& x,
     m_y=y;
     int n=x.size();
     LUtools< T > LUObj;
-    std::vector< T > initVec_b(n,0.0), initVec_a_c(n-1,0.0);
+    std::vector< T > initVec_b(n,0.0), initVec_a_c(n,0.0); // <--------------------------- Tested its effects when initVec_a_c(n-1,0.0).
     m_b=initVec_b; m_a=initVec_a_c; m_c=initVec_a_c; // Must init containers holding the spline coefficients.
     // TODO: maybe sort x and y, rather than returning an error
     for(size_t i=0; i<n-1; i++) {
         assert(m_x[i]<m_x[i+1]);
     }
-
     if(cubic_spline==true) { // cubic spline interpolation
         // setting up the matrix and right hand side of the equation system
         // for the parameters b[]
@@ -215,7 +220,6 @@ void spline<T>::set_points(const std::vector<double>& x,
         } else {
             assert(false);
         }
-    
         // solve the equation system to obtain the parameters b[]. Separating first the matrix A into
         // subdiagonal, diagonal and superdiagonal parts.
         std::vector< T > subdiagonal(n-1), diagonal(n), superdiagonal(n-1);
@@ -230,7 +234,7 @@ void spline<T>::set_points(const std::vector<double>& x,
             LUObj.tridiagonal_LU_decomposition(subdiagonal,diagonal,superdiagonal);
             LUObj.tridiagonal_LU_solve(subdiagonal,diagonal,superdiagonal,rhs,m_b); // Writes in m_b
         }catch (const std::exception& err){
-            std::cerr << err.what() << std::endl;
+            std::cerr << err.what() << "\n";
         }
         // calculate parameters a[] and c[] based on b[]
         for(size_t i=0; i<n-1; i++) {
@@ -243,10 +247,9 @@ void spline<T>::set_points(const std::vector<double>& x,
         for(size_t i=0; i<n-1; i++) {
             m_a[i]=0.0;
             m_b[i]=0.0;
-            m_c[i]=(m_y[i+1]-m_y[i])/(m_x[i+1]-m_x[i]);
+            m_c[i]=(m_y.slice(i+1)(0,0)-m_y.slice(i)(0,0))/(m_x[i+1]-m_x[i]);
         }
     }
-
     // for left extrapolation coefficients
     m_b0 = (m_force_linear_extrapolation==false) ? m_b[0] : 0.0;
     m_c0 = m_c[0];
@@ -259,11 +262,15 @@ void spline<T>::set_points(const std::vector<double>& x,
     if(m_force_linear_extrapolation==true)
         m_b[n-1]=0.0;
     m_c[0]=m_c0; // What the hell happened to m_c[0]? Reset to 0 for some stupid reasons...
+
+    // for (auto el : m_c) std::cout << "m_c: " << el << std::endl;
+    // for (auto el : m_b) std::cout << "m_b: " << el << std::endl;
+    // for (auto el : m_a) std::cout << "m_c: " << el << std::endl; 
     
 }
 
 template<class T>
-T spline<T>::operator() (double x) const{
+T spline<T>::operator()(double x) const{
     size_t n=m_x.size();
     // find the closest point m_x[idx] < x, idx=0 even if x<m_x[0]
     std::vector<double>::const_iterator it;
@@ -274,13 +281,14 @@ T spline<T>::operator() (double x) const{
     T interpol;
     if(x<m_x[0]) {
         // extrapolation to the left
-        interpol=(m_b0*h + m_c0)*h + m_y[0];
+        interpol=(m_b0*h + m_c0)*h + m_y.slice(0)(0,0);
     } else if(x>m_x[n-1]) {
         // extrapolation to the right
-        interpol=(m_b[n-1]*h + m_c[n-1])*h + m_y[n-1];
+        interpol=(m_b[n-1]*h + m_c[n-1])*h + m_y.slice(n-1)(0,0);
     } else {
         // interpolation
-        interpol=((m_a[idx]*h + m_b[idx])*h + m_c[idx])*h + m_y[idx];
+        interpol=((m_a[idx]*h + m_b[idx])*h + m_c[idx])*h + m_y.slice(idx)(0,0);
+        // std::cout << "interpol: " << interpol << std::endl;
     }
     return interpol;
 }
@@ -346,15 +354,15 @@ T spline<T>::deriv(int order, double x) const{
 template<class T>
 void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double beta, const unsigned int N_tau){
     // Setting the boundary conditions. The spline f_i starts at i=1, because f_0(x) = b_1(x-x_1) + c_1(x-x_1) + y_1, x <= x_1.
-    _S_1_0=m_y[0]; // f_1(x_0) = a_1(x_0-x_1)^3 + b_1(x_0-x_1)^2 + c_1(x_0-x_1) + y_1 = y_0
+    _S_1_0=m_y.slice(0)(0,0); // f_1(x_0) = a_1(x_0-x_1)^3 + b_1(x_0-x_1)^2 + c_1(x_0-x_1) + y_1 = y_0
     _Sp_1_0=m_c0; // f'_1(x_0) = 3a_1(x_0-x_1)^2 + 2b_1(x_0-x_1)^1 + c_1 = c_0
     _Spp_1_0=2.0*m_b[0]; // f''_1(x_0) = 6a_1(x_0-x_1) + 2b_1 = b_0
     // The spline f_i ends at i=N, because f_N(x) = b_N(x-x_N) + c_N(x-x_N) + y_N, x >= x_1.
     std::vector<double>::const_iterator it = m_x.end(); // returns pointer after last element.
-    const double h_last = *(it-1)-*(it-2);
-    _S_N_beta=m_a.back()*h_last*h_last*h_last+m_b[2*N_tau-1]*h_last*h_last+m_c.back()*h_last+m_y.slice(2*N_tau-1)(0,0); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
-    _Sp_N_beta=3.0*m_a.back()*h_last*h_last+2.0*m_b[2*N_tau-1]*h_last+m_c.back();
-    _Spp_N_beta=6.0*m_a.back()*h_last+2.0*m_b[2*N_tau-1];
+    const double h_last = *(it-1)-*(it-2); // This is kind of beta^{-}: f_{N-1}(x_N)
+    _S_N_beta=m_a[2*N_tau-1]*h_last*h_last*h_last+m_b[2*N_tau-1]*h_last*h_last+m_c[2*N_tau-1]*h_last+m_y.slice(2*N_tau-1)(0,0); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
+    _Sp_N_beta=3.0*m_a[2*N_tau-1]*h_last*h_last+2.0*m_b[2*N_tau-1]*h_last+m_c[2*N_tau-1];
+    _Spp_N_beta=6.0*m_a[2*N_tau-1]*h_last+2.0*m_b[2*N_tau-1];
     // This will be used later for IFFT.
     for (size_t n=0; n<m_x.size()-1; n++){
         _Sppp.push_back(6.0*m_a[n]);
@@ -430,51 +438,4 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
 //    std::cout << s(1.5) << std::endl;
 //    s.iwn_tau_spl_extrm();
 
-
-
-//    // C++ version of the algorithm
-//    // Testing the LU methods <----------------------------------------KEEP FOR TEST 
-//    // const std::complex<double> im = std::complex<double>(0.0,1.0);
-//    // arma::Mat< std::complex<double> > matArmaD = { { 2.+1.0*im, -1.-0.3*im, 0.0+0.0*im },
-//    //                                                 { -4.-2.1*im, 6.-0.1*im, 3.+0.0*im },
-//    //                                                 { 0.0+0.0*im, -2.-0.3*im, 8.+0.5*im } };
-
-//    // std::vector< std::complex<double> > subdiagonalArma, diagonalArma, superdiagonalArma;
-
-//    // std::cout << "size of matArma: " << matArmaD.size() << std::endl;
-//    // std::cout << "size if row: " << matArmaD.n_rows << std::endl; // square matrix
-
-//    // std::vector< std::complex<double> > BArma{ 2.+0.1*im , 0.5-2.3*im , 7.+0.2*im }, xArma(matArmaD.n_rows,0.0);
-
-//    // // Building main parts of the routine.
-//    // for (unsigned int k=0; k<matArmaD.n_cols-1; k++){
-//    //    subdiagonalArma.push_back(matArmaD(k+1,k));
-//    //    superdiagonalArma.push_back(matArmaD(k,k+1));
-//    // }
-//    // for (unsigned int k=0; k<matArmaD.n_cols; k++){
-//    //    diagonalArma.push_back(matArmaD(k,k));
-//    // }
-
-//    // try{
-//    //    LUObj.tridiagonal_LU_decomposition(subdiagonalArma,diagonalArma,superdiagonalArma);
-//    //    LUObj.tridiagonal_LU_solve(subdiagonalArma,diagonalArma,superdiagonalArma,BArma,xArma);
-//    // } 
-//    // catch (const std::exception& err){
-//    //    std::cout << err.what() << std::endl;
-//    // }
-
-//    // for (unsigned int i=0; i<NN; i++){
-//    //    std::cout << x[i] << "  ";
-//    //    std::cout << xArma[i] << "\n";
-//    // }
-
-//    // else {                                                                 
-//    //      err = Tridiagonal_LU_Solve(subdiagonal, diagonal, superdiagonal, B, x, N);
-//    // }
-
-//    // for (int i=0; i<N; i++){
-//    //    std::cout << x[i] << "\n";
-//    // }
-
-//    return 0;
-// }
+#endif /* end of Tridiagonal_H_ */

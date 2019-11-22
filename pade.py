@@ -76,7 +76,7 @@ print(U, beta, nn)
 omega = [ wmin+i*(wmax-wmin)/(nbr_w-1.) for i in range(nbr_w) ]
 dict_names={}
 for name in filenames:
-	R = np.genfromtxt(name,skip_header=1,dtype=float,usecols=(2,3,4),delimiter='\t\t') # Watch out for the nan at the end of the file. Have to add the proper delimiter '\t\t' at the end.
+	R = np.genfromtxt(name,skip_header=1,dtype=float,usecols=(0,1,2),delimiter='\t\t') # Watch out for the nan at the end of the file. Have to add the proper delimiter '\t\t' at the end.
 	omega_n = R[:,0]
 	Rf_n = R[:,1]
 	If_n = R[:,2]

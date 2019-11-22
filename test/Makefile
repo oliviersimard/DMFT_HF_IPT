@@ -2,11 +2,11 @@ SRC=$(PWD)/src
 OBJ=$(PWD)/obj
 UPPEROBJ=$(PWD)/../obj
 
-CXX=g++ -std=c++14 -Wall -g
+CXX=g++ -std=c++11 -Wall -g
 INC=${HOME}/gsl/include
 LIB=${HOME}/gsl/lib
 
-CXXFLAGS=-L$(LIB) -lgtest -lgmock -lfftw3 -larmadillo -lm -lgsl -lgslcblas
+CXXFLAGS=-L$(LIB) -lgtest -lgmock -lfftw3 -ljson_spirit -larmadillo -lm -lgsl -lgslcblas
 
 PROG=IPT_test
 

@@ -2,18 +2,60 @@ cmake_minimum_required(VERSION 3.02 FATAL_ERROR)
 
 project(HubbardIPT)
 
-# important for the use of tuples
-set(CMAKE_CXX_FLAGS "-std=c++14")
+# Setting c++ custom preprocessing flags
+set(CMPLR "clang" CACHE STRING "Determines the compiler.") # Use for instance cmake -DCMPLR:STRING=gcc ..
+message(STATUS "Compiler chosen is: " ${CMPLR})
+set(DIM "oneD" CACHE STRING "Determines the dimensions for calculations.") # Use for instance cmake -DDIM:STRING=twoD ..
+message(STATUS "Dimension: " ${DIM})
+set(PRLL OFF CACHE STRING "Determines whether the program is parallelized or not.") # Use for instance cmake -DDIM:BOOL=ON ..
+message(STATUS "Parallelization: " ${PRLL})
+
+if (${CMPLR} STREQUAL "clang")
+        if (${DIM} STREQUAL "oneD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=1 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=1")
+                endif()
+        elseif (${DIM} STREQUAL "twoD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=2 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -DDIM=2")
+                endif()
+        endif()
+elseif (${CMPLR} STREQUAL "gcc")
+        if (${DIM} STREQUAL "oneD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=1 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=1")
+                endif()
+        elseif (${DIM} STREQUAL "twoD")
+                if (${PRLL})
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=2 -DPARALLEL")
+                else()
+                        set(CMAKE_CXX_FLAGS "-Wall -std=c++14 -fpermissive -DDIM=2")
+                endif()
+        endif()
+endif()
 set(CMAKE_SOURCE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/cmake_source")
 message("CMAKE_SOURCE_PREFIX for GMock setup: " ${CMAKE_SOURCE_PREFIX})
 
-set(LIBRARIES_CUSTOM fftw3 armadillo)
+if (${CMPLR} STREQUAL "clang")
+        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
+elseif (${CMPLR} STREQUAL "gcc")
+        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit pthread)
+endif()
 
 set(SOURCES_COMMON
         src/IPT2nd3rdorderSingle2
         src/integral_utils
         src/green_utils
-        src/file_utils)
+        src/file_utils
+        src/json_utils
+        src/thread_utils
+        src/susceptibilities)
 
 set(SOURCES_MAIN mainIPT ${SOURCES_COMMON})
 set(SOURCES_TEST test/src/test_utils)

@@ -2,15 +2,6 @@
 
 //using namespace std;
 
-
-double epsilonk(double kx){
-    return -2.0*std::cos(kx);
-}
-
-double epsilonk(double kx, double ky){
-    return -2.0*(std::cos(kx)+std::cos(ky));
-}
-
 /**************************************************************************************************/
 
 namespace IPT2{
@@ -23,7 +14,9 @@ DMFTproc::DMFTproc(GreenStuff& WeissGreen_,GreenStuff& Hyb_,GreenStuff& LocalGre
                                                 const std::vector<double>& karr_l_, const double n_t_spin_) : WeissGreen(WeissGreen_),
                                                 Hyb(Hyb_), LocalGreen(LocalGreen_), SelfEnergy(SelfEnergy_),
                                                 data_dg_dtau_pos(dg_dtau_pos), data_dg_dtau_neg(dg_dtau_neg), karr_l(karr_l_){
-    std::cout << "DMFTproc: N_k: " << GreenStuff::N_k << std::endl;
+    std::cout << "DMFTproc: U: " << GreenStuff::U << "\n";
+    std::cout << "DMFTproc: beta: " << GreenStuff::beta << "\n";
+    std::cout << "DMFTproc: N_k: " << GreenStuff::N_k << "\n";
     std::cout << "DMFTproc: N_tau: " << GreenStuff::N_tau << std::endl;
     if (objCount<1){
         this->n=n_t_spin_;
@@ -56,6 +49,7 @@ void DMFTproc::update_impurity_self_energy(){ // Returns the full parametrized s
     double A = 2.0*n*(2.0-2.0*n)/( 2.0*n*(2.0-2.0*n) ); // IPTD becomes one because n_0 is set to be equal to n using right chemical potential mu_0.
     // Also, in the paramagnetic state for a single impurity site, n_up=n_down, hence the total electron density is 2.0*n_t_spin.
     double B = ( (1.0-n)*GreenStuff::U + GreenStuff::mu0 - GreenStuff::mu )/( n*(1.0-n)*GreenStuff::U*GreenStuff::U );
+    std::cout << "U: " << GreenStuff::U << " and beta : " << GreenStuff::beta << std::endl; 
     // Compute the Fourier transformation to tau space for impurity self-energy calculation
     // Stores data in matsubara_t_pos and matsubara_t_neg
     FFTObj.fft_spec(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.plain_positive);
@@ -240,61 +234,127 @@ void FFTtools::fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>
     }
 }
 
-void saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW){
-    for (size_t j=0; j<sublatt1.LocalGreen.matsubara_t_pos.n_slices; j++){
-        if (j==0){
-            ofGloc << "G_loc AAup tau pos" << "\t" << "G_loc AAup tau neg" << "\t" << "iwn" << "\t\t" << "G_loc AAup iwn re" << "\t" << "G_loc AAup iwn im" << "\n";
-            ofSE << "SE AAup tau pos" << "\t" << "SE AAup tau neg" << "\t" << "iwn" << "\t\t" << "SE AAup iwn re" << "\t" << "SE AAup iwn im" << "\n";
-            ofGW << "G0 AAup tau pos" << "\t" << "G0 AAup tau neg" << "\t" << "iwn" << "\t\t" << "G0 AAup iwn re" << "\t" << "G0 AAup iwn im" << "\n";
+void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false){
+    /* DMFT loop */
+    const Integrals integralsObj;
+    unsigned int iter=1;
+    double n,n0,G0_diff=0.0;
+    bool converged=false;
+    arma::Cube< std::complex<double> > WeissGreenTmpA(2,2,iwnArr_l.size()); // Initialization of the hybridization function.
+    arma::Cube< std::complex<double> > G0_density_mu0_m(2,2,iwnArr_l.size()), G_density_mu_m(2,2,iwnArr_l.size());
+    std::function<double(double)> wrapped_density_mu, wrapped_density_mu0;
+    std::cout << "size of iwnArr: " << iwnArr_l.size() << std::endl;
+    for (size_t i=0; i<iwnArr_l.size(); i++){
+        sublatt1.Hyb.matsubara_w.slice(i)(0,0) = sublatt1.Hyb.get_hyb_c()/iwnArr_l[i];
+    }
+    while (iter<=N_it && !converged){ // Everything has been designed to accomodate a bipartite lattice.
+        G0_diff=0.0; // resetting G0_diff
+        objSaveStreamGloc.open(vecStr[0]+"_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app);
+        objSaveStreamSE.open(vecStr[1]+"_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app);
+        objSaveStreamGW.open(vecStr[2]+"_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app);
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            sublatt1.WeissGreen.matsubara_w.slice(j)(0,0)=1.0/(iwnArr_l[j]+sublatt1.WeissGreen.get_mu0()-sublatt1.Hyb.matsubara_w.slice(j)(0,0));
+        }
+        sublatt1.update_impurity_self_energy(); // Spits out Sigma(iwn). To begin with, mu=U/2.0.
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            G0_density_mu0_m.slice(j)(0,0)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(0,0);
+            G_density_mu_m.slice(j)(0,0)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(0,0)-sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0);
+        }
+        std::cout << "mu: " << sublatt1.SelfEnergy.get_mu() << " and mu0 " << sublatt1.SelfEnergy.get_mu0() << std::endl;
+        // Compute the various chemical potentials to get n_target
+        n=sublatt1.density_mu(G_density_mu_m);
+        n0=sublatt1.density_mu0(G0_density_mu0_m);
 
-            ofGloc << sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-            ofGloc << sublatt1.LocalGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
+        std::cout << "n0: " << n0 <<  " for mu0: " << sublatt1.WeissGreen.get_mu0() << std::endl;
+        std::cout << "n: " << n << " for mu: " << sublatt1.WeissGreen.get_mu() << std::endl;
+
+        if ( ( std::abs(n-sublatt1.n)>ROOT_FINDING_TOL ) && iter>1 ){
+            try{
+                wrapped_density_mu = [&](double mu){ return sublatt1.density_mu(mu,G_density_mu_m)-sublatt1.n; };
+                double mu_new = integralsObj.falsePosMethod(wrapped_density_mu,-20.,20.);
+                std::cout << "mu_new at iter " << iter << ": " << mu_new << std::endl;
+                sublatt1.WeissGreen.update_mu(mu_new); // Updates mu from instance, even though it is a static member variable.
+            }catch (const std::exception& err){
+                std::cerr << err.what() << "\n";
+            }
+        }
+        if ( ( std::abs(n0-sublatt1.n)>ROOT_FINDING_TOL ) ){
+            try{
+                wrapped_density_mu0 = [&](double mu0){ return sublatt1.density_mu0(mu0,G0_density_mu0_m)-sublatt1.n; };
+                double mu0_new = integralsObj.falsePosMethod(wrapped_density_mu0,-20.,20.);
+                std::cout << "mu0_new at iter " << iter << ": " << mu0_new << std::endl;
+                sublatt1.WeissGreen.update_mu0(mu0_new); // Updates mu from instance, even though it is a static member variable.
+            }catch (const std::exception& err){
+                std::cerr << err.what() << "\n";
+            }
+        }
+        // Determining G_loc
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            #if DIM == 1
+            std::function<std::complex<double>(double,std::complex<double>)> G_latt = [&](double kx, std::complex<double> iwn){
+                return 1.0/(iwn + sublatt1.WeissGreen.get_mu() - epsilonk(kx) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(2.*M_PI)*integralsObj.integrate_simps(G_latt,-M_PI,M_PI,iwnArr_l[j],0.001);
+            #elif DIM == 2
+            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt = [&](double kx, double ky, std::complex<double> iwn){
+                return 1.0/(iwn + sublatt1.WeissGreen.get_mu() - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.I2D(G_latt,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j]);
+            #endif
+        }
+        // Updating the hybridization function for next round.
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            sublatt1.Hyb.matsubara_w.slice(j)(0,0) = iwnArr_l[j] + sublatt1.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - 1.0/sublatt1.LocalGreen.matsubara_w.slice(j)(0,0);
+        }
+        if (iter>2){
+            for (size_t j=0; j<iwnArr_l.size(); j++) G0_diff+=std::abs(WeissGreenTmpA.slice(j)(0,0)-sublatt1.WeissGreen.matsubara_w.slice(j)(0,0));
+            std::cout << "G0_diff: " << G0_diff << std::endl;
+            if (G0_diff<0.001 && std::abs(n-sublatt1.n)<ROOT_FINDING_TOL && std::abs(n0-sublatt1.n)<ROOT_FINDING_TOL) converged=true; 
+        }
+        if (iter>2){ // Assess the convergence process 
+            for (size_t j=0; j<iwnArr_l.size(); j++){
+                WeissGreenTmpA.slice(j)(0,0) = sublatt1.WeissGreen.matsubara_w.slice(j)(0,0);
+            }
+        }
+        std::cout << "new n0: " << sublatt1.density_mu0(G0_density_mu0_m) <<  " for mu0: " << sublatt1.WeissGreen.get_mu0() << std::endl;
+        std::cout << "new n: " << sublatt1.density_mu(G_density_mu_m) << " for mu: " << sublatt1.WeissGreen.get_mu() << std::endl;
+        std::cout << "double occupancy: " << sublatt1.double_occupancy() << std::endl;
+        saveEachIt(sublatt1,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW);
+        std::cout << "iteration #" << iter << std::endl;
+        iter++;
+    }
+    sublatt1.LocalGreen.reset_counter();
+}
+
+void saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW){
+    for (size_t j=0; j<sublatt1.LocalGreen.matsubara_w.n_slices; j++){
+        if (j==0){ // The "/" is important when reading files.
+            ofGloc << "/iwn" << "\t\t" << "G_loc AAup iwn re" << "\t\t" << "G_loc AAup iwn im" << "\n";
+            ofSE << "/iwn" << "\t\t" << "SE AAup iwn re" << "\t\t" << "SE AAup iwn im" << "\n";
+            ofGW << "/iwn" << "\t\t" << "G0 AAup iwn re" << "\t\t" << "G0 AAup iwn im" << "\n";
+
             ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
             ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
             ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
             //
-            ofSE << sublatt1.SelfEnergy.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-            ofSE << sublatt1.SelfEnergy.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
             ofSE << iwnArr_l[j].imag() << "\t\t"; // AAup
             ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
             ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
             //
-            ofGW << sublatt1.WeissGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-            ofGW << sublatt1.WeissGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
             ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
             ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
             ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
         }
         else{
-            if (j<sublatt1.LocalGreen.matsubara_t_pos.n_slices-1){ // To avoid busting bounds of matsubara w array.
-                ofGloc << sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << iwnArr_l[j].imag() << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
-            } else{
-                ofGloc << sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << sublatt1.LocalGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGloc << "\t\t" << "\t\t" << "\t\t"; // Important to be able to read off data with python programs.
-                //
-                ofSE << sublatt1.SelfEnergy.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << sublatt1.SelfEnergy.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofSE << "\t\t" << "\t\t" << "\t\t";
-                //
-                ofGW << sublatt1.WeissGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << sublatt1.WeissGreen.matsubara_t_neg.slice(j)(0,0) << "\t\t"; // AAup
-                ofGW << "\t\t" << "\t\t" << "\t\t";
-            }
+            ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
+            ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
+            ofGloc << sublatt1.LocalGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
+            ofSE << iwnArr_l[j].imag() << "\t\t"; // AAup
+            ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
+            ofSE << sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
+            ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
+            ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // AAup
+            ofGW << sublatt1.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\n"; // AAup
         }
     }
     ofGloc.close();

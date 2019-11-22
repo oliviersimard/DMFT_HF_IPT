@@ -145,6 +145,12 @@ namespace{
     EXPECT_NEAR(0.166667,resultI2D,0.001);
   }
 
+  TEST_F(TestUtilities, oneDIntegral){ /* this integral method is recursive */
+    std::function<double(double)> testFunct = [](double x){ return x*x; };
+    double resultI1D = integralsObj.integrate_simps(testFunct,0.0,2.0,1e-5);
+    EXPECT_NEAR(resultI1D,2.66666,1e-5);
+  }
+
   TEST_F(TestUtilities, LUDecomposition){
     LUtools< std::complex<double> > LUObj;
     arma::Mat< std::complex<double> > matArmaD = { { 2.+1.0*im, -1.-0.3*im, 0.0+0.0*im },
@@ -177,6 +183,20 @@ namespace{
     EXPECT_COMPLEX_DOUBLE_EQ(std::complex<double>(0.994411,-0.105562), xArma[2], 0.0001);
   }
 
+  TEST_F(TestUtilities, CubicSpline){
+    spline<double> spl;
+    std::vector<double> X(5);
+    arma::Cube<double> Y(2,2,5);
+    X[0]=0.1; X[1]=0.4; X[2]=1.2; X[3]=1.8; X[4]=2.0;
+    Y.slice(0)(0,0)=0.1; Y.slice(1)(0,0)=0.7; Y.slice(2)(0,0)=0.6; Y.slice(3)(0,0)=1.1; Y.slice(4)(0,0)=0.9;
+
+    spl.set_points(X,Y);    // currently it is required that X is already sorted
+
+    double x=1.5;
+    double result=spl(x);
+    EXPECT_NEAR(result,0.915345,1e-6);
+  }
+
   TEST_F(TestUtilities, GlobSearchFiles){
     std::string strTest("*duGrandNimporteQuoi*");
     std::stringstream buffer;
@@ -188,7 +208,7 @@ namespace{
     }
     std::string stdoutval = buffer.str();
     redirectObj.~cerr_redirect(); // redirect to standard output buffer.
-    EXPECT_EQ("glob() failed with return_value -3\n", stdoutval) << "Glob should return -3 to std output.";
+    EXPECT_EQ("glob() failed with return_value -3 for "+strTest+"\n\n", stdoutval) << "Glob should return -3 to std output.";
   }
 
   // TEST_F(TestGreenStuff, copyAssignment){
