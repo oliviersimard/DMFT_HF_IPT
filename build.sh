@@ -12,17 +12,17 @@ read -p "parallelized calculations? (y or n): " PRLL
 if [ ! -d $dir ]; then
         mkdir ${dir}
 else
-        echo -e "Directory $dir already exists.\n"
+        echo -e "Directory $dir already exists."
 fi
 if [ ! -d $dirTest ]; then
         mkdir ${dirTest}
 else
-        echo -e "Directory $dirTest already exists.\n"
+        echo -e "Directory $dirTest already exists."
 fi
 if [ ! -d $dirData ]; then
         mkdir ${dirData}
 else
-        echo -e "Directory $dirData already exists.\n"
+        echo -e "Directory $dirData already exists."
 fi
 
 

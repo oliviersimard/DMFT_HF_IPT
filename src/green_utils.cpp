@@ -1,6 +1,6 @@
 #include "green_utils.hpp"
 
-unsigned int iter=0;
+//unsigned int iter=0;
 std::vector<double> vecK;
 std::vector< std::complex<double> > iwnArr_l;
 std::vector< std::complex<double> > iqnArr_l;

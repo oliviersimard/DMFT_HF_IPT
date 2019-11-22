@@ -4,11 +4,11 @@ project(HubbardIPT)
 
 # Setting c++ custom preprocessing flags
 set(CMPLR "clang" CACHE STRING "Determines the compiler.") # Use for instance cmake -DCMPLR:STRING=gcc ..
-message(WARNING "Compiler chosen is: " ${CMPLR})
+message(STATUS "Compiler chosen is: " ${CMPLR})
 set(DIM "oneD" CACHE STRING "Determines the dimensions for calculations.") # Use for instance cmake -DDIM:STRING=twoD ..
-message(WARNING "Dimension: " ${DIM})
+message(STATUS "Dimension: " ${DIM})
 set(PRLL OFF CACHE STRING "Determines whether the program is parallelized or not.") # Use for instance cmake -DDIM:BOOL=ON ..
-message(WARNING "Parallelization: " ${PRLL})
+message(STATUS "Parallelization: " ${PRLL})
 
 if (${CMPLR} STREQUAL "clang")
         if (${DIM} STREQUAL "oneD")

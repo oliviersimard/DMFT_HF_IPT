@@ -8,7 +8,7 @@
 #include <iostream>
 #include <assert.h> // For assert()
 
-//#define DIM 1
+#define DIM 1
 #define SPINDEG 2
 
 // Some declarations
@@ -23,7 +23,7 @@ template<class T> class Susceptibility;
 extern std::vector<double> vecK;
 extern std::vector< std::complex<double> > iwnArr_l;
 extern std::vector< std::complex<double> > iqnArr_l;
-extern unsigned int iter;
+//extern unsigned int iter;
 extern const arma::Mat< std::complex<double> > ZEROS_;
 extern arma::Mat< std::complex<double> > statMat;
 
