@@ -7,6 +7,7 @@ arma::Mat< std::complex<double> > matWeigths;
 arma::Mat< std::complex<double> > matTotSus;
 arma::Mat< std::complex<double> > matCorr;
 arma::Mat< std::complex<double> > matMidLev;
+int root_process=0;
 
 #if DIM == 1
 void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_prototype sp) const{ 
@@ -31,7 +32,9 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
                 tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                 tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 if ((wtilde==0) && (wbar==0)){
-                    std::cout << "Thread id: " << std::this_thread::get_id() << std::endl;
+                    int world_rank;
+                    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+                    std::cout << "Process id: " << world_rank << std::endl;
                     std::cout << "ktilde: " << _Gk._kArr_l[ktilde] << std::endl;
                     std::cout << "kbar: " << _Gk._kArr_l[kbar] << std::endl;
                     std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << std::endl;
@@ -66,7 +69,9 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
                 tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                 tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 if ((wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline.iwn_array.size()/2))){
-                    std::cout << "Thread id: " << std::this_thread::get_id() << std::endl;
+                    int world_rank;
+                    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+                    std::cout << "Process id: " << world_rank << std::endl;
                     std::cout << "ktilde: " << _splInline.k_array[ktilde] << std::endl;
                     std::cout << "kbar: " << _splInline.k_array[kbar] << std::endl;
                     std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << std::endl;
@@ -240,4 +245,19 @@ void ThreadWrapper::join_all(std::vector<std::thread>& grp) const{
             thread.join();
         }
     }
+}
+
+void get_vector_mpi(size_t totSize,bool is_jj,solver_prototype sp,std::vector<mpistruct_t>* vec_root_process){
+    size_t idx=0;
+    for (size_t lkt=0; lkt<vecK.size(); lkt++){
+        for (size_t lkb=0; lkb<vecK.size(); lkb++){
+            mpistruct_t MPIObj;
+            MPIObj._lkt=lkt;
+            MPIObj._lkb=lkb;
+            MPIObj._is_jj=is_jj;
+            MPIObj._sp=sp;
+            vec_root_process->at(idx) = MPIObj;
+            idx++;
+        }
+    }       
 }

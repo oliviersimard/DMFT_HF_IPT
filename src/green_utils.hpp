@@ -19,6 +19,8 @@ namespace ThreadFunctor{ class ThreadWrapper; };
 namespace ThreadFunctor{ enum solver_prototype : short; };
 //class FFTtools;
 template<class T> class Susceptibility;
+namespace ThreadFunctor{ struct mpistruct; };
+typedef ThreadFunctor::mpistruct mpistruct_t;
 
 extern std::vector<double> vecK;
 extern std::vector< std::complex<double> > iwnArr_l;
@@ -132,6 +134,7 @@ namespace HF{
         friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
         public:
             explicit FunctorBuildGk(double,double,double,double,std::vector<double>&,unsigned int,unsigned int,std::vector< std::complex<double> >&);
+            FunctorBuildGk& operator=(const FunctorBuildGk& obj);
             FunctorBuildGk()=default;
             #if DIM == 1
             arma::Mat< std::complex<double> > operator()(int j, double kx) const{

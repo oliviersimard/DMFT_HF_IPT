@@ -70,6 +70,22 @@ namespace HF{
             this->_precomp_qn.push_back(q(j));
         }
     }
+    FunctorBuildGk& FunctorBuildGk::operator=(const FunctorBuildGk& obj){
+        if (this != &obj){
+            this->_beta=obj._beta;
+            this->_u=obj._u;
+            this->_size=obj._size;
+            this->_Nk=obj._Nk;
+            this->_Nit=obj._Nit;
+            this->_ndo=obj._ndo;
+            this->_mu=obj._mu;
+            this->_Gup_k=obj._Gup_k;
+            this->_kArr_l=obj._kArr_l;
+            this->_precomp_qn=obj._precomp_qn;
+            this->_precomp_wn=obj._precomp_wn;
+        }
+        return *this;
+    }
     #if DIM == 1
     arma::Mat< std::complex<double> > FunctorBuildGk::buildGkAA_1D(int j, double kx) const{
         statMat(0,0) = 1.0/( w(j,_mu) - _u*_ndo - epsilonk(kx)*epsilonk(kx)/( w(j,_mu) - _u*(1.0-_ndo) ) ); // G^{AA}_{up}

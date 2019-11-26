@@ -2,6 +2,12 @@
 #include "src/json_utils.hpp"
 
 int main(int argc, char** argv){
+    #ifdef PARALLEL
+    int world_rank, world_size;
+    MPI_Init(&argc,&argv);
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD,&world_size);
+    #endif
     // Loading parameters from Json file
     #ifndef DEBUG
     const std::string filename("./../params.json"); // ../ necessary because compiled inside build directory using CMake. For Makefile, set to params.json only (Debug mode).
@@ -126,6 +132,7 @@ int main(int argc, char** argv){
 
                     /* Calculation Susceptibilities. The second template argument specifies the type of the SplineInline object. */
                     #ifdef PARALLEL
+                    MPI_Barrier(MPI_COMM_WORLD);
                     calculateSusceptibilitiesParallel<IPT2::DMFTproc>(splInlineObj,pathToDir,customDirName,is_full,is_jj,ThreadFunctor::solver_prototype::IPT2_prot);
                     #else
                     calculateSusceptibilities<IPT2::DMFTproc>(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
@@ -160,6 +167,7 @@ int main(int argc, char** argv){
                     exit(1);
                 }
                 #ifdef PARALLEL
+                MPI_Barrier(MPI_COMM_WORLD);
                 calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj,ndo_converged,ThreadFunctor::solver_prototype::HF_prot);
                 #else
                 calculateSusceptibilities<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj);
@@ -167,6 +175,5 @@ int main(int argc, char** argv){
             }
         }
     }
-
     return 0;
 }
