@@ -127,70 +127,55 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     if (world_rank==root_process){
         // First initialize the data array to be distributed across all the processes called in.
         get_vector_mpi(totSize,is_jj,sp,vec_root_process);
-
         /* distribute a portion of the bector to each child process */
-   
         for(int an_id = 1; an_id < world_size; an_id++) {
             start_arr = an_id*num_elements_per_proc + 1;
             end_arr = (an_id + 1)*num_elements_per_proc;
-
             if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
                end_arr = totSize - 1;
-
             num_elems_to_send = end_arr - start_arr + 1;
-
             ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
-
             ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
                   an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
         }
         /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
         mpistruct_t tmpObj;
-        for (int i=0; i<num_elements_per_proc; i++){
+        for (int i=0; i<=num_elements_per_proc; i++){
             tmpObj=vec_root_process->at(i);
-            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp); // Performing the calculations here...
+            //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp); // Performing the calculations here...
+            printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
         }
         MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
-        printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
-
         /* Gather the results from the child processes into the externally linked matrices meant for this purpose. */
-        char chars_to_receive[30];
         for(int an_id = 1; an_id < world_size; an_id++) {
-            
-            ierr = MPI_Recv( chars_to_receive, 30, MPI_CHAR, MPI_ANY_SOURCE,
+            char chars_to_receive[50];
+            ierr = MPI_Recv( chars_to_receive, 50, MPI_CHAR, MPI_ANY_SOURCE,
                   RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
-  
             sender = status.MPI_SOURCE;
-
             printf("Slave process %i returned\n", sender);
-     
+            printf("%s\n",chars_to_receive);
         }
     } else{
         /* Slave processes receive their part of work from the root process. */
-
         ierr = MPI_Recv( &num_elems_to_receive, 1, MPI_INT, 
                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
-          
         ierr = MPI_Recv( (void*)(vec_slave_processes->data()), sizeof(mpistruct_t)*num_elems_to_receive, MPI_BYTE, 
                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
-
         /* Calculate the sum of my portion of the array */
         mpistruct_t tmpObj;
         for(int i = 0; i < num_elems_to_receive; i++) {
             tmpObj = vec_slave_processes->at(i);
-            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
-            printf("vec_slave_processes el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
+            //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
+            printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
         }
-        char chars_to_send[30];
-        sprintf(chars_to_send,"vec_slave_processes el %d completed", world_rank);
+        char chars_to_send[50];
+        sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
         /* Finally send integers to root process to notify the state of the calculations. */
-        
-        ierr = MPI_Send( chars_to_send, 30, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
+        ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
         MPI_Barrier(MPI_COMM_WORLD);
     }
     delete vec_root_process;
     delete vec_slave_processes;
-    ierr = MPI_Finalize();
     #elif DIM == 2
     HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
     ThreadFunctor::ThreadWrapper threadObj(Gk,qq,ndo_converged);
@@ -239,6 +224,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         it+=NUM_THREADS;
     }
     #endif
+    // To make sure not all the processes save at the same time in the same file.
     outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
     outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
     outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
@@ -255,6 +241,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     outputChispspGamma.close();
     outputChispspWeights.close();
     outputChispspTotSus.close();
+    ierr = MPI_Finalize();
 }
 
 template<>
@@ -280,70 +267,55 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     if (world_rank==root_process){
         // First initialize the data array to be distributed across all the processes called in.
         get_vector_mpi(totSize,is_jj,sp,vec_root_process);
-
         /* distribute a portion of the bector to each child process */
-   
         for(int an_id = 1; an_id < world_size; an_id++) {
             start_arr = an_id*num_elements_per_proc + 1;
             end_arr = (an_id + 1)*num_elements_per_proc;
-
             if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
                end_arr = totSize - 1;
-
             num_elems_to_send = end_arr - start_arr + 1;
-
             ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
-
             ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
                   an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
         }
         /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
         mpistruct_t tmpObj;
-        for (int i=0; i<num_elements_per_proc; i++){
+        for (int i=0; i<=num_elements_per_proc; i++){
             tmpObj=vec_root_process->at(i);
             threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp); // Performing the calculations here...
         }
         MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
         printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
-
         /* Gather the results from the child processes into the externally linked matrices meant for this purpose. */
-        char chars_to_receive[30];
         for(int an_id = 1; an_id < world_size; an_id++) {
-            
-            ierr = MPI_Recv( chars_to_receive, 30, MPI_CHAR, MPI_ANY_SOURCE,
-                  RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
-  
+            char chars_to_receive[50];
+            ierr = MPI_Recv( chars_to_receive, 50, MPI_CHAR, MPI_ANY_SOURCE,
+                 RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
             sender = status.MPI_SOURCE;
-
             printf("Slave process %i returned\n", sender);
-     
+            printf("%s\n",chars_to_receive);
         }
     } else{
         /* Slave processes receive their part of work from the root process. */
-
         ierr = MPI_Recv( &num_elems_to_receive, 1, MPI_INT, 
                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
-          
         ierr = MPI_Recv( (void*)(vec_slave_processes->data()), sizeof(mpistruct_t)*num_elems_to_receive, MPI_BYTE, 
                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
-
         /* Calculate the sum of my portion of the array */
         mpistruct_t tmpObj;
         for(int i = 0; i < num_elems_to_receive; i++) {
             tmpObj = vec_slave_processes->at(i);
             threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
-            printf("vec_slave_processes el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
+            printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
         }
-        char chars_to_send[30];
-        sprintf(chars_to_send,"vec_slave_processes el %d completed", world_rank);
+        char chars_to_send[50];
+        sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
         /* Finally send integers to root process to notify the state of the calculations. */
-        
-        ierr = MPI_Send( chars_to_send, 30, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
+        ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
         MPI_Barrier(MPI_COMM_WORLD);
     }
     delete vec_root_process;
     delete vec_slave_processes;
-    ierr = MPI_Finalize();
     #elif DIM == 2
     HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
     ThreadFunctor::ThreadWrapper threadObj(qq,splInline);
@@ -392,6 +364,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         it+=NUM_THREADS;
     }
     #endif
+    // To make sure not all the processes save in the same file at the same time.
     outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
     outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
     outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
@@ -408,6 +381,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     outputChispspGamma.close();
     outputChispspWeights.close();
     outputChispspTotSus.close();
+    ierr = MPI_Finalize();
 }
 #endif /* PARALLEL */
 

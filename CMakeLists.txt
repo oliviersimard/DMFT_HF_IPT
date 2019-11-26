@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.02 FATAL_ERROR)
 
 project(HubbardIPT)
 
+# Locate MPI
+find_package(MPI REQUIRED)
+include_directories(${MPI_CXX_INCLUDE_PATH})
+message(STATUS "MPI CXX COMPILER IS: " ${MPI_CXX_COMPILER})
+
 # Setting c++ custom preprocessing flags
 set(CMPLR "clang" CACHE STRING "Determines the compiler.") # Use for instance cmake -DCMPLR:STRING=gcc ..
 message(STATUS "Compiler chosen is: " ${CMPLR})
@@ -40,13 +45,9 @@ elseif (${CMPLR} STREQUAL "gcc")
         endif()
 endif()
 set(CMAKE_SOURCE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/cmake_source")
-message("CMAKE_SOURCE_PREFIX for GMock setup: " ${CMAKE_SOURCE_PREFIX})
+message(STATUS "CMAKE_SOURCE_PREFIX for GMock setup: " ${CMAKE_SOURCE_PREFIX})
 
-if (${CMPLR} STREQUAL "clang")
-        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
-elseif (${CMPLR} STREQUAL "gcc")
-        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit pthread)
-endif()
+set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
 
 set(SOURCES_COMMON
         src/IPT2nd3rdorderSingle2
@@ -54,8 +55,7 @@ set(SOURCES_COMMON
         src/green_utils
         src/file_utils
         src/json_utils
-        src/thread_utils
-        src/susceptibilities)
+        src/thread_utils)
 
 set(SOURCES_MAIN mainIPT ${SOURCES_COMMON})
 set(SOURCES_TEST test/src/test_utils)
