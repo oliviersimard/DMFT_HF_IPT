@@ -8,12 +8,20 @@ arma::Mat< std::complex<double> > matTotSus;
 arma::Mat< std::complex<double> > matCorr;
 arma::Mat< std::complex<double> > matMidLev;
 int root_process=0;
+std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matGammaSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
+std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matWeightsSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
+std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matTotSusSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
+std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matCorrSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
+std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matMidLevSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
 
 #if DIM == 1
-void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_prototype sp) const{ 
+void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_prototype sp) const{
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> tmp_val_kt_kb(0.0,0.0);
     std::complex<double> tmp_val_weights(0.0,0.0);
     std::complex<double> tmp_val_tot_sus(0.0,0.0);
+    std::complex<double> val_jj;
     switch(sp){
     case solver_prototype::HF_prot:
         for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
@@ -45,11 +53,20 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
         // lock_guard<mutex> guard(mutx); 
         matGamma(kbar,ktilde) = tmp_val_kt_kb*1.0/(_Gk._beta)/(_Gk._beta); // These matrices are static variables.
         matWeigths(kbar,ktilde) = tmp_val_weights*1.0/(_Gk._beta)/(_Gk._beta);
+        if (world_rank != root_process){ // Saving into vector of tuples.
+            matGammaSlaves->push_back( std::make_tuple( kbar, ktilde, tmp_val_kt_kb*1.0/(_Gk._beta)/(_Gk._beta) ) );
+            matWeightsSlaves->push_back( std::make_tuple( kbar, ktilde, tmp_val_weights*1.0/(_Gk._beta)/(_Gk._beta) ) );
+        }
         if (!is_jj){
             matTotSus(kbar,ktilde) = 1.0/(_Gk._beta)/(_Gk._beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
+            if (world_rank != root_process)
+                matTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, 1.0/(_Gk._beta)/(_Gk._beta)*tmp_val_tot_sus ) );
         }
         else if (is_jj){
-            matTotSus(kbar,ktilde) = -1.0/(_Gk._beta)/(_Gk._beta)*(-2.0*std::sin(_Gk._kArr_l[ktilde]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[kbar]));
+            val_jj = -1.0/(_Gk._beta)/(_Gk._beta)*(-2.0*std::sin(_Gk._kArr_l[ktilde]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[kbar]));
+            matTotSus(kbar,ktilde) = val_jj;
+            if (world_rank != root_process)
+                matTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, val_jj ) );
         }
         break;
     case solver_prototype::IPT2_prot:    
@@ -82,11 +99,20 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
         // lock_guard<mutex> guard(mutx); 
         matGamma(kbar,ktilde) = tmp_val_kt_kb*1.0/(GreenStuff::beta)/(GreenStuff::beta); // These matrices are static variables.
         matWeigths(kbar,ktilde) = tmp_val_weights*1.0/(GreenStuff::beta)/(GreenStuff::beta);
+        if (world_rank != root_process){
+            matGammaSlaves->push_back( std::make_tuple( kbar, ktilde, tmp_val_kt_kb*1.0/(GreenStuff::beta)/(GreenStuff::beta) ) );
+            matWeightsSlaves->push_back( std::make_tuple( kbar, ktilde, tmp_val_weights*1.0/(GreenStuff::beta)/(GreenStuff::beta) ) );
+        }
         if (!is_jj){
             matTotSus(kbar,ktilde) = 1.0/(GreenStuff::beta)/(GreenStuff::beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
+            if (world_rank != root_process)
+                matTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, 1.0/(GreenStuff::beta)/(GreenStuff::beta)*tmp_val_tot_sus ) );
         }
         else if (is_jj){
-            matTotSus(kbar,ktilde) = -1.0/(GreenStuff::beta)/(GreenStuff::beta)*(-2.0*std::sin(_splInline.k_array[ktilde]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[kbar]));
+            val_jj = -1.0/(GreenStuff::beta)/(GreenStuff::beta)*(-2.0*std::sin(_splInline.k_array[ktilde]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[kbar]));
+            matTotSus(kbar,ktilde) = val_jj;
+            if (world_rank != root_process)
+                matTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, val_jj ) );
         }
         break;
     }
