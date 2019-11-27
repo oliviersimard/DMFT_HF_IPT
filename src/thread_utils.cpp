@@ -23,8 +23,6 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
     std::complex<double> tmp_val_tot_sus(0.0,0.0);
     std::complex<double> val_jj;
     std::complex<double> tmp_val_kt_kb_tmp, tmp_val_weights_tmp;
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     switch(sp){
     case solver_prototype::HF_prot:
         for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
@@ -328,15 +326,6 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 }
 
 #endif /* DIM */
-
-
-void ThreadWrapper::join_all(std::vector<std::thread>& grp) const{
-    for (auto& thread : grp){
-        if (thread.joinable()){
-            thread.join();
-        }
-    }
-}
 
 void get_vector_mpi(size_t totSize,bool is_jj,solver_prototype sp,std::vector<mpistruct_t>* vec_root_process){
     size_t idx=0;

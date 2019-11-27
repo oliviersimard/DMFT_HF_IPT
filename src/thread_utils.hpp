@@ -3,8 +3,6 @@
 
 #define PARALLEL
 
-#include<mutex>
-#include<thread>
 #ifdef PARALLEL
 #include<mpi.h>
 #endif
@@ -20,7 +18,6 @@
 #define RETURN_DATA_TAG_WEIGHTS 3002
 #define RETURN_DATA_TAG_TOT_SUS 3003
 
-static std::mutex mutx;
 extern arma::Mat< std::complex<double> > matGamma; // Matrices used in case parallel.
 extern arma::Mat< std::complex<double> > matWeigths;
 extern arma::Mat< std::complex<double> > matTotSus;
@@ -67,7 +64,6 @@ namespace ThreadFunctor{
             std::complex<double> gamma_twoD_spsp_full_lower_IPT(double kpx,double kpy,double kbarx,double kbary,std::complex<double> iknp,std::complex<double> wbar) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
-            void join_all(std::vector<std::thread>& grp) const;
         private:
             double _ndo_converged {0.0};
             HF::FunctorBuildGk _Gk={};
