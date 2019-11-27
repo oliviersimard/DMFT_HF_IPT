@@ -27,11 +27,11 @@ extern arma::Mat< std::complex<double> > matTotSus;
 extern arma::Mat< std::complex<double> > matCorr;
 extern arma::Mat< std::complex<double> > matMidLev;
 extern int root_process;
-extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matGammaSlaves;
-extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matWeightsSlaves;
-extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matTotSusSlaves;
-extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matCorrSlaves;
-extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matMidLevSlaves;
+extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaSlaves;
+extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsSlaves;
+extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecTotSusSlaves;
+extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrSlaves;
+extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevSlaves;
 
 
 template<typename T> 
@@ -162,9 +162,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         for(int an_id = 1; an_id < world_size; an_id++) {
             char chars_to_receive[50];
             int sizeOfGamma, sizeOfWeights, sizeOfTotSus;
-            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
-            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matWeightsTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
-            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* matTotSusTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecTotSusTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
             // Should send the sizes of the externally linked vectors of tuples to be able to receive. That is why the need to probe...
             MPI_Probe(an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,&status);
             MPI_Get_count(&status,MPI_BYTE,&sizeOfGamma);
@@ -175,18 +175,35 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             
             ierr = MPI_Recv( chars_to_receive, 50, MPI_CHAR, an_id,
                   RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
-            ierr = MPI_Recv( (void*)(matTotSusTmp->data()), sizeOfTotSus, MPI_BYTE, an_id,
+            ierr = MPI_Recv( (void*)(vecTotSusTmp->data()), sizeOfTotSus, MPI_BYTE, an_id,
                   RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            ierr = MPI_Recv( (void*)(matWeightsTmp->data()), sizeOfWeights, MPI_BYTE, an_id,
+            ierr = MPI_Recv( (void*)(vecWeightsTmp->data()), sizeOfWeights, MPI_BYTE, an_id,
                   RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            ierr = MPI_Recv( (void*)(matGammaTmp->data()), sizeOfGamma, MPI_BYTE, an_id,
+            ierr = MPI_Recv( (void*)(vecGammaTmp->data()), sizeOfGamma, MPI_BYTE, an_id,
                   RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             sender = status.MPI_SOURCE;
             printf("Slave process %i returned\n", sender);
             printf("%s\n",chars_to_receive);
-            std::cout << "Data receiving from source " << sender << ": " << std::endl;
-            delete matGammaTmp; delete matWeightsTmp;
-            delete matTotSusTmp;
+            /* Now the data received from the other processes have to be stored in their arma::Mats on root process */
+            const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
+            size_t kt,kb,ii;
+            for (ii=0; ii<sizeOfGamma/sizeOfTuple; ii++){
+                kb=std::get<0>(vecGammaTmp->at(ii));
+                kt=std::get<1>(vecGammaTmp->at(ii));
+                matGamma(kb,kt)=std::get<2>(vecGammaTmp->at(ii));
+            }
+            for (ii=0; ii<sizeOfWeights/sizeOfTuple; ii++){
+                kb=std::get<0>(vecWeightsTmp->at(ii));
+                kt=std::get<1>(vecWeightsTmp->at(ii));
+                matWeigths(kb,kt)=std::get<2>(vecWeightsTmp->at(ii));
+            }
+            for (ii=0; ii<sizeOfTotSus/sizeOfTuple; ii++){
+                kb=std::get<0>(vecTotSusTmp->at(ii));
+                kt=std::get<1>(vecTotSusTmp->at(ii));
+                matTotSus(kb,kt)=std::get<2>(vecTotSusTmp->at(ii));
+            }
+            delete vecGammaTmp; delete vecWeightsTmp;
+            delete vecTotSusTmp;
         }
     } else{
         /* Slave processes receive their part of work from the root process. */
@@ -194,7 +211,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
         ierr = MPI_Recv( (void*)(vec_slave_processes->data()), sizeof(mpistruct_t)*num_elems_to_receive, MPI_BYTE, 
                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
-        /* Calculate the sum of my portion of the array */
+        /* Calculate the sum of the portion of the array */
         mpistruct_t tmpObj;
         for(int i = 0; i < num_elems_to_receive; i++) {
             tmpObj = vec_slave_processes->at(i);
@@ -207,13 +224,12 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         /* Finally send integers to root process to notify the state of the calculations. */
         // Data for matrices is stored in a column-by-column order. Why using strans method...
         // std::complex<double>* matGammaPtr=matGamma.memptr(), *matWeightsPtr=matWeigths.memptr(), *matTotSusPtr=matTotSus.memptr();
-        std::cout << "LLLL down: " << sizeof(std::tuple< size_t,size_t,std::complex<double> >)*matGammaSlaves->size() << std::endl;
-        ierr = MPI_Send( (void*)(matGammaSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*matGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
-        ierr = MPI_Send( (void*)(matWeightsSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*matWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
-        ierr = MPI_Send( (void*)(matTotSusSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*matTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
         ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
-        delete matGammaSlaves;
-        delete matWeightsSlaves; delete matTotSusSlaves;
+        delete vecGammaSlaves;
+        delete vecWeightsSlaves; delete vecTotSusSlaves;
     }
     delete vec_root_process;
     delete vec_slave_processes;
@@ -266,22 +282,24 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     }
     #endif
     // To make sure not all the processes save at the same time in the same file.
-    outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
-    outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
-    outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
-    for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
-        for (size_t kbar=0; kbar<vecK.size(); kbar++){
-            outputChispspGamma << matGamma(kbar,ktilde) << " ";
-            outputChispspWeights << matWeigths(kbar,ktilde) << " ";
-            outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
+    if (world_rank == root_process){
+        outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
+        outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
+        outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
+        for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
+            for (size_t kbar=0; kbar<vecK.size(); kbar++){
+                outputChispspGamma << matGamma(kbar,ktilde) << " ";
+                outputChispspWeights << matWeigths(kbar,ktilde) << " ";
+                outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
+            }
+            outputChispspGamma << "\n";
+            outputChispspWeights << "\n";
+            outputChispspTotSus << "\n";
         }
-        outputChispspGamma << "\n";
-        outputChispspWeights << "\n";
-        outputChispspTotSus << "\n";
+        outputChispspGamma.close();
+        outputChispspWeights.close();
+        outputChispspTotSus.close();
     }
-    outputChispspGamma.close();
-    outputChispspWeights.close();
-    outputChispspTotSus.close();
     ierr = MPI_Finalize();
 }
 
@@ -330,11 +348,28 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         /* Gather the results from the child processes into the externally linked matrices meant for this purpose. */
         for(int an_id = 1; an_id < world_size; an_id++) {
             char chars_to_receive[50];
-            ierr = MPI_Recv( chars_to_receive, 50, MPI_CHAR, MPI_ANY_SOURCE,
-                 RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
+            int sizeOfGamma, sizeOfWeights, sizeOfTotSus;
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecTotSusTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            /* Need to probe the size of the messages sent by the slave processes, because the externally 
+                linked matrices on the root process have size 0. */
+            MPI_Probe(an_id,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD,&status);
+            MPI_Get_count(&status,MPI_BYTE,&sizeOfTotSus);
+            MPI_Probe(an_id,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD,&status);
+            MPI_Get_count(&status,MPI_BYTE,&sizeOfWeights);
+            MPI_Probe(an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,&status);
+            MPI_Get_count(&status,MPI_BYTE,&sizeOfGamma);
+            // Now that the sizes have been guessed, the messages can be captured.
+            ierr = MPI_Recv( chars_to_receive, 50, MPI_CHAR, an_id, RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
+            ierr = MPI_Recv( (void*)(vecTotSusTmp->data()),sizeOfTotSus,MPI_BYTE,an_id,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD,MPI_STATUS_IGNORE );
+            ierr = MPI_Recv( (void*)(vecWeightsTmp->data()),sizeOfWeights,MPI_BYTE,an_id,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD,MPI_STATUS_IGNORE );
+            ierr = MPI_Recv( (void*)(vecGammaTmp->data()),sizeOfGamma,MPI_BYTE,an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,MPI_STATUS_IGNORE );
             sender = status.MPI_SOURCE;
             printf("Slave process %i returned\n", sender);
             printf("%s\n",chars_to_receive);
+            delete vecGammaTmp; delete vecWeightsTmp;
+            delete vecTotSusTmp;
         }
     } else{
         /* Slave processes receive their part of work from the root process. */
@@ -349,11 +384,16 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
             printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
         }
+        MPI_Barrier(MPI_COMM_WORLD);
         char chars_to_send[50];
+        const size_t sizeOfTup = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
         sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
         /* Finally send integers to root process to notify the state of the calculations. */
         ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecGammaSlaves->data()),sizeOfTup*vecGammaSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD );
+        ierr = MPI_Send( (void*)(vecWeightsSlaves->data()),sizeOfTup*vecWeightsSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD );
+        ierr = MPI_Send( (void*)(vecTotSusSlaves->data()),sizeOfTup*vecTotSusSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD );
+
     }
     delete vec_root_process;
     delete vec_slave_processes;
@@ -406,22 +446,24 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     }
     #endif
     // To make sure not all the processes save in the same file at the same time.
-    outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
-    outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
-    outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
-    for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
-        for (size_t kbar=0; kbar<vecK.size(); kbar++){
-            outputChispspGamma << matGamma(kbar,ktilde) << " ";
-            outputChispspWeights << matWeigths(kbar,ktilde) << " ";
-            outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
+    if (world_rank != root_process){
+        outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
+        outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
+        outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
+        for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
+            for (size_t kbar=0; kbar<vecK.size(); kbar++){
+                outputChispspGamma << matGamma(kbar,ktilde) << " ";
+                outputChispspWeights << matWeigths(kbar,ktilde) << " ";
+                outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
+            }
+            outputChispspGamma << "\n";
+            outputChispspWeights << "\n";
+            outputChispspTotSus << "\n";
         }
-        outputChispspGamma << "\n";
-        outputChispspWeights << "\n";
-        outputChispspTotSus << "\n";
+        outputChispspGamma.close();
+        outputChispspWeights.close();
+        outputChispspTotSus.close();
     }
-    outputChispspGamma.close();
-    outputChispspWeights.close();
-    outputChispspTotSus.close();
     ierr = MPI_Finalize();
 }
 #endif /* PARALLEL */
