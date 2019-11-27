@@ -65,6 +65,8 @@ namespace ThreadFunctor{
             std::vector< std::complex<double> > buildGK2D_IPT(std::complex<double> ik, double kx, double ky) const;
             std::complex<double> gamma_twoD_spsp_full_lower(double kpx,double kpy,double kbarx,double kbary,std::complex<double> iknp,std::complex<double> wbar) const;
             std::complex<double> gamma_twoD_spsp_full_lower_IPT(double kpx,double kpy,double kbarx,double kbary,std::complex<double> iknp,std::complex<double> wbar) const;
+            std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
+            std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             void join_all(std::vector<std::thread>& grp) const;
         private:
             double _ndo_converged {0.0};
@@ -133,9 +135,14 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     const size_t num_elements_per_proc = totSize/world_size;
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
     std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc);
+    const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
     ThreadFunctor::ThreadWrapper threadObj(Gk,q,ndo_converged);
+    #elif DIM == 2
+    HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
+    ThreadFunctor::ThreadWrapper threadObj(Gk,qq,ndo_converged);
+    #endif
     if (world_rank==root_process){
         // First initialize the data array to be distributed across all the processes called in.
         get_vector_mpi(totSize,is_jj,sp,vec_root_process);
@@ -154,7 +161,11 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         mpistruct_t tmpObj;
         for (int i=0; i<=num_elements_per_proc; i++){
             tmpObj=vec_root_process->at(i);
+            #if DIM == 1
             threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp); // Performing the calculations here...
+            #elif DIM == 2
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj); // Performing the calculations here...
+            #endif
             printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
         }
         MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
@@ -185,7 +196,6 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             printf("Slave process %i returned\n", sender);
             printf("%s\n",chars_to_receive);
             /* Now the data received from the other processes have to be stored in their arma::Mats on root process */
-            const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
             size_t kt,kb,ii;
             for (ii=0; ii<sizeOfGamma/sizeOfTuple; ii++){
                 kb=std::get<0>(vecGammaTmp->at(ii));
@@ -215,7 +225,11 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         mpistruct_t tmpObj;
         for(int i = 0; i < num_elems_to_receive; i++) {
             tmpObj = vec_slave_processes->at(i);
+            #if DIM == 1
             threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
+            #elif DIM == 2
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj);
+            #endif
             printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
         }
         MPI_Barrier(MPI_COMM_WORLD);
@@ -224,63 +238,15 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         /* Finally send integers to root process to notify the state of the calculations. */
         // Data for matrices is stored in a column-by-column order. Why using strans method...
         // std::complex<double>* matGammaPtr=matGamma.memptr(), *matWeightsPtr=matWeigths.memptr(), *matTotSusPtr=matTotSus.memptr();
-        ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
-        ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
-        ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeof(std::tuple< size_t,size_t,std::complex<double> >)*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeOfTuple*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeOfTuple*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
         ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
         delete vecGammaSlaves;
         delete vecWeightsSlaves; delete vecTotSusSlaves;
     }
     delete vec_root_process;
     delete vec_slave_processes;
-    #elif DIM == 2
-    HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
-    ThreadFunctor::ThreadWrapper threadObj(Gk,qq,ndo_converged);
-    while (it<totSize){
-        if (totSize % NUM_THREADS != 0){
-            if ( (totSize-it)<NUM_THREADS ){
-                size_t last_it=totSize-it;
-                std::vector<std::thread> tt(last_it);
-                for (size_t l=0; l<last_it; l++){
-                    ltot=it+l; // Have to make sure spans over the whole array of k-space.
-                    lkt = static_cast<size_t>(floor(ltot/vecK.size())); // Samples the rows
-                    lkb = (ltot % vecK.size()); // Samples the columns
-                    std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
-                    tt[l]=std::move(t);
-                    // tt[l]=thread(threadObj,lkt,lkb,beta);
-                }
-                threadObj.join_all(tt);
-            }
-            else{
-                std::vector<std::thread> tt(NUM_THREADS);
-                for (size_t l=0; l<NUM_THREADS; l++){
-                    ltot=it+l; // Have to make sure spans over the whole array of k-space.
-                    lkt = static_cast<size_t>(floor(ltot/vecK.size()));
-                    lkb = (ltot % vecK.size());
-                    std::cout << "lkt: " << lkt << " lkb: " << lkb << "\n";
-                    std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
-                    tt[l]=std::move(t);
-                    //tt.push_back(static_cast<thread&&>(t));
-                }
-                threadObj.join_all(tt);
-            }
-        }
-        else{
-            std::vector<std::thread> tt(NUM_THREADS);
-            for (size_t l=0; l<NUM_THREADS; l++){
-                ltot=it+l; // Have to make sure spans over the whole array of k-space.
-                lkt = static_cast<int>(floor(ltot/vecK.size()));
-                lkb = (ltot % vecK.size());
-                std::cout << "lkt: " << lkt << " lkb: " << lkb << "\n";
-                std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
-                tt[l]=std::move(t);
-                // tt[l]=thread(threadObj,lkt,lkb,beta);
-            }
-            threadObj.join_all(tt);
-        }
-        it+=NUM_THREADS;
-    }
-    #endif
     // To make sure not all the processes save at the same time in the same file.
     if (world_rank == root_process){
         outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
@@ -320,9 +286,14 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     const size_t num_elements_per_proc = totSize/world_size;
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
     std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc);
+    const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
     ThreadFunctor::ThreadWrapper threadObj(q,splInline);
+    #elif DIM == 2 
+    HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
+    ThreadFunctor::ThreadWrapper threadObj(qq,splInline);
+    #endif
     if (world_rank==root_process){
         // First initialize the data array to be distributed across all the processes called in.
         get_vector_mpi(totSize,is_jj,sp,vec_root_process);
@@ -341,7 +312,11 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         mpistruct_t tmpObj;
         for (int i=0; i<=num_elements_per_proc; i++){
             tmpObj=vec_root_process->at(i);
+            #if DIM == 1
             threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp); // Performing the calculations here...
+            #elif DIM == 2
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj);
+            #endif
         }
         MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
         printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
@@ -368,6 +343,22 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             sender = status.MPI_SOURCE;
             printf("Slave process %i returned\n", sender);
             printf("%s\n",chars_to_receive);
+            size_t kt,kb,ii;
+            for (ii=0; ii<sizeOfGamma/sizeOfTuple; ii++){
+                kb=std::get<0>(vecGammaTmp->at(ii));
+                kt=std::get<1>(vecGammaTmp->at(ii));
+                matGamma(kb,kt)=std::get<2>(vecGammaTmp->at(ii));
+            }
+            for (ii=0; ii<sizeOfWeights/sizeOfTuple; ii++){
+                kb=std::get<0>(vecWeightsTmp->at(ii));
+                kt=std::get<1>(vecWeightsTmp->at(ii));
+                matWeigths(kb,kt)=std::get<2>(vecWeightsTmp->at(ii));
+            }
+            for (ii=0; ii<sizeOfTotSus/sizeOfTuple; ii++){
+                kb=std::get<0>(vecTotSusTmp->at(ii));
+                kt=std::get<1>(vecTotSusTmp->at(ii));
+                matTotSus(kb,kt)=std::get<2>(vecTotSusTmp->at(ii));
+            }
             delete vecGammaTmp; delete vecWeightsTmp;
             delete vecTotSusTmp;
         }
@@ -381,70 +372,26 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         mpistruct_t tmpObj;
         for(int i = 0; i < num_elems_to_receive; i++) {
             tmpObj = vec_slave_processes->at(i);
+            #if DIM == 1
             threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
+            #elif DIM == 2
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj);
+            #endif
             printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
         }
         MPI_Barrier(MPI_COMM_WORLD);
         char chars_to_send[50];
-        const size_t sizeOfTup = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
         sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
         /* Finally send integers to root process to notify the state of the calculations. */
         ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
-        ierr = MPI_Send( (void*)(vecGammaSlaves->data()),sizeOfTup*vecGammaSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD );
-        ierr = MPI_Send( (void*)(vecWeightsSlaves->data()),sizeOfTup*vecWeightsSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD );
-        ierr = MPI_Send( (void*)(vecTotSusSlaves->data()),sizeOfTup*vecTotSusSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD );
-
+        ierr = MPI_Send( (void*)(vecGammaSlaves->data()),sizeOfTuple*vecGammaSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD );
+        ierr = MPI_Send( (void*)(vecWeightsSlaves->data()),sizeOfTuple*vecWeightsSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD );
+        ierr = MPI_Send( (void*)(vecTotSusSlaves->data()),sizeOfTuple*vecTotSusSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD );
+        delete vecGammaSlaves; delete vecWeightsSlaves;
+        delete vecTotSusSlaves;
     }
     delete vec_root_process;
     delete vec_slave_processes;
-    #elif DIM == 2
-    HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
-    ThreadFunctor::ThreadWrapper threadObj(qq,splInline);
-    while (it<totSize){
-        if (totSize % NUM_THREADS != 0){
-            if ( (totSize-it)<NUM_THREADS ){
-                size_t last_it=totSize-it;
-                std::vector<std::thread> tt(last_it);
-                for (size_t l=0; l<last_it; l++){
-                    ltot=it+l; // Have to make sure spans over the whole array of k-space.
-                    lkt = static_cast<size_t>(floor(ltot/vecK.size())); // Samples the rows
-                    lkb = (ltot % vecK.size()); // Samples the columns
-                    std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
-                    tt[l]=std::move(t);
-                    // tt[l]=thread(threadObj,lkt,lkb,beta);
-                }
-                threadObj.join_all(tt);
-            }
-            else{
-                std::vector<std::thread> tt(NUM_THREADS);
-                for (int l=0; l<NUM_THREADS; l++){
-                    ltot=it+l; // Have to make sure spans over the whole array of k-space.
-                    lkt = static_cast<size_t>(floor(ltot/vecK.size()));
-                    lkb = (ltot % vecK.size());
-                    std::cout << "lkt: " << lkt << " lkb: " << lkb << "\n";
-                    std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
-                    tt[l]=std::move(t);
-                    //tt.push_back(static_cast<thread&&>(t));
-                }
-                threadObj.join_all(tt);
-            }
-        }
-        else{
-            std::vector<std::thread> tt(NUM_THREADS);
-            for (size_t l=0; l<NUM_THREADS; l++){
-                ltot=it+l; // Have to make sure spans over the whole array of k-space.
-                lkt = static_cast<int>(floor(ltot/vecK.size()));
-                lkb = (ltot % vecK.size());
-                std::cout << "lkt: " << lkt << " lkb: " << lkb << "\n";
-                std::thread t(std::ref(threadObj),sp,lkt,lkb,is_jj);
-                tt[l]=std::move(t);
-                // tt[l]=thread(threadObj,lkt,lkb,beta);
-            }
-            threadObj.join_all(tt);
-        }
-        it+=NUM_THREADS;
-    }
-    #endif
     // To make sure not all the processes save in the same file at the same time.
     if (world_rank != root_process){
         outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);

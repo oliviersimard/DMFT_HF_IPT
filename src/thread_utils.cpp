@@ -22,12 +22,15 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
     std::complex<double> tmp_val_weights(0.0,0.0);
     std::complex<double> tmp_val_tot_sus(0.0,0.0);
     std::complex<double> val_jj;
+    std::complex<double> tmp_val_kt_kb_tmp, tmp_val_weights_tmp;
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     switch(sp){
     case solver_prototype::HF_prot:
         for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
             for (size_t wbar=0; wbar<_Gk._size; wbar++){
-                std::complex<double> tmp_val_kt_kb_tmp = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
-                std::complex<double> tmp_val_weights_tmp = buildGK1D(
+                tmp_val_kt_kb_tmp = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
+                tmp_val_weights_tmp = buildGK1D(
                                     _Gk._precomp_wn[wtilde],_Gk._kArr_l[ktilde]
                                     )[0]*buildGK1D(
                                     _Gk._precomp_wn[wtilde]-_q._iwn,_Gk._kArr_l[ktilde]-_q._qx
@@ -40,12 +43,10 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
                 tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                 tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 if ((wtilde==0) && (wbar==0)){
-                    int world_rank;
-                    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
-                    std::cout << "Process id: " << world_rank << std::endl;
-                    std::cout << "ktilde: " << _Gk._kArr_l[ktilde] << std::endl;
-                    std::cout << "kbar: " << _Gk._kArr_l[kbar] << std::endl;
-                    std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << std::endl;
+                    std::cout << "Process id: " << world_rank << "\n";
+                    std::cout << "ktilde: " << _Gk._kArr_l[ktilde] << "\n";
+                    std::cout << "kbar: " << _Gk._kArr_l[kbar] << "\n";
+                    std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << "\n";
                     std::cout << "weights: " << tmp_val_weights << std::endl;
                 }
             } 
@@ -72,8 +73,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
     case solver_prototype::IPT2_prot:    
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
             for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
-                std::complex<double> tmp_val_kt_kb_tmp = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
-                std::complex<double> tmp_val_weights_tmp = buildGK1D_IPT(
+                tmp_val_kt_kb_tmp = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
+                tmp_val_weights_tmp = buildGK1D_IPT(
                                     _splInline.iwn_array[wtilde],_splInline.k_array[ktilde]
                                     )[0]*buildGK1D_IPT(
                                     _splInline.iwn_array[wtilde]-_q._iwn,_splInline.k_array[ktilde]-_q._qx
@@ -86,12 +87,10 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
                 tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                 tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 if ((wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline.iwn_array.size()/2))){
-                    int world_rank;
-                    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
-                    std::cout << "Process id: " << world_rank << std::endl;
-                    std::cout << "ktilde: " << _splInline.k_array[ktilde] << std::endl;
-                    std::cout << "kbar: " << _splInline.k_array[kbar] << std::endl;
-                    std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << std::endl;
+                    std::cout << "Process id: " << world_rank << "\n";
+                    std::cout << "ktilde: " << _splInline.k_array[ktilde] << "\n";
+                    std::cout << "kbar: " << _splInline.k_array[kbar] << "\n";
+                    std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << "\n";
                     std::cout << "weights: " << tmp_val_weights << std::endl;
                 }
             } 
@@ -155,7 +154,10 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_IPT(double ktilde,std::compl
 #elif DIM == 2
 void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj) const{
 /* In 2D, calculating the weights implies computing whilst dismissing the translational invariance of the vertex function (Gamma). */
-    std::complex<double> tmp_val_kt_kb(0.0,0.0);
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+    std::complex<double> tmp_val_kt_kb(0.0,0.0), tmp_val_weights(0.0,0.0), tmp_val_tot_sus(0.0,0.0);
+    std::complex<double> val_jj(0.0,0.0);
     double kbarx;
     switch(sp){
     case solver_prototype::HF_prot:
@@ -163,42 +165,74 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
         for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
             for (size_t wbar=0; wbar<_Gk._size; wbar++){
                 tmp_val_kt_kb += gamma_twoD_spsp(_Gk._kArr_l[kbarx_m_tildex],_Gk._kArr_l[kbary_m_tildey],_Gk._precomp_wn[wtilde],_Gk._precomp_wn[wbar]);
+                tmp_val_weights += getWeightsHF(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar);
                 if ((wtilde==0) && (wbar==0)){
-                    std::cout << "Thread id: " << std::this_thread::get_id() << std::endl;
-                    std::cout << "kbarx_m_tildex: " << _Gk._kArr_l[kbarx_m_tildex] << std::endl;
-                    std::cout << "kbary_m_tildey: " << _Gk._kArr_l[kbary_m_tildey] << std::endl;
-                    std::cout << "gamma_twoD_spsp: " << tmp_val_kt_kb << std::endl;
+                    std::cout << "Process id: " << world_rank << "\n";
+                    std::cout << "kbarx_m_tildex: " << _Gk._kArr_l[kbarx_m_tildex] << "\n";
+                    std::cout << "kbary_m_tildey: " << _Gk._kArr_l[kbary_m_tildey] << "\n";
+                    std::cout << "gamma_twoD_spsp: " << tmp_val_kt_kb << "\n";
+                    std::cout << "weights: " << tmp_val_weights << std::endl;
                 }
+                tmp_val_tot_sus += tmp_val_kt_kb*tmp_val_weights;
             } 
         }
         // lock_guard<mutex> guard(mutx);
-        if (!is_jj) matGamma(kbary_m_tildey,kbarx_m_tildex) = (1.0/_Gk._beta)*(1.0/_Gk._beta)*tmp_val_kt_kb; // These matrices are static variables.
-        else if (is_jj){
+        matWeigths(kbary_m_tildey,kbarx_m_tildex) = tmp_val_weights*(1.0/_Gk._beta)*(1.0/_Gk._beta);
+        matGamma(kbary_m_tildey,kbarx_m_tildex) = tmp_val_kt_kb*(1.0/_Gk._beta)*(1.0/_Gk._beta);
+        if (world_rank != root_process){ // Saving into vector of tuples..
+            vecGammaSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex, tmp_val_kt_kb*(1.0/_Gk._beta)*(1.0/_Gk._beta) ) );
+            vecWeightsSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex, tmp_val_weights*(1.0/_Gk._beta)*(1.0/_Gk._beta) ) );
+        }
+        if (!is_jj){
+            matTotSus(kbary_m_tildey,kbarx_m_tildex) = (1.0/_Gk._beta)*(1.0/_Gk._beta)*tmp_val_tot_sus; // These matrices are static variables.
+            if (world_rank != root_process)
+                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,(1.0/_Gk._beta)*(1.0/_Gk._beta)*tmp_val_tot_sus ) );
+        }
+        else if (is_jj){ // kbarx could also be kbary
             for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
                 kbarx = (_Gk._kArr_l[ktildex]-_Gk._kArr_l[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
-                matGamma(kbary_m_tildey,kbarx_m_tildex) += -1.0*(-2.0*std::sin(_Gk._kArr_l[ktildex]))*tmp_val_kt_kb*(-2.0*std::sin(kbarx))*(1.0/_Gk._Nk)*(1.0/_Gk._beta)*(1.0/_Gk._beta);
+                val_jj += -1.0*(-2.0*std::sin(_Gk._kArr_l[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
             }
+            matTotSus(kbary_m_tildey,kbarx_m_tildex)=val_jj*(1.0/_Gk._beta)*(1.0/_Gk._beta)*(1.0/_Gk._Nk);
+            if (world_rank != root_process)
+                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,val_jj ) );
         }
         break;
     case solver_prototype::IPT2_prot:
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
             for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
                 tmp_val_kt_kb += gamma_twoD_spsp_IPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],_splInline.iwn_array[wtilde],_splInline.iwn_array[wbar]);
+                tmp_val_weights += getWeightsIPT(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar);
                 if ((wtilde==0) && (wbar==0)){
-                    std::cout << "Thread id: " << std::this_thread::get_id() << std::endl;
-                    std::cout << "kbarx_m_tildex: " << _splInline.k_array[kbarx_m_tildex] << std::endl;
-                    std::cout << "kbary_m_tildey: " << _splInline.k_array[kbary_m_tildey] << std::endl;
-                    std::cout << "gamma_twoD_spsp: " << tmp_val_kt_kb << std::endl;
+                    std::cout << "Process id: " << world_rank << "\n";
+                    std::cout << "kbarx_m_tildex: " << _splInline.k_array[kbarx_m_tildex] << "\n";
+                    std::cout << "kbary_m_tildey: " << _splInline.k_array[kbary_m_tildey] << "\n";
+                    std::cout << "gamma_twoD_spsp: " << tmp_val_kt_kb << "\n";
+                    std::cout << "weights: " << tmp_val_weights << std::endl;
                 }
+                tmp_val_tot_sus+=tmp_val_kt_kb*tmp_val_weights;
             } 
         }
         // lock_guard<mutex> guard(mutx);
-        if (!is_jj) matGamma(kbary_m_tildey,kbarx_m_tildex) = (1.0/GreenStuff::beta)*(1.0/GreenStuff::beta)*tmp_val_kt_kb; // These matrices are static variables.
+        matGamma(kbary_m_tildey,kbarx_m_tildex) = tmp_val_kt_kb*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
+        matWeigths(kbary_m_tildey,kbarx_m_tildex) = tmp_val_weights*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
+        if (world_rank != root_process){
+            vecGammaSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_kt_kb*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta) ) );
+            vecWeightsSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_weights*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta) ) );
+        }
+        if (!is_jj){
+            matTotSus(kbary_m_tildey,kbarx_m_tildex) = (1.0/GreenStuff::beta)*(1.0/GreenStuff::beta)*tmp_val_tot_sus; // These matrices are static variables.
+            if (world_rank != root_process)
+                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta)*tmp_val_tot_sus ) );
+        }
         else if (is_jj){
             for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
                 kbarx = (_splInline.k_array[ktildex]-_splInline.k_array[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
-                matGamma(kbary_m_tildey,kbarx_m_tildex) += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_kt_kb*(-2.0*std::sin(kbarx))*(1.0/GreenStuff::N_k)*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
+                val_jj += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
             }
+            matTotSus(kbary_m_tildey,kbarx_m_tildex) = val_jj*(1.0/GreenStuff::N_k)*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
+            if (world_rank != root_process)
+                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,val_jj ) );
         }
         break;
     }
@@ -260,6 +294,37 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower_IPT(double kpx,do
     lower_level *= SPINDEG*GreenStuff::U/(GreenStuff::beta*(GreenStuff::N_k)*(GreenStuff::N_k)); /// No minus sign at ground level. Factor 2 for spin.
     lower_level += 1.0;
     return GreenStuff::U/lower_level; // Means that we have to multiply the middle level of this component by the two missing Green's functions.
+}
+
+
+std::complex<double> ThreadWrapper::getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const{
+    std::complex<double> tmp_val_weigths(0.0,0.0);
+    double kbary, kbarx;
+    for (size_t ktildey=0; ktildey<_Gk._kArr_l.size(); ktildey++){
+        kbary = _Gk._kArr_l[ktildey] - kbary_m_tildey;
+        for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
+            kbarx = _Gk._kArr_l[ktildex] - kbarx_m_tildex;
+            tmp_val_weigths += _Gk(wtilde,_Gk._kArr_l[ktildex],_Gk._kArr_l[ktildey])(0,0)*_Gk(wtilde+_qq._iwn,_Gk._kArr_l[ktildex]+_qq._qx,_Gk._kArr_l[ktildey]+_qq._qy
+                )(0,0)*_Gk(wbar+_qq._iwn,kbarx+_qq._qx,kbary+_qq._qy)(1,1)*_Gk(wbar,kbarx,kbary)(1,1);
+        }      
+    }
+    tmp_val_weigths*=1.0/_Gk._kArr_l.size()/_Gk._kArr_l.size();
+    return tmp_val_weigths;
+}
+
+std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const{
+    std::complex<double> tmp_val_weigths(0.0,0.0);
+    double kbary, kbarx;
+    for (size_t ktildey=0; ktildey<_splInline.k_array.size(); ktildey++){
+        kbary = _splInline.k_array[ktildey] - kbary_m_tildey;
+        for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
+            kbarx = _splInline.k_array[ktildex] - kbarx_m_tildex;
+            tmp_val_weigths += buildGK2D_IPT(wtilde,ktildex,ktildey)[0] * buildGK2D_IPT(wtilde+_qq._iwn,ktildex+_qq._qx,ktildey+_qq._qy
+                                )[0] * buildGK2D_IPT(wbar+_qq._iwn,kbarx+_qq._qx,kbary+_qq._qy)[1] * buildGK2D_IPT(wbar,kbarx,kbary)[1];
+        }      
+    }
+    tmp_val_weigths*=1.0/_splInline.k_array.size()/_splInline.k_array.size();
+    return tmp_val_weigths;
 }
 
 #endif /* DIM */

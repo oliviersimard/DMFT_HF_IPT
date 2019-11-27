@@ -8,7 +8,7 @@
 #include <iostream>
 #include <assert.h> // For assert()
 
-#define DIM 1
+#define DIM 2
 #define SPINDEG 2
 
 // Some declarations
