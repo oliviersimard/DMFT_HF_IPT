@@ -33,13 +33,13 @@ extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLe
 
 template<typename T> 
 inline void calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool,ThreadFunctor::solver_prototype);
-void get_vector_mpi(size_t totSize,bool is_jj,ThreadFunctor::solver_prototype sp,std::vector<mpistruct_t>* vec_root_process);
+void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,ThreadFunctor::solver_prototype sp,std::vector<mpistruct_t>* vec_root_process);
 
 namespace ThreadFunctor{
     enum solver_prototype : short { HF_prot, IPT2_prot };
     struct mpistruct{
         size_t _lkt, _lkb;
-        bool _is_jj;
+        bool _is_jj, _is_full;
         solver_prototype _sp;
     };
     class ThreadWrapper{ 
@@ -50,8 +50,8 @@ namespace ThreadFunctor{
             explicit ThreadWrapper(HF::K_1D q,IPT2::SplineInline< std::complex<double> > splInline);
             explicit ThreadWrapper(HF::K_2D qq,IPT2::SplineInline< std::complex<double> > splInline);
             ThreadWrapper()=default;
-            void operator()(size_t ktilde, size_t kbar, bool is_jj, solver_prototype sp) const; // 1D IPT/HF
-            void operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj) const; // 2D IPT/HF
+            void operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_full, solver_prototype sp) const; // 1D IPT/HF
+            void operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj, bool is_full) const; // 2D IPT/HF
             std::complex<double> gamma_oneD_spsp(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
             std::complex<double> gamma_oneD_spsp_IPT(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
             std::complex<double> gamma_twoD_spsp(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
@@ -60,8 +60,14 @@ namespace ThreadFunctor{
             std::vector< std::complex<double> > buildGK1D_IPT(std::complex<double> ik, double k) const;
             std::vector< std::complex<double> > buildGK2D(std::complex<double> ik, double kx, double ky) const;
             std::vector< std::complex<double> > buildGK2D_IPT(std::complex<double> ik, double kx, double ky) const;
-            std::complex<double> gamma_twoD_spsp_full_lower(double kpx,double kpy,double kbarx,double kbary,std::complex<double> iknp,std::complex<double> wbar) const;
-            std::complex<double> gamma_twoD_spsp_full_lower_IPT(double kpx,double kpy,double kbarx,double kbary,std::complex<double> iknp,std::complex<double> wbar) const;
+            std::complex<double> gamma_oneD_spsp_full_lower(double kp,double kbar,std::complex<double> iknp,std::complex<double> wbar) const;
+            std::complex<double> gamma_oneD_spsp_full_lower_IPT(double kp,double kbar,std::complex<double> iknp,std::complex<double> wbar) const;
+            std::complex<double> gamma_twoD_spsp_full_lower(double kpx,double kpy,double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> iknp,std::complex<double> wbar) const;
+            std::complex<double> gamma_twoD_spsp_full_lower_IPT(double kpx,double kpy,double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> iknp,std::complex<double> wbar) const;
+            std::complex<double> gamma_oneD_spsp_full_middle_plotting(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const;
+            std::complex<double> gamma_oneD_spsp_full_middle_plotting_IPT(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const;
+            std::complex<double> gamma_twoD_spsp_full_middle_plotting(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
+            std::complex<double> gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
         private:
@@ -141,7 +147,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     #endif
     if (world_rank==root_process){
         // First initialize the data array to be distributed across all the processes called in.
-        get_vector_mpi(totSize,is_jj,sp,vec_root_process);
+        get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
         /* distribute a portion of the bector to each child process */
         for(int an_id = 1; an_id < world_size; an_id++) {
             start_arr = an_id*num_elements_per_proc + 1;
@@ -158,9 +164,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         for (int i=0; i<=num_elements_per_proc; i++){
             tmpObj=vec_root_process->at(i);
             #if DIM == 1
-            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp); // Performing the calculations here...
+            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
             #elif DIM == 2
-            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj); // Performing the calculations here...
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full); // Performing the calculations here...
             #endif
             printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
         }
@@ -222,9 +228,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         for(int i = 0; i < num_elems_to_receive; i++) {
             tmpObj = vec_slave_processes->at(i);
             #if DIM == 1
-            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
+            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp);
             #elif DIM == 2
-            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj);
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
             #endif
             printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
         }
@@ -292,7 +298,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     #endif
     if (world_rank==root_process){
         // First initialize the data array to be distributed across all the processes called in.
-        get_vector_mpi(totSize,is_jj,sp,vec_root_process);
+        get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
         /* distribute a portion of the bector to each child process */
         for(int an_id = 1; an_id < world_size; an_id++) {
             start_arr = an_id*num_elements_per_proc + 1;
@@ -309,9 +315,9 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         for (int i=0; i<=num_elements_per_proc; i++){
             tmpObj=vec_root_process->at(i);
             #if DIM == 1
-            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp); // Performing the calculations here...
+            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
             #elif DIM == 2
-            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj);
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
             #endif
         }
         MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
@@ -369,9 +375,9 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         for(int i = 0; i < num_elems_to_receive; i++) {
             tmpObj = vec_slave_processes->at(i);
             #if DIM == 1
-            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._sp);
+            threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp);
             #elif DIM == 2
-            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj);
+            threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
             #endif
             printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
         }

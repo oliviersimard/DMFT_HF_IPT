@@ -15,7 +15,7 @@ std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrSlaves =
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
 
 #if DIM == 1
-void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_prototype sp) const{
+void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_full, solver_prototype sp) const{
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> tmp_val_kt_kb(0.0,0.0);
@@ -27,7 +27,10 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
     case solver_prototype::HF_prot:
         for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
             for (size_t wbar=0; wbar<_Gk._size; wbar++){
-                tmp_val_kt_kb_tmp = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
+                if (!is_full)
+                    tmp_val_kt_kb_tmp = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
+                else
+                    tmp_val_kt_kb_tmp = gamma_oneD_spsp_full_middle_plotting(_Gk._kArr_l[ktilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar],_Gk._precomp_wn[wtilde]);
                 tmp_val_weights_tmp = buildGK1D(
                                     _Gk._precomp_wn[wtilde],_Gk._kArr_l[ktilde]
                                     )[0]*buildGK1D(
@@ -68,10 +71,13 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, solver_pr
                 vecTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, val_jj ) );
         }
         break;
-    case solver_prototype::IPT2_prot:    
+    case solver_prototype::IPT2_prot:
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
             for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
-                tmp_val_kt_kb_tmp = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
+                if (!is_full)
+                    tmp_val_kt_kb_tmp = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
+                else
+                    tmp_val_kt_kb_tmp = gamma_oneD_spsp_full_middle_plotting_IPT(_splInline.k_array[ktilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar],_splInline.iwn_array[wtilde]);
                 tmp_val_weights_tmp = buildGK1D_IPT(
                                     _splInline.iwn_array[wtilde],_splInline.k_array[ktilde]
                                     )[0]*buildGK1D_IPT(
@@ -149,8 +155,86 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_IPT(double ktilde,std::compl
     return GreenStuff::U/lower_level;
 }
 
+std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_lower(double kp,double kbar,std::complex<double> iknp,std::complex<double> wbar) const{
+    std::complex<double> lower_level(0.0,0.0);
+    for (size_t iknpp=0; iknpp<_Gk._size; iknpp++){
+        for (size_t kpp=0; kpp<_Gk._kArr_l.size(); kpp++){
+            lower_level+=_Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kpp]+kp-kbar)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kpp])(1,1);
+        }
+    }
+    lower_level*=SPINDEG*_Gk._u/(_Gk._beta*_Gk._Nk);
+    lower_level+=1.0;
+
+    return _Gk._u/lower_level;
+}
+
+std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_lower_IPT(double kp,double kbar,std::complex<double> iknp,std::complex<double> wbar) const{
+    std::complex<double> lower_level(0.0,0.0);
+    for (size_t iknpp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknpp<_splInline.iwn_array.size(); iknpp++){
+        for (size_t kpp=0; kpp<_splInline.k_array.size(); kpp++){
+            lower_level+=buildGK1D_IPT(_splInline.iwn_array[iknpp]+iknp-wbar,_splInline.k_array[kpp]+kp-kbar)[0] * buildGK1D_IPT(_splInline.iwn_array[iknpp],_splInline.k_array[kpp])[1];
+        }
+    }
+    lower_level*=SPINDEG*GreenStuff::U/(GreenStuff::beta*GreenStuff::N_k);
+    lower_level+=1.0;
+
+    return GreenStuff::U/lower_level;
+}
+
+std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_middle_plotting(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const{
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+    std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
+    for (size_t kp=0; kp<_Gk._kArr_l.size(); kp++){
+        for (size_t iknp=0; iknp<_Gk._size; iknp++){
+            middle_level_inf_tmp+= _Gk(_Gk._precomp_wn[iknp],_Gk._kArr_l[kp]
+            )(0,0)*gamma_oneD_spsp_full_lower(_Gk._kArr_l[kp],kbar,_Gk._precomp_wn[iknp],wbar
+            )*_Gk(_Gk._precomp_wn[iknp]-_q._iwn,_Gk._kArr_l[kp]-_q._qx)(0,0);
+        }
+    }
+    middle_level_inf_tmp*=SPINDEG/(_Gk._Nk*_Gk._beta);
+    middle_level_corr_tmp+=middle_level_inf_tmp;
+    matCorr(kbar,ktilde) = middle_level_corr_tmp;
+    middle_level_inf_tmp+=-1.0*((1.0/gamma_oneD_spsp(ktilde,wtilde,kbar,wbar))*_Gk._u-1.0);
+    matMidLev(kbar,ktilde) = middle_level_inf_tmp;
+    if (world_rank != root_process){
+        vecCorrSlaves->push_back( std::make_tuple( kbar,ktilde,middle_level_corr_tmp ) );
+        vecMidLevSlaves->push_back( std::make_tuple( kbar,ktilde,middle_level_inf_tmp ) );
+    }
+    middle_level_tmp-=middle_level_inf_tmp;
+    middle_level_tmp+=1.0;
+
+    return GreenStuff::U/middle_level_tmp;
+}
+
+std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_middle_plotting_IPT(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const{
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+    std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
+    for (size_t kp=0; kp<_splInline.k_array.size(); kp++){
+        for (size_t iknp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknp<_splInline.iwn_array.size(); iknp++){
+            middle_level_inf_tmp+= buildGK1D_IPT(_splInline.iwn_array[iknp],_splInline.k_array[kp]
+            )[0]*gamma_oneD_spsp_full_lower(_splInline.k_array[kp],kbar,_splInline.iwn_array[iknp],wbar
+            )*buildGK1D_IPT(_splInline.iwn_array[iknp]-_q._iwn,_splInline.k_array[kp]-_q._qx)[0];
+        }
+    }
+    middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
+    middle_level_corr_tmp+=middle_level_inf_tmp;
+    matCorr(kbar,ktilde) = middle_level_corr_tmp;
+    middle_level_inf_tmp+=-1.0*((1.0/gamma_oneD_spsp(ktilde,wtilde,kbar,wbar))*GreenStuff::U-1.0);
+    matMidLev(kbar,ktilde) = middle_level_inf_tmp;
+    if (world_rank != root_process){
+        vecCorrSlaves->push_back( std::make_tuple( kbar,ktilde,middle_level_corr_tmp ) );
+        vecMidLevSlaves->push_back( std::make_tuple( kbar,ktilde,middle_level_inf_tmp ) );
+    }
+    middle_level_tmp-=middle_level_inf_tmp;
+    middle_level_tmp+=1.0;
+
+    return GreenStuff::U/middle_level_tmp;
+}
+
 #elif DIM == 2
-void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj) const{
+void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj, bool is_full) const{
 /* In 2D, calculating the weights implies computing whilst dismissing the translational invariance of the vertex function (Gamma). */
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
@@ -159,10 +243,13 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
     double kbarx;
     switch(sp){
     case solver_prototype::HF_prot:
-        // cout << beta << " " << _Gk._kArr_l[ktilde] << " " << _q._iwn << " " << _q._qx << " " << _Gk._kArr_l[kbar] << endl;
+        // Looking whether the calculations concern the full calculation considering the corrections or not.
         for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
             for (size_t wbar=0; wbar<_Gk._size; wbar++){
-                tmp_val_kt_kb += gamma_twoD_spsp(_Gk._kArr_l[kbarx_m_tildex],_Gk._kArr_l[kbary_m_tildey],_Gk._precomp_wn[wtilde],_Gk._precomp_wn[wbar]);
+                if (!is_full)
+                    tmp_val_kt_kb += gamma_twoD_spsp(_Gk._kArr_l[kbarx_m_tildex],_Gk._kArr_l[kbary_m_tildey],_Gk._precomp_wn[wtilde],_Gk._precomp_wn[wbar]);
+                else
+                    tmp_val_kt_kb += gamma_twoD_spsp_full_middle_plotting(_Gk._kArr_l[kbarx_m_tildex],_Gk._kArr_l[kbary_m_tildey],_Gk._precomp_wn[wbar],_Gk._precomp_wn[wtilde]);
                 tmp_val_weights += getWeightsHF(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar);
                 if ((wtilde==0) && (wbar==0)){
                     std::cout << "Process id: " << world_rank << "\n";
@@ -199,7 +286,10 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
     case solver_prototype::IPT2_prot:
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
             for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
-                tmp_val_kt_kb += gamma_twoD_spsp_IPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],_splInline.iwn_array[wtilde],_splInline.iwn_array[wbar]);
+                if (!is_full)
+                    tmp_val_kt_kb += gamma_twoD_spsp_IPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],_splInline.iwn_array[wtilde],_splInline.iwn_array[wbar]);
+                else
+                    tmp_val_kt_kb += gamma_twoD_spsp_full_middle_plotting_IPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],_splInline.iwn_array[wbar],_splInline.iwn_array[wtilde]);
                 tmp_val_weights += getWeightsIPT(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar);
                 if ((wtilde==0) && (wbar==0)){
                     std::cout << "Process id: " << world_rank << "\n";
@@ -271,7 +361,7 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower(double kpx,double
     for (size_t iknpp=0; iknpp<_Gk._size; iknpp++){
         for (size_t kppx=0; kppx<_Gk._kArr_l.size(); kppx++){
             for (size_t kppy=0; kppy<_Gk._kArr_l.size(); kppy++){
-                lower_level += buildGK2D(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)[0]*buildGK2D(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])[1];
+                lower_level += _Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)[0]*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])[1];
             }
         }
     }
@@ -292,6 +382,80 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower_IPT(double kpx,do
     lower_level *= SPINDEG*GreenStuff::U/(GreenStuff::beta*(GreenStuff::N_k)*(GreenStuff::N_k)); /// No minus sign at ground level. Factor 2 for spin.
     lower_level += 1.0;
     return GreenStuff::U/lower_level; // Means that we have to multiply the middle level of this component by the two missing Green's functions.
+}
+
+std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_middle_plotting(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const{
+    /* This function uses the externally linked matrices matCorr and matMidLev */
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+    std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
+    double kbarx, kbary;
+    for (size_t kpx=0; kpx<_Gk._kArr_l.size(); kpx++){
+        for (size_t kpy=0; kpy<_Gk._kArr_l.size(); kpy++){
+            for (size_t ikpn=0; ikpn<_Gk._size; ikpn++){
+                for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
+                    kbarx=_Gk._kArr_l[ktildex]-kbarx_m_tildex;
+                    for (size_t ktildey=0; ktildey<_Gk._kArr_l.size(); ktildey++){
+                        kbary=_Gk._kArr_l[ktildey]-kbary_m_tildey;
+                        middle_level_inf_tmp+=_Gk(_Gk._precomp_wn[ikpn],_Gk._kArr_l[kpx],_Gk._kArr_l[kpy]
+                        )(0,0) * gamma_twoD_spsp_full_lower(_Gk._kArr_l[kpx],_Gk._kArr_l[kpy],kbarx,kbary,_Gk._precomp_wn[ikpn],wbar
+                        ) * _Gk(_Gk._precomp_wn[ikpn]-_qq._iwn,_Gk._kArr_l[kpx]-_qq._qx,_Gk._kArr_l[kpy]-_qq._qy)(0,0);
+                    }
+                }
+                middle_level_inf_tmp*=1.0/_Gk._Nk*1.0/_Gk._Nk;
+            }
+        }
+    }
+    middle_level_inf_tmp*=SPINDEG/(_Gk._Nk*_Gk._Nk*_Gk._beta);
+    middle_level_corr_tmp+=middle_level_inf_tmp; // This defines the correction term.
+    matCorr(kbary_m_tildey,kbarx_m_tildex)=middle_level_corr_tmp;
+    middle_level_inf_tmp+=-1.0*((1.0/gamma_twoD_spsp(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar))*_Gk._u-1.0); // This defines the full portion of the denominator.
+    matMidLev(kbary_m_tildey,kbarx_m_tildex)=middle_level_inf_tmp;
+    if (world_rank != root_process){ // The slave processes save their work in their respective external pointers to data storage.
+        vecMidLevSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,middle_level_corr_tmp ) );
+        vecCorrSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,middle_level_inf_tmp ) );
+    }
+    middle_level_tmp-=middle_level_inf_tmp;
+    middle_level_tmp+=1.0;
+
+    return GreenStuff::U/middle_level_tmp;
+}
+
+std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const{
+    /* This function uses the externally linked matrices matCorr and matMidLev */
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+    std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
+    double kbarx, kbary;
+    for (size_t kpx=0; kpx<_splInline.k_array.size(); kpx++){
+        for (size_t kpy=0; kpy<_splInline.k_array.size(); kpy++){
+            for (size_t ikpn=static_cast<size_t>(_splInline.iwn_array.size()/2); ikpn<_splInline.iwn_array.size(); ikpn++){
+                for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
+                    kbarx=_splInline.k_array[ktildex]-kbarx_m_tildex;
+                    for (size_t ktildey=0; ktildey<_splInline.k_array.size(); ktildey++){
+                        kbary=_splInline.k_array[ktildey]-kbary_m_tildey;
+                        middle_level_inf_tmp+=_Gk(_splInline.iwn_array[ikpn],_splInline.k_array[kpx],_splInline.k_array[kpy]
+                        )(0,0) * gamma_twoD_spsp_full_lower_IPT(_splInline.k_array[kpx],_splInline.k_array[kpy],kbarx,kbary,_splInline.iwn_array[ikpn],wbar
+                        ) * _Gk(_splInline.iwn_array[ikpn]-_qq._iwn,_splInline.k_array[kpx]-_qq._qx,_splInline.k_array[kpy]-_qq._qy)(0,0);
+                    }
+                }
+                middle_level_inf_tmp*=1.0/GreenStuff::N_k*1.0/GreenStuff::N_k;
+            }
+        }
+    }
+    middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::N_k*GreenStuff::beta);
+    middle_level_corr_tmp+=middle_level_inf_tmp; // This defines the correction term.
+    matCorr(kbary_m_tildey,kbarx_m_tildex)=middle_level_corr_tmp;
+    middle_level_inf_tmp+=-1.0*((1.0/gamma_twoD_spsp_IPT(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar))*GreenStuff::U-1.0); // This defines the full portion of the denominator.
+    matMidLev(kbary_m_tildey,kbarx_m_tildex)=middle_level_inf_tmp;
+    if (world_rank != root_process){ // The slave processes save their work in their respective external pointers to data storage.
+        vecMidLevSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,middle_level_corr_tmp ) );
+        vecCorrSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,middle_level_inf_tmp ) );
+    }
+    middle_level_tmp-=middle_level_inf_tmp;
+    middle_level_tmp+=1.0;
+
+    return GreenStuff::U/middle_level_tmp;
 }
 
 
@@ -327,7 +491,7 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 
 #endif /* DIM */
 
-void get_vector_mpi(size_t totSize,bool is_jj,solver_prototype sp,std::vector<mpistruct_t>* vec_root_process){
+void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,solver_prototype sp,std::vector<mpistruct_t>* vec_root_process){
     size_t idx=0;
     for (size_t lkt=0; lkt<vecK.size(); lkt++){
         for (size_t lkb=0; lkb<vecK.size(); lkb++){
@@ -335,6 +499,7 @@ void get_vector_mpi(size_t totSize,bool is_jj,solver_prototype sp,std::vector<mp
             MPIObj._lkt=lkt;
             MPIObj._lkb=lkb;
             MPIObj._is_jj=is_jj;
+            MPIObj._is_full=is_full;
             MPIObj._sp=sp;
             vec_root_process->at(idx) = MPIObj;
             idx++;
