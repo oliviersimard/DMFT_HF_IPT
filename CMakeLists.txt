@@ -6,6 +6,7 @@ project(HubbardIPT)
 find_package(MPI REQUIRED)
 include_directories(${MPI_CXX_INCLUDE_PATH})
 message(STATUS "MPI CXX COMPILER IS: " ${MPI_CXX_COMPILER})
+include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 
 # Setting c++ custom preprocessing flags
 set(CMPLR "clang" CACHE STRING "Determines the compiler.") # Use for instance cmake -DCMPLR:STRING=gcc ..
@@ -68,7 +69,7 @@ message(STATUS "gsl found: " ${GSL_FOUND})
 
 #------Executables
 add_executable(MAIN ${SOURCES_MAIN})
-target_link_libraries(MAIN ${GSL_LIBRARIES} ${LIBRARIES_CUSTOM})
+target_link_libraries(MAIN ${GSL_LIBRARIES} ${MPI_LIBRARIES} ${LIBRARIES_CUSTOM})
 
 # Locate GTest
 find_package(GTest REQUIRED)
@@ -92,5 +93,5 @@ endif()
 # # Now simply link against gtest or gtest_main as needed. Eg
 enable_testing()
 add_executable(IPT_test test/test.cpp ${SOURCES_COMMON} ${SOURCES_TEST})
-target_link_libraries(IPT_test ${GSL_LIBRARIES} ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES} ${LIBRARIES_CUSTOM} gtest gmock)
+target_link_libraries(IPT_test ${GSL_LIBRARIES} ${MPI_LIBRARIES} ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES} ${LIBRARIES_CUSTOM} gtest gmock)
 add_test(NAME IPT_test COMMAND ./IPT_test) ## Allows one to enter "make test" and launch the tests!
