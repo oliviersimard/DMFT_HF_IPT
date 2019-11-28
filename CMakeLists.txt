@@ -4,9 +4,9 @@ project(HubbardIPT)
 
 # Locate MPI
 find_package(MPI REQUIRED)
-include_directories(${MPI_CXX_INCLUDE_PATH})
+include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 message(STATUS "MPI CXX COMPILER IS: " ${MPI_CXX_COMPILER})
-include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+#include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 
 # Setting c++ custom preprocessing flags
 set(CMPLR "clang" CACHE STRING "Determines the compiler.") # Use for instance cmake -DCMPLR:STRING=gcc ..
