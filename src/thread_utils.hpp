@@ -17,6 +17,8 @@
 #define RETURN_DATA_TAG_GAMMA 3001
 #define RETURN_DATA_TAG_WEIGHTS 3002
 #define RETURN_DATA_TAG_TOT_SUS 3003
+#define RETURN_DATA_TAG_MID_LEV 3004
+#define RETURN_DATA_TAG_CORR 3005
 
 extern arma::Mat< std::complex<double> > matGamma; // Matrices used in case parallel.
 extern arma::Mat< std::complex<double> > matWeigths;
@@ -54,8 +56,8 @@ namespace ThreadFunctor{
             void operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj, bool is_full) const; // 2D IPT/HF
             std::complex<double> gamma_oneD_spsp(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
             std::complex<double> gamma_oneD_spsp_IPT(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
-            std::complex<double> gamma_twoD_spsp(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
-            std::complex<double> gamma_twoD_spsp_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
+            std::tuple< std::complex<double>,std::complex<double> > gamma_twoD_spsp(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
+            std::tuple< std::complex<double>,std::complex<double> > gamma_twoD_spsp_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::vector< std::complex<double> > buildGK1D(std::complex<double> ik, double k) const;
             std::vector< std::complex<double> > buildGK1D_IPT(std::complex<double> ik, double k) const;
             std::vector< std::complex<double> > buildGK2D(std::complex<double> ik, double kx, double ky) const;
@@ -66,8 +68,8 @@ namespace ThreadFunctor{
             std::complex<double> gamma_twoD_spsp_full_lower_IPT(double kpx,double kpy,double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> iknp,std::complex<double> wbar) const;
             std::complex<double> gamma_oneD_spsp_full_middle_plotting(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> gamma_oneD_spsp_full_middle_plotting_IPT(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const;
-            std::complex<double> gamma_twoD_spsp_full_middle_plotting(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
-            std::complex<double> gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
+            std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
+            std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
         private:
@@ -123,13 +125,16 @@ namespace ThreadFunctor{
 template<>
 inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBuildGk Gk,std::string pathToDir,std::string customDirName,bool is_full,bool is_jj,double ndo_converged,ThreadFunctor::solver_prototype sp){
     MPI_Status status;
-    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus;// outputChispspBubbleCorr;
+    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus, outputChispspBubble, outputChispspBubbleCorr;
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     std::string strOutputChispspGamma(pathToDir+customDirName+"/susceptibilities/ChispspGamma_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
     std::string strOutputChispspWeights(pathToDir+customDirName+"/susceptibilities/ChispspWeights_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
     std::string strOutputChispspTotSus(pathToDir+customDirName+"/susceptibilities/ChispspTotSus_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
-    //std::string strOutputChispspBubbleCorr(pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_IPT2_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat");
+    std::string strOutputChispspBubble(pathToDir+customDirName+"/susceptibilities/ChispspBubble_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
+    std::string strOutputChispspBubbleCorr;
+    if (is_full)
+        std::string strOutputChispspBubbleCorr(pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat");
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, sender, num_elems_to_receive;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
@@ -174,10 +179,14 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         /* Gather the results from the child processes into the externally linked Math rices meant for this purpose. */
         for(int an_id = 1; an_id < world_size; an_id++) {
             char chars_to_receive[50];
-            int sizeOfGamma, sizeOfWeights, sizeOfTotSus;
+            int sizeOfGamma, sizeOfWeights, sizeOfTotSus, sizeOfMidLev, sizeOfCorr;
             std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
             std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
             std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecTotSusTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrTmp;
+            if (is_full)
+                std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
             // Should send the sizes of the externally linked vectors of tuples to be able to receive. That is why the need to probe...
             MPI_Probe(an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,&status);
             MPI_Get_count(&status,MPI_BYTE,&sizeOfGamma);
@@ -185,9 +194,21 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             MPI_Get_count(&status,MPI_BYTE,&sizeOfWeights);
             MPI_Probe(an_id,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD,&status);
             MPI_Get_count(&status,MPI_BYTE,&sizeOfTotSus);
+            MPI_Probe(an_id,RETURN_DATA_TAG_MID_LEV,MPI_COMM_WORLD,&status);
+            MPI_Get_count(&status,MPI_BYTE,&sizeOfMidLev);
+            if (is_full){
+                MPI_Probe(an_id,RETURN_DATA_TAG_CORR,MPI_COMM_WORLD,&status);
+                MPI_Get_count(&status,MPI_BYTE,&sizeOfCorr);
+            }
             
             ierr = MPI_Recv( chars_to_receive, 50, MPI_CHAR, an_id,
                   RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
+            if (is_full){
+                ierr = MPI_Recv( (void*)(vecCorrTmp->data()), sizeOfCorr, MPI_BYTE, an_id,
+                        RETURN_DATA_TAG_CORR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
+            ierr = MPI_Recv( (void*)(vecMidLevTmp->data()), sizeOfMidLev, MPI_BYTE, an_id,
+                  RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             ierr = MPI_Recv( (void*)(vecTotSusTmp->data()), sizeOfTotSus, MPI_BYTE, an_id,
                   RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             ierr = MPI_Recv( (void*)(vecWeightsTmp->data()), sizeOfWeights, MPI_BYTE, an_id,
@@ -198,7 +219,19 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             printf("Slave process %i returned\n", sender);
             printf("%s\n",chars_to_receive);
             /* Now the data received from the other processes have to be stored in their arma::Mats on root process */
-            size_t kt,kb,ii;
+            size_t kt,kb,ii; // Maybe implement this portion as a separate function.
+            if (is_full){
+                for (ii=0; ii<sizeOfCorr/sizeOfTuple; ii++){
+                    kb=std::get<0>(vecCorrTmp->at(ii));
+                    kt=std::get<1>(vecCorrTmp->at(ii));
+                    matCorr(kb,kt)=std::get<2>(vecCorrTmp->at(ii));
+                }
+            }
+            for (ii=0; ii<sizeOfMidLev/sizeOfTuple; ii++){
+                kb=std::get<0>(vecMidLevTmp->at(ii));
+                kt=std::get<1>(vecMidLevTmp->at(ii));
+                matMidLev(kb,kt)=std::get<2>(vecMidLevTmp->at(ii));
+            }
             for (ii=0; ii<sizeOfGamma/sizeOfTuple; ii++){
                 kb=std::get<0>(vecGammaTmp->at(ii));
                 kt=std::get<1>(vecGammaTmp->at(ii));
@@ -215,7 +248,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
                 matTotSus(kb,kt)=std::get<2>(vecTotSusTmp->at(ii));
             }
             delete vecGammaTmp; delete vecWeightsTmp;
-            delete vecTotSusTmp;
+            delete vecTotSusTmp; delete vecMidLevTmp;
+            if (is_full)
+                delete vecCorrTmp;
         }
     } else{
         /* Slave processes receive their part of work from the root process. */
@@ -238,14 +273,17 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         char chars_to_send[50];
         sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
         /* Finally send integers to root process to notify the state of the calculations. */
-        // Data for matrices is stored in a column-by-column order. Why using strans method...
-        // std::complex<double>* matGammaPtr=matGamma.memptr(), *matWeightsPtr=matWeigths.memptr(), *matTotSusPtr=matTotSus.memptr();
+        if (is_full)
+            ierr = MPI_Send( (void*)(vecCorrSlaves->data()), sizeOfTuple*vecCorrSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_CORR, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
         ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
         ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeOfTuple*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
         ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeOfTuple*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
         ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
-        delete vecGammaSlaves;
+        delete vecGammaSlaves; delete vecMidLevSlaves;
         delete vecWeightsSlaves; delete vecTotSusSlaves;
+        if (is_full)
+            delete vecCorrSlaves;
     }
     delete vec_root_process;
     delete vec_slave_processes;
@@ -254,19 +292,29 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
         outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
         outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
+        outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
         for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
             for (size_t kbar=0; kbar<vecK.size(); kbar++){
                 outputChispspGamma << matGamma(kbar,ktilde) << " ";
                 outputChispspWeights << matWeigths(kbar,ktilde) << " ";
                 outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
+                outputChispspBubble << matMidLev(kbar,ktilde) << " ";
+                if (is_full)
+                    outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";
             }
             outputChispspGamma << "\n";
             outputChispspWeights << "\n";
             outputChispspTotSus << "\n";
+            outputChispspBubble << "\n";
+            if (is_full)
+                outputChispspBubbleCorr << "\n";
         }
         outputChispspGamma.close();
         outputChispspWeights.close();
         outputChispspTotSus.close();
+        outputChispspBubble.close();
+        if (is_full)
+            outputChispspBubbleCorr.close();
     }
     ierr = MPI_Finalize();
 }
