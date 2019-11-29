@@ -1,4 +1,8 @@
+#ifdef PARALLEL
 #include "src/thread_utils.hpp"
+#else
+#include "src/susceptibilities.hpp"
+#endif
 #include "src/json_utils.hpp"
 
 int main(int argc, char** argv){
@@ -84,7 +88,7 @@ int main(int argc, char** argv){
                 std::vector< std::string > vecFiles={filenameToSaveGloc,filenameToSaveSE,filenameToSaveGW};
                 try{ // Ensures that we don't overwrite any files within build/.
                     check_file_content(vecFiles,pathToDir+customDirName+"/analytic_continuations",pathToDir+customDirName+"/susceptibilities"); // Checks whether files already exist to avoid overwritting. Also creates 
-                } catch (const std::exception& err){                                                                                            // directory architecture
+                } catch (const std::runtime_error& err){                                                                                            // directory architecture
                     std::cerr << err.what() << "\n";
                     exit(1);
                 }

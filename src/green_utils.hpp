@@ -10,6 +10,7 @@
 
 #define DIM 1
 #define SPINDEG 2
+#define VERBOSE 0
 
 // Some declarations
 namespace IPT2{ class DMFTproc; };

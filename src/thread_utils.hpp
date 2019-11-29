@@ -1,14 +1,11 @@
 #ifndef Thread_Utils_H_
 #define Thread_Utils_H_
 
-#define PARALLEL
+//#define PARALLEL
 
-#ifdef PARALLEL
 #include<mpi.h>
-#endif
 #include "susceptibilities.hpp"
 
-#define NUM_THREADS 4
 #define SEND_DATA_TAG 2000
 #define SEND_DATA_TAG_GAMMA 2001
 #define SEND_DATA_TAG_WEIGHTS 2002
@@ -74,6 +71,10 @@ namespace ThreadFunctor{
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
         private:
+            void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
+                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const;
+            void save_data_to_local_extern_matrix_instances(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
+                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const;
             double _ndo_converged {0.0};
             HF::FunctorBuildGk _Gk={};
             HF::K_1D _q={};
@@ -120,8 +121,6 @@ namespace ThreadFunctor{
     #endif
 
 } /* end of namespace ThreadFunctor */
-
-#ifdef PARALLEL
 
 template<>
 inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBuildGk Gk,std::string pathToDir,std::string customDirName,bool is_full,bool is_jj,double ndo_converged,ThreadFunctor::solver_prototype sp){
@@ -331,7 +330,6 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         /* Finally send integers to root process to notify the state of the calculations. */
         ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
         if (is_full){
-            std::cout << "In the FULL section.." << "\n"; // <---------------------------------------REMOVE
             ierr = MPI_Send( (void*)(vecCorrSlaves->data()),sizeOfTuple*vecCorrSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_CORR,MPI_COMM_WORLD );
         }
         ierr = MPI_Send( (void*)(vecMidLevSlaves->data()),sizeOfTuple*vecMidLevSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_MID_LEV,MPI_COMM_WORLD );
@@ -378,6 +376,5 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     }
     ierr = MPI_Finalize();
 }
-#endif /* PARALLEL */
 
 #endif /* end of Thread_Utils_H_ */

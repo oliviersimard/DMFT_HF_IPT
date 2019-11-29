@@ -21,7 +21,6 @@ struct GreenStuff;
 // Prototypes
 void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&);
 void DMFTloop(IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&, std::vector< std::string >&, const unsigned int) noexcept(false);
-void get_tau_obj(GreenStuff&, GreenStuff&);
 double Hsuperior(double tau, double mu, double c, double beta);
 double Hpsuperior(double tau, double mu, double c, double beta);
 double Hinferior(double tau, double mu, double c, double beta);
@@ -162,8 +161,6 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     std::cout << iwn.size() << "\n";
     for (size_t i=0; i<2*N_tau_size; i++){
         inputFunct.slice(i)(0,0)=std::complex<double>(iwn_re[i],iwn_im[i]);
-        //std::cout << inputFunct.slice(i)(0,0) << std::endl;
-        //std::cout << iwn[i] << std::endl;
     }
     spl.set_points(iwn,inputFunct);
 }

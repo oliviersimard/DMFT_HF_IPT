@@ -1,7 +1,5 @@
 #include "IPT2nd3rdorderSingle2.hpp"
 
-//using namespace std;
-
 /**************************************************************************************************/
 
 namespace IPT2{

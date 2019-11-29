@@ -56,30 +56,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                 }
             } 
         }
-        // lock_guard<mutex> guard(mutx); 
-        matGamma(kbar,ktilde) = tmp_val_kt_kb*1.0/(_Gk._beta)/(_Gk._beta); // These matrices are extern variables.
-        matWeigths(kbar,ktilde) = tmp_val_weights*1.0/(_Gk._beta)/(_Gk._beta);
-        matMidLev(kbar,ktilde) = tmp_val_mid_lev*1.0/(_Gk._beta)/(_Gk._beta);
-        if (is_full)
-            matCorr(kbar,ktilde) = tmp_val_corr*1.0/(_Gk._beta)/(_Gk._beta);
-        if (world_rank != root_process){ // Saving into vector of tuples.
-            vecGammaSlaves->push_back( std::make_tuple( kbar, ktilde,tmp_val_kt_kb*1.0/(_Gk._beta)/(_Gk._beta) ) );
-            vecWeightsSlaves->push_back( std::make_tuple( kbar, ktilde,tmp_val_weights*1.0/(_Gk._beta)/(_Gk._beta) ) );
-            vecMidLevSlaves->push_back( std::make_tuple( kbar,ktilde,tmp_val_mid_lev*1.0/(_Gk._beta)/(_Gk._beta) ) );
-            if (is_full)
-                vecCorrSlaves->push_back( std::make_tuple( kbar,ktilde,tmp_val_corr*1.0/(_Gk._beta)/(_Gk._beta) ) );
-        }
-        if (!is_jj){
-            matTotSus(kbar,ktilde) = 1.0/(_Gk._beta)/(_Gk._beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, 1.0/(_Gk._beta)/(_Gk._beta)*tmp_val_tot_sus ) );
-        }
-        else if (is_jj){
-            val_jj = -1.0/(_Gk._beta)/(_Gk._beta)*(-2.0*std::sin(_Gk._kArr_l[ktilde]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[kbar]));
-            matTotSus(kbar,ktilde) = val_jj;
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, val_jj ) );
-        }
+        save_data_to_local_extern_matrix_instances(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
+                    ktilde,kbar,is_jj,is_full,world_rank);
         break;
     case solver_prototype::IPT2_prot:
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
@@ -111,35 +89,13 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     std::cout << "Process id: " << world_rank << "\n";
                     std::cout << "ktilde: " << _splInline.k_array[ktilde] << "\n";
                     std::cout << "kbar: " << _splInline.k_array[kbar] << "\n";
-                    std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << "\n";
+                    std::cout << "gamma_oneD_spsp_IPT: " << tmp_val_kt_kb << "\n";
                     std::cout << "weights: " << tmp_val_weights << std::endl;
                 }
             } 
         }
-        // lock_guard<mutex> guard(mutx); 
-        matGamma(kbar,ktilde) = tmp_val_kt_kb*1.0/(GreenStuff::beta)/(GreenStuff::beta); // These matrices are extern variables.
-        matWeigths(kbar,ktilde) = tmp_val_weights*1.0/(GreenStuff::beta)/(GreenStuff::beta);
-        matMidLev(kbar,ktilde) = tmp_val_mid_lev*1.0/(GreenStuff::beta)/(GreenStuff::beta);
-        if (is_full)
-            matCorr(kbar,ktilde) = tmp_val_corr*1.0/(GreenStuff::beta)/(GreenStuff::beta);
-        if (world_rank != root_process){
-            vecGammaSlaves->push_back( std::make_tuple( kbar,ktilde,tmp_val_kt_kb*1.0/(GreenStuff::beta)/(GreenStuff::beta) ) );
-            vecWeightsSlaves->push_back( std::make_tuple( kbar,ktilde,tmp_val_weights*1.0/(GreenStuff::beta)/(GreenStuff::beta) ) );
-            vecMidLevSlaves->push_back( std::make_tuple( kbar,ktilde,tmp_val_mid_lev*1.0/(GreenStuff::beta)/(GreenStuff::beta) ) );
-            if (is_full)
-                vecCorrSlaves->push_back( std::make_tuple( kbar,ktilde,tmp_val_corr*1.0/(GreenStuff::beta)/(GreenStuff::beta) ) );
-        }
-        if (!is_jj){
-            matTotSus(kbar,ktilde) = 1.0/(GreenStuff::beta)/(GreenStuff::beta)*tmp_val_tot_sus; // This gives the total susceptibility resolved in k-space. Summation performed on beta only.
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, 1.0/(GreenStuff::beta)/(GreenStuff::beta)*tmp_val_tot_sus ) );
-        }
-        else if (is_jj){
-            val_jj = -1.0/(GreenStuff::beta)/(GreenStuff::beta)*(-2.0*std::sin(_splInline.k_array[ktilde]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[kbar]));
-            matTotSus(kbar,ktilde) = val_jj;
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbar, ktilde, val_jj ) );
-        }
+        save_data_to_local_extern_matrix_instancesIPT(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
+                    ktilde,kbar,is_jj,is_full,world_rank);
         break;
     }
 }
@@ -245,8 +201,7 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> tmp_val_kt_kb(0.0,0.0), tmp_val_weights(0.0,0.0), tmp_val_tot_sus(0.0,0.0), tmp_val_mid_lev(0.0,0.0);
-    std::complex<double> tmp_val_corr(0.0,0.0), val_jj(0.0,0.0);
-    double kbarx;
+    std::complex<double> tmp_val_corr(0.0,0.0);
     std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > tupOfValsFull;
     std::tuple< std::complex<double>,std::complex<double> > tupOfVals;
     switch(sp){
@@ -265,7 +220,7 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
                     tmp_val_corr += std::get<1>(tupOfValsFull);
                     tmp_val_mid_lev += std::get<2>(tupOfValsFull);
                 }
-                tmp_val_weights += getWeightsHF(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar);
+                tmp_val_weights += getWeightsHF(_Gk._kArr_l[kbarx_m_tildex],_Gk._kArr_l[kbary_m_tildey],wtilde,wbar);
                 if ((wtilde==0) && (wbar==0)){
                     std::cout << "Process id: " << world_rank << "\n";
                     std::cout << "kbarx_m_tildex: " << _Gk._kArr_l[kbarx_m_tildex] << "\n";
@@ -276,33 +231,8 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
                 tmp_val_tot_sus += tmp_val_kt_kb*tmp_val_weights;
             } 
         }
-        // lock_guard<mutex> guard(mutx);
-        matWeigths(kbary_m_tildey,kbarx_m_tildex) = tmp_val_weights*(1.0/_Gk._beta)*(1.0/_Gk._beta);
-        matGamma(kbary_m_tildey,kbarx_m_tildex) = tmp_val_kt_kb*(1.0/_Gk._beta)*(1.0/_Gk._beta);
-        matMidLev(kbary_m_tildey,kbarx_m_tildex) = tmp_val_mid_lev*(1.0/_Gk._beta)*(1.0/_Gk._beta);
-        if (is_full)
-            matCorr(kbary_m_tildey,kbarx_m_tildex) = tmp_val_corr*(1.0/_Gk._beta)*(1.0/_Gk._beta);
-        if (world_rank != root_process){ // Saving into vector of tuples..
-            vecGammaSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex, tmp_val_kt_kb*(1.0/_Gk._beta)*(1.0/_Gk._beta) ) );
-            vecWeightsSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex, tmp_val_weights*(1.0/_Gk._beta)*(1.0/_Gk._beta) ) );
-            vecMidLevSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_mid_lev*(1.0/_Gk._beta)*(1.0/_Gk._beta) ) );
-            if (is_full)
-                vecCorrSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_corr*(1.0/_Gk._beta)*(1.0/_Gk._beta) ) );
-        }
-        if (!is_jj){
-            matTotSus(kbary_m_tildey,kbarx_m_tildex) = (1.0/_Gk._beta)*(1.0/_Gk._beta)*tmp_val_tot_sus; // These matrices are static variables.
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,(1.0/_Gk._beta)*(1.0/_Gk._beta)*tmp_val_tot_sus ) );
-        }
-        else if (is_jj){ // kbarx could also be kbary
-            for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
-                kbarx = (_Gk._kArr_l[ktildex]-_Gk._kArr_l[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
-                val_jj += -1.0*(-2.0*std::sin(_Gk._kArr_l[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
-            }
-            matTotSus(kbary_m_tildey,kbarx_m_tildex)=val_jj*(1.0/_Gk._beta)*(1.0/_Gk._beta)*(1.0/_Gk._Nk);
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,val_jj ) );
-        }
+        save_data_to_local_extern_matrix_instances(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
+                    kbarx_m_tildex,kbary_m_tildey,is_jj,is_full,world_rank);
         break;
     case solver_prototype::IPT2_prot:
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
@@ -318,44 +248,19 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
                     tmp_val_corr += std::get<1>(tupOfValsFull);
                     tmp_val_mid_lev += std::get<2>(tupOfValsFull);
                 }
-                tmp_val_weights += getWeightsIPT(kbarx_m_tildex,kbary_m_tildey,wtilde,wbar);
-                if ((wtilde==0) && (wbar==0)){
+                tmp_val_weights += getWeightsIPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],wtilde,wbar);
+                if ((wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline.iwn_array.size()/2))){
                     std::cout << "Process id: " << world_rank << "\n";
                     std::cout << "kbarx_m_tildex: " << _splInline.k_array[kbarx_m_tildex] << "\n";
                     std::cout << "kbary_m_tildey: " << _splInline.k_array[kbary_m_tildey] << "\n";
-                    std::cout << "gamma_twoD_spsp: " << tmp_val_kt_kb << "\n";
+                    std::cout << "gamma_twoD_spsp_IPT: " << tmp_val_kt_kb << "\n";
                     std::cout << "weights: " << tmp_val_weights << std::endl;
                 }
                 tmp_val_tot_sus+=tmp_val_kt_kb*tmp_val_weights;
             } 
         }
-        // lock_guard<mutex> guard(mutx);
-        matGamma(kbary_m_tildey,kbarx_m_tildex) = tmp_val_kt_kb*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
-        matWeigths(kbary_m_tildey,kbarx_m_tildex) = tmp_val_weights*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
-        matMidLev(kbary_m_tildey,kbarx_m_tildex) = tmp_val_mid_lev*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
-        if (is_full)
-            matCorr(kbary_m_tildey,kbarx_m_tildex) = tmp_val_corr*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
-        if (world_rank != root_process){
-            vecGammaSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_kt_kb*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta) ) );
-            vecWeightsSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_weights*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta) ) );
-            vecMidLevSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_mid_lev*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta) ) );
-            if (is_full)
-                vecCorrSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,tmp_val_corr*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta) ) );
-        }
-        if (!is_jj){
-            matTotSus(kbary_m_tildey,kbarx_m_tildex) = (1.0/GreenStuff::beta)*(1.0/GreenStuff::beta)*tmp_val_tot_sus; // These matrices are static variables.
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta)*tmp_val_tot_sus ) );
-        }
-        else if (is_jj){
-            for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
-                kbarx = (_splInline.k_array[ktildex]-_splInline.k_array[kbarx_m_tildex]); // It brakets within [-2pi,2pi].
-                val_jj += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
-            }
-            matTotSus(kbary_m_tildey,kbarx_m_tildex) = val_jj*(1.0/GreenStuff::N_k)*(1.0/GreenStuff::beta)*(1.0/GreenStuff::beta);
-            if (world_rank != root_process)
-                vecTotSusSlaves->push_back( std::make_tuple( kbary_m_tildey,kbarx_m_tildex,val_jj ) );
-        }
+        save_data_to_local_extern_matrix_instancesIPT(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
+                    kbarx_m_tildex,kbary_m_tildey,is_jj,is_full,world_rank);
         break;
     }
 
@@ -368,7 +273,7 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_two
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttildey=0; qttildey<_Gk._kArr_l.size(); qttildey++){
             for (size_t qttildex=0; qttildex<_Gk._kArr_l.size(); qttildex++){ // the change of variable only applies to k-space, due to periodicity modulo 2pi.
-                lower_level += buildGK2D((wtilde-_Gk._precomp_qn[wttilde]),_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])[0]*buildGK2D((wbar-_Gk._precomp_qn[wttilde]),(_Gk._kArr_l[qttildex]+kbarx_m_tildex),(_Gk._kArr_l[qttildey]+kbary_m_tildey))[1];
+                lower_level += _Gk((wtilde-_Gk._precomp_qn[wttilde]),_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk((wbar-_Gk._precomp_qn[wttilde]),(_Gk._kArr_l[qttildex]+kbarx_m_tildex),(_Gk._kArr_l[qttildey]+kbary_m_tildey))(1,1);
             }
         }
     }
@@ -400,7 +305,7 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower(double kpx,double
     for (size_t iknpp=0; iknpp<_Gk._size; iknpp++){
         for (size_t kppx=0; kppx<_Gk._kArr_l.size(); kppx++){
             for (size_t kppy=0; kppy<_Gk._kArr_l.size(); kppy++){
-                lower_level += _Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)[0]*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])[1];
+                lower_level += _Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])(1,1);
             }
         }
     }
@@ -518,6 +423,83 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 }
 
 #endif /* DIM */
+
+
+void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<double> tmp_val_kt_kb,std::complex<double> tmp_val_weights,std::complex<double> tmp_val_mid_lev,std::complex<double> tmp_val_corr,
+                        std::complex<double> tmp_val_tot_sus,size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const{
+    double kbarx;
+    std::complex<double> val_jj(0.0,0.0);
+    double beta_div = (1.0/GreenStuff::beta/GreenStuff::beta);
+    matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
+    matWeigths(k2,k1) = tmp_val_weights*beta_div;
+    matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
+    if (is_full)
+        matCorr(k2,k1) = tmp_val_corr*beta_div;
+    if (world_rank != root_process){
+        vecGammaSlaves->push_back( std::make_tuple( k2,k1,tmp_val_kt_kb*beta_div ) );
+        vecWeightsSlaves->push_back( std::make_tuple( k2,k1,tmp_val_weights*beta_div ) );
+        vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
+        if (is_full)
+            vecCorrSlaves->push_back( std::make_tuple( k2,k1,tmp_val_corr*beta_div ) );
+    }
+    if (!is_jj){
+        matTotSus(k2,k1) = beta_div*tmp_val_tot_sus; // These matrices are static variables.
+        if (world_rank != root_process)
+            vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
+    }
+    else if (is_jj){
+        #if DIM == 1
+        val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline.k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[2]));
+        matTotSus(k2,k1) = val_jj;
+        #elif DIM == 2
+        for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
+            kbarx = (_splInline.k_array[ktildex]-_splInline.k_array[k1]); // It brakets within [-2pi,2pi].
+            val_jj += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
+        }
+        matTotSus(k2,k1) = val_jj*(1.0/GreenStuff::N_k)*beta_div;
+        #endif
+        if (world_rank != root_process)
+            vecTotSusSlaves->push_back( std::make_tuple( k2,k1,val_jj ) );
+    }
+}
+
+void ThreadWrapper::save_data_to_local_extern_matrix_instances(std::complex<double> tmp_val_kt_kb,std::complex<double> tmp_val_weights,std::complex<double> tmp_val_mid_lev,std::complex<double> tmp_val_corr,std::complex<double> tmp_val_tot_sus,
+                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const{
+    double kbarx;
+    std::complex<double> val_jj(0.0,0.0);
+    double beta_div = 1.0/_Gk._beta/_Gk._beta;
+    matWeigths(k2,k1) = tmp_val_weights*beta_div;
+    matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
+    matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
+    if (is_full)
+        matCorr(k2,k1) = tmp_val_corr*beta_div;
+    if (world_rank != root_process){ // Saving into vector of tuples..
+        vecGammaSlaves->push_back( std::make_tuple( k2,k1, tmp_val_kt_kb*beta_div ) );
+        vecWeightsSlaves->push_back( std::make_tuple( k2,k1, tmp_val_weights*beta_div ) );
+        vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
+        if (is_full)
+            vecCorrSlaves->push_back( std::make_tuple( k2,k1,tmp_val_corr*beta_div ) );
+    }
+    if (!is_jj){
+        matTotSus(k2,k1) = beta_div*tmp_val_tot_sus; // These matrices are static variables.
+        if (world_rank != root_process)
+            vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
+    }
+    else if (is_jj){ // kbarx could also be kbary
+        #if DIM == 1
+        val_jj = -1.0*beta_div*(-2.0*std::sin(_Gk._kArr_l[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[k2]));
+        matTotSus(k2,k1) = val_jj;
+        #elif DIM == 2
+        for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
+            kbarx = (_Gk._kArr_l[ktildex]-_Gk._kArr_l[k1]); // It brakets within [-2pi,2pi].
+            val_jj += -1.0*(-2.0*std::sin(_Gk._kArr_l[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
+        }
+        matTotSus(k2,k1)=(1.0/_Gk._Nk)*val_jj*beta_div;
+        #endif
+        if (world_rank != root_process)
+            vecTotSusSlaves->push_back( std::make_tuple( k2,k1,val_jj ) );
+    }
+}
 
 void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,solver_prototype sp,std::vector<mpistruct_t>* vec_root_process){
     size_t idx=0;

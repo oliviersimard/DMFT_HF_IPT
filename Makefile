@@ -1,7 +1,7 @@
 SRC=$(PWD)/src
 OBJ=$(PWD)/obj
 
-CXX=mpic++ -std=c++11 -Wall -g -DDEBUG
+CXX=mpic++ -std=c++11 -Wall -g -DDEBUG -DPARALLEL
 INC=${HOME}/gsl/include
 LIB=${HOME}/gsl/lib
 

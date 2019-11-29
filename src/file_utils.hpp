@@ -1,6 +1,8 @@
 #ifndef File_Utils_H_
 #define File_Utils_H_
 
+#define VERBOSE 0
+
 #include<sys/stat.h> // for posix stat()
 //#include<regex> // for regular expressions
 extern "C" {

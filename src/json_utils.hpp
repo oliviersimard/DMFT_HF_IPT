@@ -6,7 +6,6 @@
 #include <fstream>
 #include <string>
 
-
 #define VERBOSE 0
 #define MAX_DOUBLE_SIZE 10
 #define MAX_INT_SIZE 5

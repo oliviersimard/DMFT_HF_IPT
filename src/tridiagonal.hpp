@@ -390,52 +390,6 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
     for(size_t i=0; i<timeGrid; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
         SelfEnergy.matsubara_w.slice(i)(0,0)=( -1.0*( -(_S_1_0+_S_N_beta)/iwnArr_l[i] + (_Sp_1_0+_Sp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]) - (_Spp_1_0+_Spp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]) + (1.0-std::exp(1.0*iwnArr_l[i]*beta/(double)timeGrid))/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i])*(Fp[2*i]+im*Fp[2*i+1]) ) );
     }
-}   
-
-
-// int main(int argc, char** argv){
-
-//    // Solving Ax = b
-//    double B[NN] = { 2. , 0.5 , 7. }, x[NN];
-
-//    double mat[][NN] = { { 2., -1., -2. },
-//                     { -4., 6., 3. },
-//                     { -4., -2., 8. } };
-
-//    double subdiagonal[2], diagonal[NN], superdiagonal[2];
-
-//    // Building main parts of the routine.
-//    for (int k=0; k<2; k++){
-//       subdiagonal[k]=mat[k+1][k];
-//       superdiagonal[k]=mat[k][k+1];
-//    }
-//    for (int k=0; k<NN; k++){
-//       diagonal[k]=mat[k][k];
-//    }
-
-//    for (int i=0; i<NN; i++){
-//       for (int j=0; j<(int)(sizeof(mat)/sizeof(mat[0])); j++){
-//          std::cout << mat[i][j] << " ";
-//       }
-//       std::cout << "\n";
-//    }
-
-//    int err = Tridiagonal_LU_Decomposition(subdiagonal, diagonal, superdiagonal, NN);
-//    if (err < 0) printf(" Matrix A failed the LU decomposition\n");
-//    else{
-//       err = Tridiagonal_LU_Solve(subdiagonal,diagonal,superdiagonal,B,x,NN);
-//    }
-
-//    // Testing the spline methods
-//    const std::complex<double> im = std::complex<double>(0.0,1.0);
-//    std::vector< std::complex<double> > Y(5);
-//    std::vector<double> X(5);
-//    X[0]=0.1; X[1]=0.4; X[2]=1.2; X[3]=1.8; X[4]=2.0; /// <------------------ test passed
-//    Y[0]=0.1+0.1*im; Y[1]=0.7-0.2*im; Y[2]=0.6+0.0*im; Y[3]=1.1-0.4*im; Y[4]=0.9;
-
-//    spline< std::complex<double> > s;
-//    s.set_points(X,Y);
-//    std::cout << s(1.5) << std::endl;
-//    s.iwn_tau_spl_extrm();
+}
 
 #endif /* end of Tridiagonal_H_ */
