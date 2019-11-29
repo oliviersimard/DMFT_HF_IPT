@@ -226,13 +226,13 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     for (size_t kp=0; kp<_splInline.k_array.size(); kp++){
         for (size_t iknp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknp<_splInline.iwn_array.size(); iknp++){
             middle_level_inf_tmp+= buildGK1D_IPT(_splInline.iwn_array[iknp],_splInline.k_array[kp]
-            )[0]*gamma_oneD_spsp_full_lower(_splInline.k_array[kp],kbar,_splInline.iwn_array[iknp],wbar
+            )[0]*gamma_oneD_spsp_full_lower_IPT(_splInline.k_array[kp],kbar,_splInline.iwn_array[iknp],wbar
             )*buildGK1D_IPT(_splInline.iwn_array[iknp]-_q._iwn,_splInline.k_array[kp]-_q._qx)[0];
         }
     }
     middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
     middle_level_corr_tmp+=middle_level_inf_tmp;
-    middle_level_inf_tmp+=std::get<1>(gamma_oneD_spsp(ktilde,wtilde,kbar,wbar));
+    middle_level_inf_tmp+=std::get<1>(gamma_oneD_spsp_IPT(ktilde,wtilde,kbar,wbar));
     middle_level_tmp-=middle_level_inf_tmp;
     middle_level_tmp+=1.0;
 

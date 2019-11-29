@@ -346,7 +346,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     delete vec_root_process;
     delete vec_slave_processes;
     // To make sure not all the processes save in the same file at the same time.
-    if (world_rank != root_process){
+    if (world_rank == root_process){
         outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
         outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
         outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);

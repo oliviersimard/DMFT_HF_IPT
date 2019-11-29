@@ -8,10 +8,10 @@
     "betamin": 50.0,
     "Ntau": 128,
     "N_it": 100,
-    "gridK": 10,
+    "gridK": 5,
     "q_1D": 0.0,
     "q_2D": [0.0,0.0],
-    "dGdPhi": false,
+    "dGdPhi": true,
     "load_self": true,
     "is_jj": false,
     "solver_type": "IPT"

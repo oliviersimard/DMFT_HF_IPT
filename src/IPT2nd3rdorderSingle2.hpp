@@ -122,8 +122,9 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     std::vector< std::string > vecStr;
     try{
         vecStr=glob(patternFile);
-    }catch (const std::exception& err){
+    }catch (const std::invalid_argument& err){
         std::cerr << err.what() << "\n";
+        exit(1);
     }
     int largestNum=1; // Numbers after N_it are always positive.
     for (auto str : vecStr){ // Getting the largest iteration number to eventually load for interpolation.
@@ -138,7 +139,7 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     infile.open(finalFile);// file containing numbers in 3 columns
     std::cout << "The file from which the spline is done: "+finalFile << "\n";
     if(infile.fail()){ // checks to see if file opended 
-        std::cout << "error" << std::endl; 
+        std::cerr << "error" << "\n"; 
         throw std::ios_base::failure("File not Found in SplineInline!!"); // no point continuing if the file didn't open...
     }
     while(!infile.eof()){ // reads file to end of *file*, not line

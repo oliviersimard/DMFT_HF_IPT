@@ -9,13 +9,16 @@ std::vector<std::string> glob(const std::string& pattern) noexcept(false){
 
     // do the glob operation
     int return_value = glob(pattern.c_str(), GLOB_TILDE, NULL, &glob_result);
-    if(return_value != 0){
+    if(return_value == GLOB_NOMATCH){
         globfree(&glob_result);
         stringstream ss;
-        ss << "glob() failed with return_value " << return_value << " for "+pattern << "\n";
-        throw std::runtime_error(ss.str());
+        ss << "glob() failed with return_value " << return_value << " for "+pattern+"; pattern was not found." << "\n";
+        std::cerr << ss.str() << "\n";
+    } else if (return_value == 0){
+        std::cerr << "The file "+pattern+" was found!!" << "\n";
+    } else{
+        throw std::invalid_argument("Glob issued an error: "+std::to_string(return_value));
     }
-
     // collect all the filenames into a std::list<std::string>
     vector<string> filenames;
     for(size_t i = 0; i < glob_result.gl_pathc; ++i) {
@@ -68,6 +71,7 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
     }
     catch(const std::runtime_error& e){
         std::cerr << e.what() << "\n";
+        exit(0);
     }
 
     if ( search0.size() > 0 || search1.size() > 0 || search2.size() > 0 ){

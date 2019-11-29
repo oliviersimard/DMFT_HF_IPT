@@ -104,12 +104,13 @@ int main(int argc, char** argv){
                 GreenStuff LocalGreenA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,local_green_A_matsubara_t_pos,local_green_A_matsubara_t_neg,local_green_A_matsubara_w);
 
                 IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos,data_dG_dtau_neg,vecK,n_t_spin);
-
+                
                 /* Performs the complete DMFT calculations if directory doesn't already exist */
                 #ifndef DEBUG
                 int message = stat( (pathToDirLoad+customDirName).c_str(), &infoDir );
-                if ( !(infoDir.st_mode & S_IFDIR) && message!=0 ) // If the directory doesn't already exist in ../data/ ...
+                if ( !(infoDir.st_mode & S_IFDIR) && message!=0 ){ // If the directory doesn't already exist in ../data/ ...
                     DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
+                }
                 else
                     std::cout << "The DMFT loop has been skipped since according to the directories, it has already been created for this set of parameters." << std::endl;
                 #endif
@@ -119,10 +120,12 @@ int main(int argc, char** argv){
                     IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec,vecK,iwnArr_l,iqnArr_l);
                     try{
                         splInlineObj.loadFileSpline(filenameToLoad); // Spline is ready for use by calling function calculateSpline()-
-                    } catch(const std::exception& err){ // If filenameToLoad is not found...
+                    } catch(const std::invalid_argument& err){ // If filenameToLoad is not found...
                         std::cerr << err.what() << "\n";
                         std::cerr << "Check if data with "+std::to_string(MULT_N_TAU)+" times the N_tau selected is available...\n";
                         exit(1);
+                    } catch(const std::runtime_error& err){
+                        std::cerr << err.what() << "\n";
                     }
                     //std::complex<double> test = splInlineObj.calculateSpline(0.4); // Should include this into test file with the proper file to load.
                     //std::cout << test << std::endl;
