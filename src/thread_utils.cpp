@@ -20,7 +20,6 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> tmp_val_kt_kb(0.0,0.0),tmp_val_weights(0.0,0.0),tmp_val_tot_sus(0.0,0.0),
     tmp_val_mid_lev(0.0,0.0),tmp_val_corr(0.0,0.0);
-    std::complex<double> val_jj;
     std::complex<double> tmp_val_kt_kb_tmp, tmp_val_weights_tmp;
     std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > tupOfValsFull;
     std::tuple< std::complex<double>,std::complex<double> > tupOfVals;
@@ -124,7 +123,7 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_one
     }
     
     lower_level *= SPINDEG*GreenStuff::U/(GreenStuff::beta*GreenStuff::N_k);
-    bubble = -1.0*bubble;
+    bubble = -1.0*lower_level;
     lower_level += 1.0;
     return std::make_tuple(GreenStuff::U/lower_level,bubble);
 }
@@ -427,7 +426,6 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 
 void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<double> tmp_val_kt_kb,std::complex<double> tmp_val_weights,std::complex<double> tmp_val_mid_lev,std::complex<double> tmp_val_corr,
                         std::complex<double> tmp_val_tot_sus,size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const{
-    double kbarx;
     std::complex<double> val_jj(0.0,0.0);
     double beta_div = (1.0/GreenStuff::beta/GreenStuff::beta);
     matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
@@ -452,6 +450,7 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<d
         val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline.k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[2]));
         matTotSus(k2,k1) = val_jj;
         #elif DIM == 2
+        double kbarx;
         for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
             kbarx = (_splInline.k_array[ktildex]-_splInline.k_array[k1]); // It brakets within [-2pi,2pi].
             val_jj += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
@@ -465,7 +464,6 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<d
 
 void ThreadWrapper::save_data_to_local_extern_matrix_instances(std::complex<double> tmp_val_kt_kb,std::complex<double> tmp_val_weights,std::complex<double> tmp_val_mid_lev,std::complex<double> tmp_val_corr,std::complex<double> tmp_val_tot_sus,
                         size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const{
-    double kbarx;
     std::complex<double> val_jj(0.0,0.0);
     double beta_div = 1.0/_Gk._beta/_Gk._beta;
     matWeigths(k2,k1) = tmp_val_weights*beta_div;
@@ -490,6 +488,7 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instances(std::complex<doub
         val_jj = -1.0*beta_div*(-2.0*std::sin(_Gk._kArr_l[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[k2]));
         matTotSus(k2,k1) = val_jj;
         #elif DIM == 2
+        double kbarx;
         for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
             kbarx = (_Gk._kArr_l[ktildex]-_Gk._kArr_l[k1]); // It brakets within [-2pi,2pi].
             val_jj += -1.0*(-2.0*std::sin(_Gk._kArr_l[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
