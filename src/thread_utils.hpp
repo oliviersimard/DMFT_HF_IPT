@@ -266,7 +266,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
-    const size_t num_elements_per_proc = totSize/world_size;
+    const size_t num_elements_per_proc = totSize/world_size; // Investigate this further, because there might prob with rounding.
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
     std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc);
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);

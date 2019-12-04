@@ -1,13 +1,11 @@
 SRC=$(PWD)/src
 OBJ=$(PWD)/obj
 
-CXX=mpic++ -std=c++11 -Wall -g -fpermissive
-INC=${HOME}/gsl/include
-INC2=${HOME}/include
-LIB=${HOME}/gsl/lib
-LIB2=${HOME}/lib
+CXX=mpicc -g -O2 -std=c++11 -Wall -fpermissive -DPARALLEL -DDIM=1 -DDEBUG
+INC=${HOME}/gsl/include -I${HOME}/include
+LIB=${HOME}/gsl/lib -L${HOME}/lib
 
-CXXFLAGS=-L$(LIB) -L$(LIB2) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -ljson_spirit -lpthread#-lgtest -lgmock -lpthread
+CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -ljson_spirit#-lgtest -lgmock -lpthread
 
 PROG=IPT-DMFT-OLI
 
@@ -17,25 +15,25 @@ $(PROG): $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IP
 	$(CXX) $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(OBJ)/thread_utils.o $(CXXFLAGS) -o mainIPT.out
 
 $(OBJ)/mainIPT.o: $(PWD)/mainIPT.cpp
-	$(CXX) -c -I$(INC) -I$(INC2) $(PWD)/mainIPT.cpp -o $(OBJ)/mainIPT.o
+	$(CXX) -c -I$(INC) $(PWD)/mainIPT.cpp -o $(OBJ)/mainIPT.o
 
 $(OBJ)/green_utils.o: $(SRC)/green_utils.cpp
-	$(CXX) -c -I$(INC) -I$(INC2) $(SRC)/green_utils.cpp -o $(OBJ)/green_utils.o
+	$(CXX) -c -I$(INC) $(SRC)/green_utils.cpp -o $(OBJ)/green_utils.o
 
 $(OBJ)/integral_utils.o: $(SRC)/integral_utils.cpp
-	$(CXX) -c -I$(INC) -I$(INC2) $(SRC)/integral_utils.cpp -o $(OBJ)/integral_utils.o
+	$(CXX) -c -I$(INC) $(SRC)/integral_utils.cpp -o $(OBJ)/integral_utils.o
 
 $(OBJ)/IPT2nd3rdorderSingle2.o: $(SRC)/IPT2nd3rdorderSingle2.cpp
-	$(CXX) -c -I$(INC) -I$(INC2) $(SRC)/IPT2nd3rdorderSingle2.cpp -o $(OBJ)/IPT2nd3rdorderSingle2.o
+	$(CXX) -c -I$(INC) $(SRC)/IPT2nd3rdorderSingle2.cpp -o $(OBJ)/IPT2nd3rdorderSingle2.o
 
 $(OBJ)/json_utils.o: $(SRC)/json_utils.cpp
-	$(CXX) -c -I$(INC) -I$(INC2) $(SRC)/json_utils.cpp -o $(OBJ)/json_utils.o
+	$(CXX) -c -I$(INC) $(SRC)/json_utils.cpp -o $(OBJ)/json_utils.o
 
 $(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
-	$(CXX) -c -I$(INC) -I$(INC2) $(SRC)/file_utils.cpp -o $(OBJ)/file_utils.o
+	$(CXX) -c -I$(INC) $(SRC)/file_utils.cpp -o $(OBJ)/file_utils.o
 
 $(OBJ)/thread_utils.o: $(SRC)/thread_utils.cpp
-	$(CXX) -c -I$(INC) -I$(INC2) $(SRC)/thread_utils.cpp -o $(OBJ)/thread_utils.o
+	$(CXX) -c -I$(INC) $(SRC)/thread_utils.cpp -o $(OBJ)/thread_utils.o
 
 clean:
 	rm -f $(OBJ)/* $(PWD)/mainIPT.out && cd test && make clean
