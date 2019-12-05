@@ -134,7 +134,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
     const size_t num_elements_per_proc = totSize/world_size;
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
-    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc);
+    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q1D;
@@ -167,7 +167,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
                 start_arr = an_id*num_elements_per_proc + 1;
                 end_arr = (an_id + 1)*num_elements_per_proc;
                 if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
-                end_arr = totSize - 1;
+                    end_arr = totSize - 1;
                 num_elems_to_send = end_arr - start_arr + 1;
                 ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
                 ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
@@ -175,7 +175,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             }
             /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
             mpistruct_t tmpObj;
-            for (int i=0; i<num_elements_per_proc; i++){ // Careful with <=
+            for (int i=0; i<=num_elements_per_proc; i++){ // Careful with <=
                 tmpObj=vec_root_process->at(i);
                 #if DIM == 1
                 threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
@@ -275,7 +275,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
     const size_t num_elements_per_proc = totSize/world_size; // Investigate this further, because there might prob with rounding.
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
-    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc);
+    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q1D;
@@ -306,7 +306,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
                 start_arr = an_id*num_elements_per_proc + 1;
                 end_arr = (an_id + 1)*num_elements_per_proc;
                 if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
-                end_arr = totSize - 1;
+                    end_arr = totSize - 1;
                 num_elems_to_send = end_arr - start_arr + 1;
                 ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
                 ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
@@ -314,16 +314,16 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             }
             /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
             mpistruct_t tmpObj;
-            for (int i=0; i<num_elements_per_proc; i++){
+            for (int i=0; i<=num_elements_per_proc; i++){
                 tmpObj=vec_root_process->at(i);
                 #if DIM == 1
                 threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
                 #elif DIM == 2
                 threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
                 #endif
+                printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
             }
             MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
-            printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
             /* Gather the results from the child processes into the externally linked matrices meant for this purpose. */
             for(int an_id = 1; an_id < world_size; an_id++) {
                 fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple);

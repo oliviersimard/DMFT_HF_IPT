@@ -1,7 +1,7 @@
 SRC=$(PWD)/src
 OBJ=$(PWD)/obj
 
-CXX=mpicc -g -O0 -std=c++11 -Wall -fpermissive -DPARALLEL -DDIM=1 -DDEBUG
+CXX=mpicc -g -O2 -std=c++11 -Wall -fpermissive -DPARALLEL -DDIM=1 -DDEBUG
 INC=${HOME}/gsl/include -I${HOME}/include
 LIB=${HOME}/gsl/lib -L${HOME}/lib
 
