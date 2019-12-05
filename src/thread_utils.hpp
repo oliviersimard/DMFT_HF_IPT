@@ -1,8 +1,6 @@
 #ifndef Thread_Utils_H_
 #define Thread_Utils_H_
 
-//#define PARALLEL
-
 #include<mpi.h>
 #include "susceptibilities.hpp"
 
@@ -22,6 +20,7 @@ extern arma::Mat< std::complex<double> > matWeigths;
 extern arma::Mat< std::complex<double> > matTotSus;
 extern arma::Mat< std::complex<double> > matCorr;
 extern arma::Mat< std::complex<double> > matMidLev;
+extern std::complex<double>**** gamma_tensor;
 extern int root_process;
 extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaSlaves;
 extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsSlaves;
@@ -50,8 +49,8 @@ namespace ThreadFunctor{
             explicit ThreadWrapper(HF::K_1D q,IPT2::SplineInline< std::complex<double> > splInline);
             explicit ThreadWrapper(HF::K_2D qq,IPT2::SplineInline< std::complex<double> > splInline);
             ThreadWrapper()=default;
-            void operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_full, solver_prototype sp) const; // 1D IPT/HF
-            void operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj, bool is_full) const; // 2D IPT/HF
+            void operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_full, size_t j, solver_prototype sp) const; // 1D IPT/HF
+            void operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj, bool is_full, size_t j) const; // 2D IPT/HF
             std::tuple< std::complex<double>,std::complex<double> > gamma_oneD_spsp(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
             std::tuple< std::complex<double>,std::complex<double> > gamma_oneD_spsp_IPT(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const;
             std::tuple< std::complex<double>,std::complex<double> > gamma_twoD_spsp(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
@@ -72,9 +71,9 @@ namespace ThreadFunctor{
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
         private:
             void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
-                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const;
+                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const;
             void save_data_to_local_extern_matrix_instances(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
-                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const;
+                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const;
             double _ndo_converged {0.0};
             HF::FunctorBuildGk _Gk={};
             HF::K_1D _q={};
@@ -126,6 +125,7 @@ template<>
 inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBuildGk Gk,std::string pathToDir,std::string customDirName,bool is_full,bool is_jj,double ndo_converged,ThreadFunctor::solver_prototype sp){
     MPI_Status status;
     std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus, outputChispspBubble, outputChispspBubbleCorr;
+    std::string strOutputChispspWeights, strOutputChispspTotSus, strOutputChispspBubble, strOutputChispspGamma, strOutputChispspBubbleCorr;
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=Gk._kArr_l.size()*Gk._kArr_l.size(); // Nk+1 * Nk+1
@@ -144,11 +144,10 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     std::cout << "totSize: " << totSize << " and " << vec_root_process->size() << "\n";
     std::cout << "num_elements_per_proc: " << num_elements_per_proc << std::endl;
     for (size_t j=0; j<Gk._precomp_qn.size(); j++){ // Looping over the bosonic Matsubara frequencies...
-        std::string strOutputChispspGamma(pathToDir+customDirName+"/susceptibilities/ChispspGamma_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspWeights(pathToDir+customDirName+"/susceptibilities/ChispspWeights_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspTotSus(pathToDir+customDirName+"/susceptibilities/ChispspTotSus_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspBubble(pathToDir+customDirName+"/susceptibilities/ChispspBubble_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspBubbleCorr;
+        strOutputChispspWeights=pathToDir+customDirName+"/susceptibilities/ChispspWeights_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat";
+        strOutputChispspTotSus=pathToDir+customDirName+"/susceptibilities/ChispspTotSus_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat";
+        strOutputChispspBubble=pathToDir+customDirName+"/susceptibilities/ChispspBubble_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat";
+        strOutputChispspGamma=pathToDir+customDirName+"/susceptibilities/ChispspGamma_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat";
         if (is_full)
             strOutputChispspBubbleCorr = pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat";
         #if DIM == 1
@@ -178,9 +177,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             for (int i=0; i<=num_elements_per_proc; i++){ // Careful with <=
                 tmpObj=vec_root_process->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
                 #elif DIM == 2
-                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full); // Performing the calculations here...
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j); // Performing the calculations here...
                 #endif
                 printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
             }
@@ -200,9 +199,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             for(int i = 0; i < num_elems_to_receive; i++) {
                 tmpObj = vec_slave_processes->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp);
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
                 #elif DIM == 2
-                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
                 printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
             }
@@ -317,9 +316,9 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             for (int i=0; i<=num_elements_per_proc; i++){
                 tmpObj=vec_root_process->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
                 #elif DIM == 2
-                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
                 printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
             }
@@ -339,9 +338,9 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             for(int i = 0; i < num_elems_to_receive; i++) {
                 tmpObj = vec_slave_processes->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp);
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
                 #elif DIM == 2
-                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
                 printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
             }

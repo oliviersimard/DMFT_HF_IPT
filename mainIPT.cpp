@@ -1,3 +1,4 @@
+#define PARALLEL
 #ifdef PARALLEL
 #include "src/thread_utils.hpp"
 #else
@@ -7,7 +8,9 @@
 
 int main(int argc, char** argv){
     #ifdef PARALLEL
+    int world_rank;
     MPI_Init(&argc,&argv);
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     #endif
     // Loading parameters from Json file
     #ifndef DEBUG
@@ -48,6 +51,19 @@ int main(int argc, char** argv){
     matTotSus = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
     matCorr = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
     matMidLev = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
+    // Allocating
+    if (world_rank==root_process){
+        gamma_tensor = new std::complex<double>***[vecK.size()];
+        for (size_t i=0; i<N_tau; i++){
+            gamma_tensor[i] = new std::complex<double>**[N_tau];
+            for (size_t j=0; j<vecK.size(); j++){
+                gamma_tensor[i][j] = new std::complex<double>*[vecK.size()];
+                for (size_t k=0; k<N_tau; k++){
+                    gamma_tensor[i][j][k] = new std::complex<double>[N_tau];
+                }
+            } 
+        }
+    }
     #endif
     arma::Cube<double> weiss_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> weiss_green_tmp_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_tmp_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
@@ -179,5 +195,16 @@ int main(int argc, char** argv){
             }
         }
     }
+    // Deallocating
+    for (size_t i=0; i<N_tau; i++){
+        for (size_t j=0; j<vecK.size(); j++){
+            for (size_t k=0; k<N_tau; k++){
+                delete[] gamma_tensor[i][j][k];
+            }
+            delete[] gamma_tensor[i][j];
+        }
+        delete[] gamma_tensor[i];
+    }
+    delete[] gamma_tensor;
     return 0;
 }

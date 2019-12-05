@@ -2,11 +2,12 @@
 
 using namespace ThreadFunctor;
 
-arma::Mat< std::complex<double> > matGamma; // Matrices used in case parallel.
+arma::Mat< std::complex<double> > matGamma; // Matrices (and tensor) used in case parallel. Initialized in the main.
 arma::Mat< std::complex<double> > matWeigths;
 arma::Mat< std::complex<double> > matTotSus;
 arma::Mat< std::complex<double> > matCorr;
 arma::Mat< std::complex<double> > matMidLev;
+std::complex<double>**** gamma_tensor;
 int root_process=0;
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
@@ -15,7 +16,7 @@ std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrSlaves =
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
 
 #if DIM == 1
-void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_full, solver_prototype sp) const{
+void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_full, size_t j, solver_prototype sp) const{
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> tmp_val_kt_kb(0.0,0.0),tmp_val_weights(0.0,0.0),tmp_val_tot_sus(0.0,0.0),
@@ -27,51 +28,46 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
     case solver_prototype::HF_prot:
         for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
             for (size_t wbar=0; wbar<_Gk._size; wbar++){
+                tmp_val_weights_tmp = _Gk(_Gk._precomp_wn[wtilde],_Gk._kArr_l[ktilde]
+                                    )(0,0)*_Gk(_Gk._precomp_wn[wtilde]+_q._iwn,_Gk._kArr_l[ktilde]+_q._qx
+                                    )(0,0)*_Gk(_Gk._precomp_wn[wbar]+_q._iwn,_Gk._kArr_l[kbar]+_q._qx
+                                    )(1,1)*_Gk(_Gk._precomp_wn[wbar],_Gk._kArr_l[kbar]
+                                    )(1,1);
                 if (!is_full){
-                    tupOfVals = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
-                    tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
-                    tmp_val_mid_lev += std::get<1>(tupOfVals);
-                }
-                else{
+                    if (j==0){
+                        tupOfVals = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
+                        tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
+                        gamma_tensor[ktilde][wtilde][kbar][wbar] = tmp_val_kt_kb_tmp;
+                        tmp_val_mid_lev += std::get<1>(tupOfVals);
+                        tmp_val_kt_kb += tmp_val_kt_kb_tmp;
+                        tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
+                    } else{
+                        tmp_val_tot_sus += gamma_tensor[ktilde][wtilde][kbar][wbar]*tmp_val_weights_tmp;
+                    }
+                } else{
                     tupOfValsFull = gamma_oneD_spsp_full_middle_plotting(_Gk._kArr_l[ktilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar],_Gk._precomp_wn[wtilde]);
                     tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
                     tmp_val_corr += std::get<1>(tupOfValsFull);
                     tmp_val_mid_lev += std::get<2>(tupOfValsFull);
+                    tmp_val_kt_kb += tmp_val_kt_kb_tmp;
+                    tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 }
-                tmp_val_weights_tmp = _Gk(_Gk._precomp_wn[wtilde],_Gk._kArr_l[ktilde]
-                                    )(0,0)*_Gk(_Gk._precomp_wn[wtilde]-_q._iwn,_Gk._kArr_l[ktilde]-_q._qx
-                                    )(0,0)*_Gk(_Gk._precomp_wn[wbar]-_q._iwn,_Gk._kArr_l[kbar]-_q._qx
-                                    )(1,1)*_Gk(_Gk._precomp_wn[wbar],_Gk._kArr_l[kbar]
-                                    )(1,1); 
                 tmp_val_weights += tmp_val_weights_tmp;
-                tmp_val_kt_kb += tmp_val_kt_kb_tmp;
-                tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 if ((wtilde==0) && (wbar==0)){
                     std::cout << "Process id: " << world_rank << "\n";
                     std::cout << "ktilde: " << _Gk._kArr_l[ktilde] << "\n";
                     std::cout << "kbar: " << _Gk._kArr_l[kbar] << "\n";
-                    std::cout << "gamma_oneD_spsp: " << tmp_val_kt_kb << "\n";
-                    std::cout << "weights: " << tmp_val_weights << std::endl;
+                    std::cout << "Tot Sus: " << tmp_val_tot_sus << "\n";
+                    std::cout << "Weights: " << tmp_val_weights << std::endl;
                 }
             } 
         }
         save_data_to_local_extern_matrix_instances(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
-                    ktilde,kbar,is_jj,is_full,world_rank);
+                    ktilde,kbar,is_jj,is_full,world_rank,j);
         break;
     case solver_prototype::IPT2_prot:
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
             for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
-                if (!is_full){
-                    tupOfVals = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
-                    tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
-                    tmp_val_mid_lev += std::get<1>(tupOfVals);
-                }
-                else{
-                    tupOfValsFull = gamma_oneD_spsp_full_middle_plotting_IPT(_splInline.k_array[ktilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar],_splInline.iwn_array[wtilde]);
-                    tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
-                    tmp_val_corr += std::get<1>(tupOfValsFull);
-                    tmp_val_mid_lev += std::get<2>(tupOfValsFull);
-                }
                 tmp_val_weights_tmp = buildGK1D_IPT(
                                     _splInline.iwn_array[wtilde],_splInline.k_array[ktilde]
                                     )[0]*buildGK1D_IPT(
@@ -80,8 +76,23 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                                     _splInline.iwn_array[wbar]-_q._iwn,_splInline.k_array[kbar]-_q._qx
                                     )[1]*buildGK1D_IPT(
                                     _splInline.iwn_array[wbar],_splInline.k_array[kbar]
-                                    )[1]; 
+                                    )[1];
                 tmp_val_weights += tmp_val_weights_tmp;
+                if (!is_full){
+                    if (j==0){
+                        tupOfVals = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
+                        tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
+                        tmp_val_mid_lev += std::get<1>(tupOfVals);
+                    } else{
+                        tmp_val_kt_kb_tmp = matGamma(kbar,ktilde);
+                    }
+                }
+                else{
+                    tupOfValsFull = gamma_oneD_spsp_full_middle_plotting_IPT(_splInline.k_array[ktilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar],_splInline.iwn_array[wtilde]);
+                    tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
+                    tmp_val_corr += std::get<1>(tupOfValsFull);
+                    tmp_val_mid_lev += std::get<2>(tupOfValsFull);
+                }
                 tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                 tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 if ((wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline.iwn_array.size()/2))){
@@ -94,7 +105,7 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
             } 
         }
         save_data_to_local_extern_matrix_instancesIPT(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
-                    ktilde,kbar,is_jj,is_full,world_rank);
+                    ktilde,kbar,is_jj,is_full,world_rank,j);
         break;
     }
 }
@@ -195,7 +206,7 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
 }
 
 #elif DIM == 2
-void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj, bool is_full) const{
+void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_t kbary_m_tildey, bool is_jj, bool is_full, size_t j) const{
 /* In 2D, calculating the weights implies computing whilst dismissing the translational invariance of the vertex function (Gamma). */
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
@@ -231,7 +242,7 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
             } 
         }
         save_data_to_local_extern_matrix_instances(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
-                    kbarx_m_tildex,kbary_m_tildey,is_jj,is_full,world_rank);
+                    kbarx_m_tildex,kbary_m_tildey,is_jj,is_full,world_rank,j);
         break;
     case solver_prototype::IPT2_prot:
         for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
@@ -259,7 +270,7 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
             } 
         }
         save_data_to_local_extern_matrix_instancesIPT(tmp_val_kt_kb,tmp_val_weights,tmp_val_mid_lev,tmp_val_corr,tmp_val_tot_sus,
-                    kbarx_m_tildex,kbary_m_tildey,is_jj,is_full,world_rank);
+                    kbarx_m_tildex,kbary_m_tildey,is_jj,is_full,world_rank,j);
         break;
     }
 
@@ -425,27 +436,42 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 
 
 void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<double> tmp_val_kt_kb,std::complex<double> tmp_val_weights,std::complex<double> tmp_val_mid_lev,std::complex<double> tmp_val_corr,
-                        std::complex<double> tmp_val_tot_sus,size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const{
+                        std::complex<double> tmp_val_tot_sus,size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const{
     std::complex<double> val_jj(0.0,0.0);
     double beta_div = (1.0/GreenStuff::beta/GreenStuff::beta);
-    matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
     matWeigths(k2,k1) = tmp_val_weights*beta_div;
-    matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
-    if (is_full)
-        matCorr(k2,k1) = tmp_val_corr*beta_div;
-    if (world_rank != root_process){
-        vecGammaSlaves->push_back( std::make_tuple( k2,k1,tmp_val_kt_kb*beta_div ) );
-        vecWeightsSlaves->push_back( std::make_tuple( k2,k1,tmp_val_weights*beta_div ) );
-        vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
-        if (is_full)
-            vecCorrSlaves->push_back( std::make_tuple( k2,k1,tmp_val_corr*beta_div ) );
-    }
+    if (is_full){
+        if (j==0){ // Because matCorr is "homogeneous" throughout the processes afterwards.. (only part not depending on q)
+            matCorr(k2,k1) = tmp_val_corr*beta_div;
+            if (world_rank != root_process){
+                vecCorrSlaves->push_back( std::make_tuple( k2,k1,tmp_val_corr*beta_div ) );
+            }
+        }
+        matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
+        matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
+        if (world_rank != root_process){
+            vecGammaSlaves->push_back( std::make_tuple( k2,k1,tmp_val_kt_kb*beta_div ) );
+            vecWeightsSlaves->push_back( std::make_tuple( k2,k1,tmp_val_weights*beta_div ) );
+            vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
+        }
+    } else{
+        if (j==0){
+            matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
+            matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
+            if (world_rank != root_process){
+                vecGammaSlaves->push_back( std::make_tuple( k2,k1,tmp_val_kt_kb*beta_div ) );
+                vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
+            }
+        }
+        if (world_rank != root_process){
+            vecWeightsSlaves->push_back( std::make_tuple( k2,k1,tmp_val_weights*beta_div ) );
+        }
+    }   
     if (!is_jj){
         matTotSus(k2,k1) = beta_div*tmp_val_tot_sus; // These matrices are static variables.
         if (world_rank != root_process)
             vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
-    }
-    else if (is_jj){
+    }else if (is_jj){
         #if DIM == 1
         val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline.k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[2]));
         matTotSus(k2,k1) = val_jj;
@@ -463,27 +489,41 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<d
 }
 
 void ThreadWrapper::save_data_to_local_extern_matrix_instances(std::complex<double> tmp_val_kt_kb,std::complex<double> tmp_val_weights,std::complex<double> tmp_val_mid_lev,std::complex<double> tmp_val_corr,std::complex<double> tmp_val_tot_sus,
-                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank) const{
+                        size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const{
     std::complex<double> val_jj(0.0,0.0);
     double beta_div = 1.0/_Gk._beta/_Gk._beta;
     matWeigths(k2,k1) = tmp_val_weights*beta_div;
-    matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
-    matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
-    if (is_full)
-        matCorr(k2,k1) = tmp_val_corr*beta_div;
-    if (world_rank != root_process){ // Saving into vector of tuples..
-        vecGammaSlaves->push_back( std::make_tuple( k2,k1, tmp_val_kt_kb*beta_div ) );
-        vecWeightsSlaves->push_back( std::make_tuple( k2,k1, tmp_val_weights*beta_div ) );
-        vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
-        if (is_full)
-            vecCorrSlaves->push_back( std::make_tuple( k2,k1,tmp_val_corr*beta_div ) );
+    if (is_full){
+        if (j==0){
+            matCorr(k2,k1) = tmp_val_corr*beta_div;
+            if (world_rank != root_process)
+                vecCorrSlaves->push_back( std::make_tuple( k2,k1,tmp_val_corr*beta_div ) );
+        }
+        matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
+        matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
+        if (world_rank != root_process){ // Saving into vector of tuples..
+            vecGammaSlaves->push_back( std::make_tuple( k2,k1, tmp_val_kt_kb*beta_div ) );
+            vecWeightsSlaves->push_back( std::make_tuple( k2,k1, tmp_val_weights*beta_div ) );
+            vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
+        }
+    }else{
+        if (j==0){
+            matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
+            matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
+            if (world_rank != root_process){
+                vecGammaSlaves->push_back( std::make_tuple( k2,k1, tmp_val_kt_kb*beta_div ) );
+                vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
+            }
+        }
+        if (world_rank != root_process){ // Saving into vector of tuples..
+            vecWeightsSlaves->push_back( std::make_tuple( k2,k1, tmp_val_weights*beta_div ) );
+        }
     }
     if (!is_jj){
         matTotSus(k2,k1) = beta_div*tmp_val_tot_sus; // These matrices are static variables.
         if (world_rank != root_process)
             vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
-    }
-    else if (is_jj){ // kbarx could also be kbary
+    }else if (is_jj){ // kbarx could also be kbary
         #if DIM == 1
         val_jj = -1.0*beta_div*(-2.0*std::sin(_Gk._kArr_l[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[k2]));
         matTotSus(k2,k1) = val_jj;
