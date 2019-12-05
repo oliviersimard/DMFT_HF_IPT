@@ -141,7 +141,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
     const size_t num_elements_per_proc = totSize/world_size;
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
-    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc);
+    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
@@ -150,19 +150,86 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
     ThreadFunctor::ThreadWrapper threadObj(Gk,qq,ndo_converged);
     #endif
-    if (world_rank==root_process){
-        // First initialize the data array to be distributed across all the processes called in.
-        get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
-        /* distribute a portion of the bector to each child process */
-        for(int an_id = 1; an_id < world_size; an_id++) {
-            start_arr = an_id*num_elements_per_proc + 1;
-            end_arr = (an_id + 1)*num_elements_per_proc;
-            if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
-               end_arr = totSize - 1;
-            num_elems_to_send = end_arr - start_arr + 1;
-            ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
-            ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
-                  an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
+    std::cout << "totSize: " << totSize << " and " << vec_root_process->size() << "\n";
+    std::cout << "num_elements_per_proc: " << num_elements_per_proc << std::endl;
+    for (size_t j=0; j<Gk._precomp_qn.size(); j++){ // Looping over the bosonic Matsubara frequencies...
+        std::string strOutputChispspGamma(pathToDir+customDirName+"/susceptibilities/ChispspGamma_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspWeights(pathToDir+customDirName+"/susceptibilities/ChispspWeights_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspTotSus(pathToDir+customDirName+"/susceptibilities/ChispspTotSus_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspBubble(pathToDir+customDirName+"/susceptibilities/ChispspBubble_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspBubbleCorr;
+        if (is_full)
+            strOutputChispspBubbleCorr = pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+"_iqn_"+std::to_string(Gk._precomp_qn[j].imag())+trailingStr+".dat";
+        #if DIM == 1
+        q1D._iwn = Gk._precomp_qn[j]; // photon 4-vector
+        ThreadFunctor::ThreadWrapper threadObj(Gk,q1D,ndo_converged);
+        #elif DIM == 2
+        qq2D._iwn = Gk._precomp_qn[j]; // photon 4-vector
+        ThreadFunctor::ThreadWrapper threadObj(Gk,qq2D,ndo_converged);
+        #endif
+        std::cout << "\n\n iqn: " << Gk._precomp_qn[j] << "\n\n";
+        if (world_rank==root_process){
+            // First initialize the data array to be distributed across all the processes called in.
+            get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
+            /* distribute a portion of the bector to each child process */
+            for(int an_id = 1; an_id < world_size; an_id++) {
+                start_arr = an_id*num_elements_per_proc + 1;
+                end_arr = (an_id + 1)*num_elements_per_proc;
+                if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
+                    end_arr = totSize - 1;
+                num_elems_to_send = end_arr - start_arr + 1;
+                ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
+                ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
+                    an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
+            }
+            /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
+            mpistruct_t tmpObj;
+            for (int i=0; i<=num_elements_per_proc; i++){ // Careful with <=
+                tmpObj=vec_root_process->at(i);
+                #if DIM == 1
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
+                #elif DIM == 2
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full); // Performing the calculations here...
+                #endif
+                printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
+            }
+            MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
+            /* Gather the results from the child processes into the externally linked Math rices meant for this purpose. */
+            for(int an_id = 1; an_id < world_size; an_id++) {
+                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple);
+            }
+        } else{
+            /* Slave processes receive their part of work from the root process. */
+            ierr = MPI_Recv( &num_elems_to_receive, 1, MPI_INT, 
+                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
+            ierr = MPI_Recv( (void*)(vec_slave_processes->data()), sizeof(mpistruct_t)*num_elems_to_receive, MPI_BYTE, 
+                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
+            /* Calculate the sum of the portion of the array */
+            mpistruct_t tmpObj;
+            for(int i = 0; i < num_elems_to_receive; i++) {
+                tmpObj = vec_slave_processes->at(i);
+                #if DIM == 1
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp);
+                #elif DIM == 2
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
+                #endif
+                printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+            char chars_to_send[50];
+            sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
+            /* Finally send integers to root process to notify the state of the calculations. */
+            if (is_full)
+                ierr = MPI_Send( (void*)(vecCorrSlaves->data()), sizeOfTuple*vecCorrSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_CORR, MPI_COMM_WORLD);
+            ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
+            ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+            ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeOfTuple*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
+            ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeOfTuple*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
+            ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
+            vecGammaSlaves->clear(); vecMidLevSlaves->clear();
+            vecWeightsSlaves->clear(); vecTotSusSlaves->clear();
+            if (is_full)
+                vecCorrSlaves->clear();
         }
         /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
         mpistruct_t tmpObj;
@@ -268,7 +335,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
     const size_t num_elements_per_proc = totSize/world_size; // Investigate this further, because there might prob with rounding.
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
-    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc);
+    std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q(0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
@@ -277,19 +344,85 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     HF::K_2D qq(0.0,0.0,std::complex<double>(0.0,0.0)); // photon 4-vector
     ThreadFunctor::ThreadWrapper threadObj(qq,splInline);
     #endif
-    if (world_rank==root_process){
-        // First initialize the data array to be distributed across all the processes called in.
-        get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
-        /* distribute a portion of the bector to each child process */
-        for(int an_id = 1; an_id < world_size; an_id++) {
-            start_arr = an_id*num_elements_per_proc + 1;
-            end_arr = (an_id + 1)*num_elements_per_proc;
-            if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
-               end_arr = totSize - 1;
-            num_elems_to_send = end_arr - start_arr + 1;
-            ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
-            ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
-                  an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
+    for (size_t j=0; j<GreenStuff::N_tau; j++){
+        std::string strOutputChispspGamma(pathToDir+customDirName+"/susceptibilities/ChispspGamma_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspWeights(pathToDir+customDirName+"/susceptibilities/ChispspWeights_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspTotSus(pathToDir+customDirName+"/susceptibilities/ChispspTotSus_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspBubble(pathToDir+customDirName+"/susceptibilities/ChispspBubble_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
+        std::string strOutputChispspBubbleCorr;
+        if (is_full)
+            strOutputChispspBubbleCorr = pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
+        #if DIM == 1
+        q1D._iwn = iqnArr_l[j]; // photon 4-vector
+        ThreadFunctor::ThreadWrapper threadObj(q1D,splInline);
+        #elif DIM == 2 
+        qq2D._iwn = iqnArr_l[j]; // photon 4-vector
+        ThreadFunctor::ThreadWrapper threadObj(qq2D,splInline);
+        #endif
+        std::cout << "\n\n iqn: " << iqnArr_l[j] << "\n\n";
+        if (world_rank==root_process){
+            // First initialize the data array to be distributed across all the processes called in.
+            get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
+            /* distribute a portion of the bector to each child process */
+            for(int an_id = 1; an_id < world_size; an_id++) {
+                start_arr = an_id*num_elements_per_proc + 1;
+                end_arr = (an_id + 1)*num_elements_per_proc;
+                if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
+                    end_arr = totSize - 1;
+                num_elems_to_send = end_arr - start_arr + 1;
+                ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
+                ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
+                    an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
+            }
+            /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
+            mpistruct_t tmpObj;
+            for (int i=0; i<=num_elements_per_proc; i++){
+                tmpObj=vec_root_process->at(i);
+                #if DIM == 1
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp); // Performing the calculations here...
+                #elif DIM == 2
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
+                #endif
+                printf("(%li,%li) calculated by root process\n", tmpObj._lkt, tmpObj._lkb);
+            }
+            MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
+            /* Gather the results from the child processes into the externally linked matrices meant for this purpose. */
+            for(int an_id = 1; an_id < world_size; an_id++) {
+                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple);
+            }
+        } else{
+            /* Slave processes receive their part of work from the root process. */
+            ierr = MPI_Recv( &num_elems_to_receive, 1, MPI_INT, 
+                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
+            ierr = MPI_Recv( (void*)(vec_slave_processes->data()), sizeof(mpistruct_t)*num_elems_to_receive, MPI_BYTE, 
+                root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
+            /* Calculate the sum of my portion of the array */
+            mpistruct_t tmpObj;
+            for(int i = 0; i < num_elems_to_receive; i++) {
+                tmpObj = vec_slave_processes->at(i);
+                #if DIM == 1
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,tmpObj._sp);
+                #elif DIM == 2
+                threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full);
+                #endif
+                printf("vec_slave_process el %d: %li, %li, %p\n", world_rank, tmpObj._lkt, tmpObj._lkb, (void*)vec_slave_processes);
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+            char chars_to_send[50];
+            sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
+            /* Finally send integers to root process to notify the state of the calculations. */
+            ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
+            if (is_full){
+                ierr = MPI_Send( (void*)(vecCorrSlaves->data()),sizeOfTuple*vecCorrSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_CORR,MPI_COMM_WORLD );
+            }
+            ierr = MPI_Send( (void*)(vecMidLevSlaves->data()),sizeOfTuple*vecMidLevSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_MID_LEV,MPI_COMM_WORLD );
+            ierr = MPI_Send( (void*)(vecGammaSlaves->data()),sizeOfTuple*vecGammaSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD );
+            ierr = MPI_Send( (void*)(vecWeightsSlaves->data()),sizeOfTuple*vecWeightsSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD );
+            ierr = MPI_Send( (void*)(vecTotSusSlaves->data()),sizeOfTuple*vecTotSusSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD );
+            vecGammaSlaves->clear(); vecMidLevSlaves->clear();
+            vecWeightsSlaves->clear(); vecTotSusSlaves->clear();
+            if (is_full)
+                vecCorrSlaves->clear();
         }
         /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
         mpistruct_t tmpObj;
