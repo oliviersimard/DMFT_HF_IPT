@@ -46,8 +46,8 @@ void mkdirTree(std::string sub, std::string dir) noexcept(false){
     }
     if( stat( dir.c_str() , &info ) != 0 ){
         const int dir_err = mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-        if (-1 == dir_err){
-            throw std::runtime_error("Could not create directory hosting the data produced by the program.");
+        if (EACCES == dir_err){
+            throw std::runtime_error("Could not create directory hosting the data produced by the program; need access permission.");
         }
     }
     else if( info.st_mode & S_IFDIR )  // S_ISDIR() doesn't exist on my windows 
