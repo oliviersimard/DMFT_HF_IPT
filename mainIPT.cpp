@@ -52,17 +52,15 @@ int main(int argc, char** argv){
     matCorr = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
     matMidLev = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
     // Allocating
-    if (world_rank==root_process){
-        gamma_tensor = new std::complex<double>***[vecK.size()];
-        for (size_t i=0; i<N_tau; i++){
-            gamma_tensor[i] = new std::complex<double>**[N_tau];
-            for (size_t j=0; j<vecK.size(); j++){
-                gamma_tensor[i][j] = new std::complex<double>*[vecK.size()];
-                for (size_t k=0; k<N_tau; k++){
-                    gamma_tensor[i][j][k] = new std::complex<double>[N_tau];
-                }
-            } 
-        }
+    gamma_tensor = new std::complex<double>***[vecK.size()];
+    for (size_t i=0; i<N_tau; i++){
+        gamma_tensor[i] = new std::complex<double>**[N_tau];
+        for (size_t j=0; j<vecK.size(); j++){
+            gamma_tensor[i][j] = new std::complex<double>*[vecK.size()];
+            for (size_t k=0; k<N_tau; k++){
+                gamma_tensor[i][j][k] = new std::complex<double>[N_tau];
+            }
+        } 
     }
     #endif
     arma::Cube<double> weiss_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 

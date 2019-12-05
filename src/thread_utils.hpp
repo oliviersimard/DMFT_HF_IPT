@@ -32,7 +32,7 @@ extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLe
 template<typename T> 
 inline void calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool,ThreadFunctor::solver_prototype);
 void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,ThreadFunctor::solver_prototype sp,std::vector<mpistruct_t>* vec_root_process);
-void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple);
+void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j);
 
 namespace ThreadFunctor{
     enum solver_prototype : short { HF_prot, IPT2_prot };
@@ -186,7 +186,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
             /* Gather the results from the child processes into the externally linked Math rices meant for this purpose. */
             for(int an_id = 1; an_id < world_size; an_id++) {
-                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple);
+                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple,j);
             }
         } else{
             /* Slave processes receive their part of work from the root process. */
@@ -209,24 +209,32 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             char chars_to_send[50];
             sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
             /* Finally send integers to root process to notify the state of the calculations. */
-            if (is_full)
-                ierr = MPI_Send( (void*)(vecCorrSlaves->data()), sizeOfTuple*vecCorrSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_CORR, MPI_COMM_WORLD);
-            ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
-            ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+            if (is_full){
+                ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
+                ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+                if (j==0){
+                    ierr = MPI_Send( (void*)(vecCorrSlaves->data()), sizeOfTuple*vecCorrSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_CORR, MPI_COMM_WORLD);
+                    vecCorrSlaves->clear();
+                }
+                vecGammaSlaves->clear(); vecMidLevSlaves->clear();
+            } else{
+                if (j==0){
+                    ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
+                    ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+                    vecGammaSlaves->clear(); vecMidLevSlaves->clear();
+                }
+            }
             ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeOfTuple*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
             ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeOfTuple*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
             ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
-            vecGammaSlaves->clear(); vecMidLevSlaves->clear();
             vecWeightsSlaves->clear(); vecTotSusSlaves->clear();
-            if (is_full)
-                vecCorrSlaves->clear();
         }
         // To make sure not all the processes save at the same time in the same file.
         if (world_rank == root_process){
-            outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
             outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
             outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
             outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
+            outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
             if (is_full)
                 outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::out | std::ofstream::app);
             for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
@@ -325,7 +333,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
             /* Gather the results from the child processes into the externally linked matrices meant for this purpose. */
             for(int an_id = 1; an_id < world_size; an_id++) {
-                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple);
+                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple,j);
             }
         } else{
             /* Slave processes receive their part of work from the root process. */

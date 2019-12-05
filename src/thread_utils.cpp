@@ -77,14 +77,16 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                                     )[1]*buildGK1D_IPT(
                                     _splInline.iwn_array[wbar],_splInline.k_array[kbar]
                                     )[1];
-                tmp_val_weights += tmp_val_weights_tmp;
                 if (!is_full){
                     if (j==0){
                         tupOfVals = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
                         tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
+                        gamma_tensor[ktilde][wtilde][kbar][wbar] = tmp_val_kt_kb_tmp;
                         tmp_val_mid_lev += std::get<1>(tupOfVals);
+                        tmp_val_kt_kb += tmp_val_kt_kb_tmp;
+                        tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                     } else{
-                        tmp_val_kt_kb_tmp = matGamma(kbar,ktilde);
+                        tmp_val_tot_sus += gamma_tensor[ktilde][wtilde][kbar][wbar]*tmp_val_weights_tmp;
                     }
                 }
                 else{
@@ -92,15 +94,16 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
                     tmp_val_corr += std::get<1>(tupOfValsFull);
                     tmp_val_mid_lev += std::get<2>(tupOfValsFull);
+                    tmp_val_kt_kb += tmp_val_kt_kb_tmp;
+                    tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 }
-                tmp_val_kt_kb += tmp_val_kt_kb_tmp;
-                tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
+                tmp_val_weights += tmp_val_weights_tmp;
                 if ((wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline.iwn_array.size()/2))){
                     std::cout << "Process id: " << world_rank << "\n";
                     std::cout << "ktilde: " << _splInline.k_array[ktilde] << "\n";
                     std::cout << "kbar: " << _splInline.k_array[kbar] << "\n";
-                    std::cout << "gamma_oneD_spsp_IPT: " << tmp_val_kt_kb << "\n";
-                    std::cout << "weights: " << tmp_val_weights << std::endl;
+                    std::cout << "Tot Sus IPT: " << tmp_val_tot_sus << "\n";
+                    std::cout << "Weights: " << tmp_val_weights << std::endl;
                 }
             } 
         }
@@ -556,16 +559,23 @@ void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,solver_prototype sp,s
     }       
 }
 
-void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple){
+void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j){
     char chars_to_receive[50];
     int sizeOfGamma, sizeOfWeights, sizeOfTotSus, sizeOfMidLev, sizeOfCorr, sender;
-    std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+    std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp, *vecGammaTmp, *vecCorrTmp = nullptr;
     std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
     std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecTotSusTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
-    std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
-    std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrTmp = nullptr;
-    if (is_full)
-        vecCorrTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+    if (is_full){
+        std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+        std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+        if (j==0)
+            vecCorrTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+    } else{
+        if (j==0){
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+        }
+    }
     // Should send the sizes of the externally linked vectors of tuples to be able to receive. That is why the need to probe...
     MPI_Probe(an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,&status);
     MPI_Get_count(&status,MPI_BYTE,&sizeOfGamma);
@@ -626,8 +636,15 @@ void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,s
         kt=std::get<1>(vecTotSusTmp->at(ii));
         matTotSus(kb,kt)=std::get<2>(vecTotSusTmp->at(ii));
     }
-    delete vecGammaTmp; delete vecWeightsTmp;
-    delete vecTotSusTmp; delete vecMidLevTmp;
-    if (is_full)
-        delete vecCorrTmp;
+    if (is_full){
+        delete vecGammaTmp; delete vecMidLevTmp;
+        if (j==0){
+            delete vecCorrTmp;
+        }
+    } else{
+        if (j==0){
+            delete vecGammaTmp; delete vecMidLevTmp;
+        }
+    }
+    delete vecWeightsTmp; delete vecTotSusTmp; 
 }
