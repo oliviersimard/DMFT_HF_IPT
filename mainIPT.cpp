@@ -53,11 +53,11 @@ int main(int argc, char** argv){
     matMidLev = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
     // Allocating
     gamma_tensor = new std::complex<double>***[vecK.size()];
-    for (size_t i=0; i<N_tau; i++){
+    for (size_t i=0; i<vecK.size(); i++){
         gamma_tensor[i] = new std::complex<double>**[N_tau];
-        for (size_t j=0; j<vecK.size(); j++){
+        for (size_t j=0; j<N_tau; j++){
             gamma_tensor[i][j] = new std::complex<double>*[vecK.size()];
-            for (size_t k=0; k<N_tau; k++){
+            for (size_t k=0; k<vecK.size(); k++){
                 gamma_tensor[i][j][k] = new std::complex<double>[N_tau];
             }
         } 
@@ -195,9 +195,9 @@ int main(int argc, char** argv){
     }
     // Deallocating
     #ifdef PARALLEL
-    for (size_t i=0; i<N_tau; i++){
-        for (size_t j=0; j<vecK.size(); j++){
-            for (size_t k=0; k<N_tau; k++){
+    for (size_t i=0; i<vecK.size(); i++){
+        for (size_t j=0; j<N_tau; j++){
+            for (size_t k=0; k<vecK.size(); k++){
                 delete[] gamma_tensor[i][j][k];
             }
             delete[] gamma_tensor[i][j];

@@ -341,7 +341,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             for (int i=0; i<=num_elements_per_proc; i++){
                 tmpObj=vec_root_process->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
+                //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
                 #elif DIM == 2
                 threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
@@ -363,7 +363,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             for(int i = 0; i < num_elems_to_receive; i++) {
                 tmpObj = vec_slave_processes->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
+                //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
                 #elif DIM == 2
                 threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
