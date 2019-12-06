@@ -1,4 +1,4 @@
-#define PARALLEL
+//#define PARALLEL
 #ifdef PARALLEL
 #include "src/thread_utils.hpp"
 #else
@@ -194,6 +194,7 @@ int main(int argc, char** argv){
         }
     }
     // Deallocating
+    #ifdef PARALLEL
     for (size_t i=0; i<N_tau; i++){
         for (size_t j=0; j<vecK.size(); j++){
             for (size_t k=0; k<N_tau; k++){
@@ -205,4 +206,5 @@ int main(int argc, char** argv){
     }
     delete[] gamma_tensor;
     return 0;
+    #endif
 }

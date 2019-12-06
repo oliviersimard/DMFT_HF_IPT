@@ -33,6 +33,7 @@ extern arma::Mat< std::complex<double> > statMat;
 extern double epsilonk(double,double);
 extern double epsilonk(double);
 
+namespace ThreadFunctor{ struct gamma_tensor_content; };
 template<typename T> inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
 template<typename T> inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);

@@ -8,6 +8,7 @@ arma::Mat< std::complex<double> > matTotSus;
 arma::Mat< std::complex<double> > matCorr;
 arma::Mat< std::complex<double> > matMidLev;
 std::complex<double>**** gamma_tensor;
+std::vector< gamma_tensor_content >* ThreadWrapper::vecGammaTensorContent = new std::vector< gamma_tensor_content >();
 int root_process=0;
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
@@ -37,7 +38,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     if (j==0){
                         tupOfVals = gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]);
                         tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
-                        gamma_tensor[ktilde][wtilde][kbar][wbar] = tmp_val_kt_kb_tmp;
+                        gamma_tensor_content GammaTObj(ktilde,wtilde,kbar,wbar,tmp_val_kt_kb_tmp);
+                        vecGammaTensorContent->push_back(std::move(GammaTObj));
                         tmp_val_mid_lev += std::get<1>(tupOfVals);
                         tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                         tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
@@ -71,9 +73,9 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                 tmp_val_weights_tmp = buildGK1D_IPT(
                                     _splInline.iwn_array[wtilde],_splInline.k_array[ktilde]
                                     )[0]*buildGK1D_IPT(
-                                    _splInline.iwn_array[wtilde]-_q._iwn,_splInline.k_array[ktilde]-_q._qx
+                                    _splInline.iwn_array[wtilde]+_q._iwn,_splInline.k_array[ktilde]+_q._qx
                                     )[0]*buildGK1D_IPT(
-                                    _splInline.iwn_array[wbar]-_q._iwn,_splInline.k_array[kbar]-_q._qx
+                                    _splInline.iwn_array[wbar]+_q._iwn,_splInline.k_array[kbar]+_q._qx
                                     )[1]*buildGK1D_IPT(
                                     _splInline.iwn_array[wbar],_splInline.k_array[kbar]
                                     )[1];
@@ -81,15 +83,15 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     if (j==0){
                         tupOfVals = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
                         tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
-                        gamma_tensor[ktilde][wtilde][kbar][wbar] = tmp_val_kt_kb_tmp;
+                        gamma_tensor_content GammaTObj(ktilde,wtilde,kbar,wbar,tmp_val_kt_kb_tmp);
+                        vecGammaTensorContent->push_back(std::move(GammaTObj));
                         tmp_val_mid_lev += std::get<1>(tupOfVals);
                         tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                         tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                     } else{
                         tmp_val_tot_sus += gamma_tensor[ktilde][wtilde][kbar][wbar]*tmp_val_weights_tmp;
                     }
-                }
-                else{
+                } else{
                     tupOfValsFull = gamma_oneD_spsp_full_middle_plotting_IPT(_splInline.k_array[ktilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar],_splInline.iwn_array[wtilde]);
                     tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
                     tmp_val_corr += std::get<1>(tupOfValsFull);
@@ -454,7 +456,6 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<d
         matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
         if (world_rank != root_process){
             vecGammaSlaves->push_back( std::make_tuple( k2,k1,tmp_val_kt_kb*beta_div ) );
-            vecWeightsSlaves->push_back( std::make_tuple( k2,k1,tmp_val_weights*beta_div ) );
             vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
         }
     } else{
@@ -466,15 +467,15 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<d
                 vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
             }
         }
-        if (world_rank != root_process){
-            vecWeightsSlaves->push_back( std::make_tuple( k2,k1,tmp_val_weights*beta_div ) );
-        }
-    }   
+    }
+    if (world_rank != root_process){
+        vecWeightsSlaves->push_back( std::make_tuple( k2,k1,tmp_val_weights*beta_div ) );
+    }
     if (!is_jj){
         matTotSus(k2,k1) = beta_div*tmp_val_tot_sus; // These matrices are static variables.
         if (world_rank != root_process)
             vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
-    }else if (is_jj){
+    } else if (is_jj){
         #if DIM == 1
         val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline.k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[2]));
         matTotSus(k2,k1) = val_jj;
@@ -506,10 +507,9 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instances(std::complex<doub
         matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
         if (world_rank != root_process){ // Saving into vector of tuples..
             vecGammaSlaves->push_back( std::make_tuple( k2,k1, tmp_val_kt_kb*beta_div ) );
-            vecWeightsSlaves->push_back( std::make_tuple( k2,k1, tmp_val_weights*beta_div ) );
             vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
         }
-    }else{
+    } else{
         if (j==0){
             matGamma(k2,k1) = tmp_val_kt_kb*beta_div;
             matMidLev(k2,k1) = tmp_val_mid_lev*beta_div;
@@ -518,15 +518,15 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instances(std::complex<doub
                 vecMidLevSlaves->push_back( std::make_tuple( k2,k1,tmp_val_mid_lev*beta_div ) );
             }
         }
-        if (world_rank != root_process){ // Saving into vector of tuples..
-            vecWeightsSlaves->push_back( std::make_tuple( k2,k1, tmp_val_weights*beta_div ) );
-        }
+    }
+    if (world_rank != root_process){ // Saving into vector of tuples..
+        vecWeightsSlaves->push_back( std::make_tuple( k2,k1, tmp_val_weights*beta_div ) );
     }
     if (!is_jj){
         matTotSus(k2,k1) = beta_div*tmp_val_tot_sus; // These matrices are static variables.
         if (world_rank != root_process)
             vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
-    }else if (is_jj){ // kbarx could also be kbary
+    } else if (is_jj){ // kbarx could also be kbary
         #if DIM == 1
         val_jj = -1.0*beta_div*(-2.0*std::sin(_Gk._kArr_l[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_Gk._kArr_l[k2]));
         matTotSus(k2,k1) = val_jj;
@@ -543,7 +543,7 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instances(std::complex<doub
     }
 }
 
-void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,solver_prototype sp,std::vector<mpistruct_t>* vec_root_process){
+void ThreadFunctor::get_vector_mpi(size_t totSize,bool is_jj,bool is_full,solver_prototype sp,std::vector<mpistruct_t>* vec_root_process){
     size_t idx=0;
     for (size_t lkt=0; lkt<vecK.size(); lkt++){
         for (size_t lkb=0; lkb<vecK.size(); lkb++){
@@ -559,72 +559,106 @@ void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,solver_prototype sp,s
     }       
 }
 
-void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j){
+void ThreadFunctor::fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j){
     char chars_to_receive[50];
     int sizeOfGamma, sizeOfWeights, sizeOfTotSus, sizeOfMidLev, sizeOfCorr, sender;
-    std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp, *vecGammaTmp, *vecCorrTmp = nullptr;
+    std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp, *vecGammaTmp;
+    std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrTmp = nullptr;
     std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
     std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecTotSusTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
     if (is_full){
-        std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
-        std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+        vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+        vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
         if (j==0)
             vecCorrTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
     } else{
         if (j==0){
-            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
-            std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            vecMidLevTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
+            vecGammaTmp = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >(num_elements_per_proc);
         }
     }
     // Should send the sizes of the externally linked vectors of tuples to be able to receive. That is why the need to probe...
-    MPI_Probe(an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,&status);
-    MPI_Get_count(&status,MPI_BYTE,&sizeOfGamma);
+    if (is_full){
+        if (j==0){
+            MPI_Probe(an_id,RETURN_DATA_TAG_CORR,MPI_COMM_WORLD,&status);
+            MPI_Get_count(&status,MPI_BYTE,&sizeOfCorr);
+        }
+        MPI_Probe(an_id,RETURN_DATA_TAG_MID_LEV,MPI_COMM_WORLD,&status);
+        MPI_Get_count(&status,MPI_BYTE,&sizeOfMidLev);
+        MPI_Probe(an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,&status);
+        MPI_Get_count(&status,MPI_BYTE,&sizeOfGamma);
+    } else{
+        if (j==0){
+            MPI_Probe(an_id,RETURN_DATA_TAG_MID_LEV,MPI_COMM_WORLD,&status);
+            MPI_Get_count(&status,MPI_BYTE,&sizeOfMidLev);
+            MPI_Probe(an_id,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD,&status);
+            MPI_Get_count(&status,MPI_BYTE,&sizeOfGamma);
+        }
+    }
     MPI_Probe(an_id,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD,&status);
     MPI_Get_count(&status,MPI_BYTE,&sizeOfWeights);
     MPI_Probe(an_id,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD,&status);
     MPI_Get_count(&status,MPI_BYTE,&sizeOfTotSus);
-    MPI_Probe(an_id,RETURN_DATA_TAG_MID_LEV,MPI_COMM_WORLD,&status);
-    MPI_Get_count(&status,MPI_BYTE,&sizeOfMidLev);
-    if (is_full){
-        MPI_Probe(an_id,RETURN_DATA_TAG_CORR,MPI_COMM_WORLD,&status);
-        MPI_Get_count(&status,MPI_BYTE,&sizeOfCorr);
-    }
     
     ierr = MPI_Recv( chars_to_receive, 50, MPI_CHAR, an_id,
             RETURN_DATA_TAG, MPI_COMM_WORLD, &status);
     if (is_full){
-        ierr = MPI_Recv( (void*)(vecCorrTmp->data()), sizeOfCorr, MPI_BYTE, an_id,
-                RETURN_DATA_TAG_CORR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        if (j==0){
+            ierr = MPI_Recv( (void*)(vecCorrTmp->data()), sizeOfCorr, MPI_BYTE, an_id,
+                    RETURN_DATA_TAG_CORR, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+        ierr = MPI_Recv( (void*)(vecMidLevTmp->data()), sizeOfMidLev, MPI_BYTE, an_id,
+                RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        ierr = MPI_Recv( (void*)(vecGammaTmp->data()), sizeOfGamma, MPI_BYTE, an_id,
+                RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } else{
+        if (j==0){
+            ierr = MPI_Recv( (void*)(vecMidLevTmp->data()), sizeOfMidLev, MPI_BYTE, an_id,
+                RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            ierr = MPI_Recv( (void*)(vecGammaTmp->data()), sizeOfGamma, MPI_BYTE, an_id,
+                RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
     }
-    ierr = MPI_Recv( (void*)(vecMidLevTmp->data()), sizeOfMidLev, MPI_BYTE, an_id,
-            RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     ierr = MPI_Recv( (void*)(vecTotSusTmp->data()), sizeOfTotSus, MPI_BYTE, an_id,
             RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     ierr = MPI_Recv( (void*)(vecWeightsTmp->data()), sizeOfWeights, MPI_BYTE, an_id,
             RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    ierr = MPI_Recv( (void*)(vecGammaTmp->data()), sizeOfGamma, MPI_BYTE, an_id,
-            RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     sender = status.MPI_SOURCE;
     printf("Slave process %i returned\n", sender);
     printf("%s\n",chars_to_receive);
     /* Now the data received from the other processes have to be stored in their arma::Mats on root process */
     size_t kt,kb,ii;
     if (is_full){
-        for (ii=0; ii<sizeOfCorr/sizeOfTuple; ii++){
-            kb=std::get<0>(vecCorrTmp->at(ii));
-            kt=std::get<1>(vecCorrTmp->at(ii));
-            matCorr(kb,kt)=std::get<2>(vecCorrTmp->at(ii));
+        if (j==0){
+            for (ii=0; ii<sizeOfCorr/sizeOfTuple; ii++){
+                kb=std::get<0>(vecCorrTmp->at(ii));
+                kt=std::get<1>(vecCorrTmp->at(ii));
+                matCorr(kb,kt)=std::get<2>(vecCorrTmp->at(ii));
+            }
         }
-    }
-    for (ii=0; ii<sizeOfMidLev/sizeOfTuple; ii++){
-        kb=std::get<0>(vecMidLevTmp->at(ii));
-        kt=std::get<1>(vecMidLevTmp->at(ii));
-        matMidLev(kb,kt)=std::get<2>(vecMidLevTmp->at(ii));
-    }
-    for (ii=0; ii<sizeOfGamma/sizeOfTuple; ii++){
-        kb=std::get<0>(vecGammaTmp->at(ii));
-        kt=std::get<1>(vecGammaTmp->at(ii));
-        matGamma(kb,kt)=std::get<2>(vecGammaTmp->at(ii));
+        for (ii=0; ii<sizeOfMidLev/sizeOfTuple; ii++){
+            kb=std::get<0>(vecMidLevTmp->at(ii));
+            kt=std::get<1>(vecMidLevTmp->at(ii));
+            matMidLev(kb,kt)=std::get<2>(vecMidLevTmp->at(ii));
+        }
+        for (ii=0; ii<sizeOfGamma/sizeOfTuple; ii++){
+            kb=std::get<0>(vecGammaTmp->at(ii));
+            kt=std::get<1>(vecGammaTmp->at(ii));
+            matGamma(kb,kt)=std::get<2>(vecGammaTmp->at(ii));
+        }
+    } else{
+        if (j==0){
+            for (ii=0; ii<sizeOfMidLev/sizeOfTuple; ii++){
+                kb=std::get<0>(vecMidLevTmp->at(ii));
+                kt=std::get<1>(vecMidLevTmp->at(ii));
+                matMidLev(kb,kt)=std::get<2>(vecMidLevTmp->at(ii));
+            }
+            for (ii=0; ii<sizeOfGamma/sizeOfTuple; ii++){
+                kb=std::get<0>(vecGammaTmp->at(ii));
+                kt=std::get<1>(vecGammaTmp->at(ii));
+                matGamma(kb,kt)=std::get<2>(vecGammaTmp->at(ii));
+            }
+        }
     }
     for (ii=0; ii<sizeOfWeights/sizeOfTuple; ii++){
         kb=std::get<0>(vecWeightsTmp->at(ii));
@@ -647,4 +681,43 @@ void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,s
         }
     }
     delete vecWeightsTmp; delete vecTotSusTmp; 
+}
+
+void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr){
+    std::vector< gamma_tensor_content >* tmpGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor); // Needs to host the data from all the processes.
+    size_t kt, wt, kb, wb;
+    ierr = MPI_Allgather((void*)(vecGammaTensorContent->data()),sizeof(gamma_tensor_content)*vecGammaTensorContent->size(),
+                MPI_BYTE,(void*)(tmpGammaGathered->data()),totSizeGammaTensor*sizeof(gamma_tensor_content),MPI_BYTE,MPI_COMM_WORLD);
+    delete vecGammaTensorContent;
+    // Filling up the tensor used in determining the susceptibilities (for iqn > 0)
+    for (size_t l=0; l<totSizeGammaTensor; l++){
+        kt=tmpGammaGathered->at(l)._ktilde;
+        wt=tmpGammaGathered->at(l)._wtilde;
+        kb=tmpGammaGathered->at(l)._kbar;
+        wb=tmpGammaGathered->at(l)._wbar;
+        gamma_tensor[kt][wt][kb][wb]=tmpGammaGathered->at(l)._gamma;
+    }
+    delete tmpGammaGathered;
+}
+
+void ThreadFunctor::send_messages_to_root_process(bool is_full, int ierr, size_t sizeOfTuple, char* chars_to_send, size_t j){
+    if (is_full){
+        ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
+        ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+        if (j==0){
+            ierr = MPI_Send( (void*)(vecCorrSlaves->data()), sizeOfTuple*vecCorrSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_CORR, MPI_COMM_WORLD);
+            vecCorrSlaves->clear();
+        }
+        vecGammaSlaves->clear(); vecMidLevSlaves->clear();
+    } else{
+        if (j==0){
+            ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
+            ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
+            vecGammaSlaves->clear(); vecMidLevSlaves->clear();
+        }
+    }
+    ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeOfTuple*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
+    ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeOfTuple*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
+    ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
+    vecWeightsSlaves->clear(); vecTotSusSlaves->clear();
 }

@@ -28,11 +28,8 @@ extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecTotSu
 extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecCorrSlaves;
 extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecMidLevSlaves;
 
-
 template<typename T> 
 inline void calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool,ThreadFunctor::solver_prototype);
-void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,ThreadFunctor::solver_prototype sp,std::vector<mpistruct_t>* vec_root_process);
-void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j);
 
 namespace ThreadFunctor{
     enum solver_prototype : short { HF_prot, IPT2_prot };
@@ -41,7 +38,19 @@ namespace ThreadFunctor{
         bool _is_jj, _is_full;
         solver_prototype _sp;
     };
+    struct gamma_tensor_content{
+        size_t _ktilde {0}, _wtilde {0}, _kbar {0}, _wbar {0};
+        std::complex<double> _gamma={};
+        gamma_tensor_content()=default;
+        gamma_tensor_content(size_t ktilde,size_t wtilde,size_t kbar,size_t wbar,std::complex<double> gamma) : _ktilde(ktilde), 
+            _wtilde(wtilde), _kbar(kbar), _wbar(wbar), _gamma(gamma) {}
+    };
+    void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,ThreadFunctor::solver_prototype sp,std::vector<mpistruct_t>* vec_root_process);
+    void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j);
+    void send_messages_to_root_process(bool is_full, int ierr, size_t sizeOfTuple, char* chars_to_send, size_t j);
     class ThreadWrapper{ 
+        template<typename T> friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
+        template<typename T> friend void ::calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool,ThreadFunctor::solver_prototype);
         public:
             //ThreadWrapper(Hubbard::FunctorBuildGk& Gk, Hubbard::K_1D& q, arma::cx_dmat::iterator matPtr, arma::cx_dmat::iterator matWPtr);
             explicit ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_1D q,double ndo_converged);
@@ -69,6 +78,7 @@ namespace ThreadFunctor{
             std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
+            void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr);
         private:
             void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
                         size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const;
@@ -79,6 +89,7 @@ namespace ThreadFunctor{
             HF::K_1D _q={};
             HF::K_2D _qq={};
             IPT2::SplineInline< std::complex<double> > _splInline={};
+            static std::vector< gamma_tensor_content >* vecGammaTensorContent;
     };
 
     inline ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_1D q,double ndo_converged) : _q(q){
@@ -98,21 +109,11 @@ namespace ThreadFunctor{
         this->_splInline=splInline;
     }
     #if DIM == 1
-    // inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D(std::complex<double> ik, double k) const{
-    //     std::vector< std::complex<double> > GK = { 1.0/( ik + _Gk._mu - epsilonk(k) - _Gk._u*_ndo_converged ), 1.0/( ik + _Gk._mu - epsilonk(k) - _Gk._u*(1.0-_ndo_converged) ) }; // UP, DOWN
-    //     return GK;
-    // }
-
     inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D_IPT(std::complex<double> ik, double k) const{
         std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ), 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ) }; // UP, DOWN
         return GK;
     }
     #elif DIM == 2
-    // inline std::vector< std::complex<double> > ThreadWrapper::buildGK2D(std::complex<double> ik, double kx, double ky) const{
-    //     std::vector< std::complex<double> > GK = { 1.0/( ik + _Gk._mu - epsilonk(kx,ky) - _Gk._u*_ndo_converged ), 1.0/( ik + _Gk._mu - epsilonk(kx,ky) - _Gk._u*(1.0-_ndo_converged) ) }; // UP, DOWN
-    //     return GK;
-    // }
-
     inline std::vector< std::complex<double> > ThreadWrapper::buildGK2D_IPT(std::complex<double> ik, double kx, double ky) const{
         std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(kx,ky) - _splInline.calculateSpline( ik.imag() ) ), 1.0/( ik + GreenStuff::mu - epsilonk(kx,ky) - _splInline.calculateSpline( ik.imag() ) ) }; // UP, DOWN
         return GK;
@@ -129,10 +130,11 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=Gk._kArr_l.size()*Gk._kArr_l.size(); // Nk+1 * Nk+1
+    const size_t totSizeGammaTensor=totSize*Gk._size*Gk._size;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
-    const size_t num_elements_per_proc = totSize/world_size;
+    const size_t num_elements_per_proc = (world_size!=1) ? totSize/world_size : totSize-1; // Otherwise problem when calculating elements assigned to root process.
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
     std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
@@ -160,9 +162,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         std::cout << "\n\n iqn: " << Gk._precomp_qn[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.
-            get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
+            ThreadFunctor::get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
             /* distribute a portion of the bector to each child process */
-            for(int an_id = 1; an_id < world_size; an_id++) {
+            for(int an_id = 1; an_id < world_size; an_id++){
                 start_arr = an_id*num_elements_per_proc + 1;
                 end_arr = (an_id + 1)*num_elements_per_proc;
                 if((totSize - end_arr) < num_elements_per_proc) // Taking care of the remaining data.
@@ -177,7 +179,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             for (int i=0; i<=num_elements_per_proc; i++){ // Careful with <=
                 tmpObj=vec_root_process->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
+                //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
                 #elif DIM == 2
                 threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j); // Performing the calculations here...
                 #endif
@@ -186,7 +188,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
             /* Gather the results from the child processes into the externally linked Math rices meant for this purpose. */
             for(int an_id = 1; an_id < world_size; an_id++) {
-                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple,j);
+                ThreadFunctor::fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple,j);
             }
         } else{
             /* Slave processes receive their part of work from the root process. */
@@ -199,7 +201,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             for(int i = 0; i < num_elems_to_receive; i++) {
                 tmpObj = vec_slave_processes->at(i);
                 #if DIM == 1
-                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
+                //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
                 #elif DIM == 2
                 threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
@@ -209,56 +211,70 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             char chars_to_send[50];
             sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
             /* Finally send integers to root process to notify the state of the calculations. */
-            if (is_full){
-                ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
-                ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
-                if (j==0){
-                    ierr = MPI_Send( (void*)(vecCorrSlaves->data()), sizeOfTuple*vecCorrSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_CORR, MPI_COMM_WORLD);
-                    vecCorrSlaves->clear();
-                }
-                vecGammaSlaves->clear(); vecMidLevSlaves->clear();
-            } else{
-                if (j==0){
-                    ierr = MPI_Send( (void*)(vecMidLevSlaves->data()), sizeOfTuple*vecMidLevSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_MID_LEV, MPI_COMM_WORLD);
-                    ierr = MPI_Send( (void*)(vecGammaSlaves->data()), sizeOfTuple*vecGammaSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_GAMMA, MPI_COMM_WORLD);
-                    vecGammaSlaves->clear(); vecMidLevSlaves->clear();
-                }
-            }
-            ierr = MPI_Send( (void*)(vecWeightsSlaves->data()), sizeOfTuple*vecWeightsSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_WEIGHTS, MPI_COMM_WORLD);
-            ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeOfTuple*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
-            ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
-            vecWeightsSlaves->clear(); vecTotSusSlaves->clear();
+            ThreadFunctor::send_messages_to_root_process(is_full,ierr,sizeOfTuple,chars_to_send,j);
+        }
+        if (j==0){
+        /* Sending to all processes their respective content of gamma_tensor */
+            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr);
         }
         // To make sure not all the processes save at the same time in the same file.
         if (world_rank == root_process){
             outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
             outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
-            outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
-            outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
-            if (is_full)
-                outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::out | std::ofstream::app);
+            if (is_full){
+                if (j==0)
+                    outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::out | std::ofstream::app);
+                outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
+                outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
+            } else{
+                if (j==0){
+                    outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
+                    outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
+                }
+            }
             for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
                 for (size_t kbar=0; kbar<vecK.size(); kbar++){
-                    outputChispspGamma << matGamma(kbar,ktilde) << " ";
                     outputChispspWeights << matWeigths(kbar,ktilde) << " ";
                     outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
-                    outputChispspBubble << matMidLev(kbar,ktilde) << " ";
-                    if (is_full)
-                        outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";
+                    if (is_full){
+                        if (j==0)
+                            outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";
+                        outputChispspGamma << matGamma(kbar,ktilde) << " ";
+                        outputChispspBubble << matMidLev(kbar,ktilde) << " ";
+                    } else{
+                        if (j==0){
+                            outputChispspBubble << matMidLev(kbar,ktilde) << " ";
+                            outputChispspGamma << matGamma(kbar,ktilde) << " ";
+                        }
+                    }
                 }
-                outputChispspGamma << "\n";
                 outputChispspWeights << "\n";
                 outputChispspTotSus << "\n";
-                outputChispspBubble << "\n";
-                if (is_full)
-                    outputChispspBubbleCorr << "\n";
+                if (is_full){
+                    if (j==0)
+                        outputChispspBubbleCorr << "\n";
+                    outputChispspGamma << "\n";
+                    outputChispspBubble << "\n";
+                } else{
+                    if (j==0){
+                        outputChispspGamma << "\n";
+                        outputChispspBubble << "\n";
+                    }
+                }
             }
-            outputChispspGamma.close();
             outputChispspWeights.close();
             outputChispspTotSus.close();
-            outputChispspBubble.close();
-            if (is_full)
-                outputChispspBubbleCorr.close();
+            if (is_full){
+                if (j==0)
+                    outputChispspBubbleCorr.close();
+                outputChispspGamma.close();
+                outputChispspBubble.close();
+            } else{
+                if (j==0){
+                    outputChispspGamma.close();
+                    outputChispspBubble.close();
+                }
+            }
         }
     }// Cleaning process
     delete vecGammaSlaves; delete vecMidLevSlaves;
@@ -274,13 +290,15 @@ template<>
 inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline< std::complex<double> > splInline,std::string pathToDir,std::string customDirName,bool is_full,bool is_jj,ThreadFunctor::solver_prototype sp){
     MPI_Status status;
     std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus, outputChispspBubble, outputChispspBubbleCorr;
+    std::string strOutputChispspGamma, strOutputChispspWeights, strOutputChispspTotSus, strOutputChispspBubble, strOutputChispspBubbleCorr;
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
+    const size_t totSizeGammaTensor=totSize*GreenStuff::N_tau*GreenStuff::N_tau;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
-    const size_t num_elements_per_proc = totSize/world_size; // Investigate this further, because there might prob with rounding.
+    const size_t num_elements_per_proc = (world_size!=1) ? totSize/world_size : totSize-1; // Investigate this further, because there might prob with rounding.
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
     std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
@@ -290,11 +308,10 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     HF::K_2D qq2D;
     #endif
     for (size_t j=0; j<GreenStuff::N_tau; j++){
-        std::string strOutputChispspGamma(pathToDir+customDirName+"/susceptibilities/ChispspGamma_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspWeights(pathToDir+customDirName+"/susceptibilities/ChispspWeights_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspTotSus(pathToDir+customDirName+"/susceptibilities/ChispspTotSus_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspBubble(pathToDir+customDirName+"/susceptibilities/ChispspBubble_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat");
-        std::string strOutputChispspBubbleCorr;
+        strOutputChispspGamma=pathToDir+customDirName+"/susceptibilities/ChispspGamma_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
+        strOutputChispspWeights=pathToDir+customDirName+"/susceptibilities/ChispspWeights_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
+        strOutputChispspTotSus=pathToDir+customDirName+"/susceptibilities/ChispspTotSus_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
+        strOutputChispspBubble=pathToDir+customDirName+"/susceptibilities/ChispspBubble_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
         if (is_full)
             strOutputChispspBubbleCorr = pathToDir+customDirName+"/susceptibilities/ChispspBubbleCorr_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
         #if DIM == 1
@@ -307,7 +324,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         std::cout << "\n\n iqn: " << iqnArr_l[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.
-            get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
+            ThreadFunctor::get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
             /* distribute a portion of the bector to each child process */
             for(int an_id = 1; an_id < world_size; an_id++) {
                 start_arr = an_id*num_elements_per_proc + 1;
@@ -333,7 +350,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             MPI_Barrier(MPI_COMM_WORLD); // Wait for the other processes to finish before moving on.
             /* Gather the results from the child processes into the externally linked matrices meant for this purpose. */
             for(int an_id = 1; an_id < world_size; an_id++) {
-                fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple,j);
+                ThreadFunctor::fetch_data_from_slaves(an_id,status,is_full,ierr,num_elements_per_proc,sizeOfTuple,j);
             }
         } else{
             /* Slave processes receive their part of work from the root process. */
@@ -341,7 +358,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
                 root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
             ierr = MPI_Recv( (void*)(vec_slave_processes->data()), sizeof(mpistruct_t)*num_elems_to_receive, MPI_BYTE, 
                 root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
-            /* Calculate the sum of my portion of the array */
+            /* Calculate the susceptibility of my portion of the array */
             mpistruct_t tmpObj;
             for(int i = 0; i < num_elems_to_receive; i++) {
                 tmpObj = vec_slave_processes->at(i);
@@ -356,49 +373,70 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             char chars_to_send[50];
             sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
             /* Finally send integers to root process to notify the state of the calculations. */
-            ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
-            if (is_full){
-                ierr = MPI_Send( (void*)(vecCorrSlaves->data()),sizeOfTuple*vecCorrSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_CORR,MPI_COMM_WORLD );
-            }
-            ierr = MPI_Send( (void*)(vecMidLevSlaves->data()),sizeOfTuple*vecMidLevSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_MID_LEV,MPI_COMM_WORLD );
-            ierr = MPI_Send( (void*)(vecGammaSlaves->data()),sizeOfTuple*vecGammaSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_GAMMA,MPI_COMM_WORLD );
-            ierr = MPI_Send( (void*)(vecWeightsSlaves->data()),sizeOfTuple*vecWeightsSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_WEIGHTS,MPI_COMM_WORLD );
-            ierr = MPI_Send( (void*)(vecTotSusSlaves->data()),sizeOfTuple*vecTotSusSlaves->size(),MPI_BYTE,root_process,RETURN_DATA_TAG_TOT_SUS,MPI_COMM_WORLD );
-            vecGammaSlaves->clear(); vecMidLevSlaves->clear();
-            vecWeightsSlaves->clear(); vecTotSusSlaves->clear();
-            if (is_full)
-                vecCorrSlaves->clear();
+            ThreadFunctor::send_messages_to_root_process(is_full,ierr,sizeOfTuple,chars_to_send,j);
+        }
+        if (j==0){
+        /* Sending to all processes their respective content of gamma_tensor */
+            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr);
         }
         // To make sure not all the processes save in the same file at the same time.
         if (world_rank == root_process){
-            outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
             outputChispspWeights.open(strOutputChispspWeights, std::ofstream::out | std::ofstream::app);
             outputChispspTotSus.open(strOutputChispspTotSus, std::ofstream::out | std::ofstream::app);
-            outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
-            if (is_full)
-                outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::out | std::ofstream::app);
+            if (is_full){
+                if (j==0)
+                    outputChispspBubbleCorr.open(strOutputChispspBubbleCorr, std::ofstream::out | std::ofstream::app);
+                outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
+                outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
+            } else{
+                if (j==0){
+                    outputChispspBubble.open(strOutputChispspBubble, std::ofstream::out | std::ofstream::app);
+                    outputChispspGamma.open(strOutputChispspGamma, std::ofstream::out | std::ofstream::app);
+                }
+            }
             for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
                 for (size_t kbar=0; kbar<vecK.size(); kbar++){
-                    outputChispspGamma << matGamma(kbar,ktilde) << " ";
                     outputChispspWeights << matWeigths(kbar,ktilde) << " ";
                     outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
-                    outputChispspBubble << matMidLev(kbar,ktilde) << " ";
-                    if (is_full)
-                        outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";
+                    if (is_full){
+                        if (j==0)
+                            outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";
+                        outputChispspGamma << matGamma(kbar,ktilde) << " ";
+                        outputChispspBubble << matMidLev(kbar,ktilde) << " ";
+                    } else{
+                        if (j==0){
+                            outputChispspBubble << matMidLev(kbar,ktilde) << " ";
+                            outputChispspGamma << matGamma(kbar,ktilde) << " ";
+                        }
+                    }
                 }
-                outputChispspGamma << "\n";
                 outputChispspWeights << "\n";
                 outputChispspTotSus << "\n";
-                outputChispspBubble << "\n";
-                if (is_full)
-                    outputChispspBubbleCorr << "\n";
+                if (is_full){
+                    if (j==0)
+                        outputChispspBubbleCorr << "\n";
+                    outputChispspGamma << "\n";
+                    outputChispspBubble << "\n";
+                } else{
+                    if (j==0){
+                        outputChispspGamma << "\n";
+                        outputChispspBubble << "\n";
+                    }
+                }
             }
-            outputChispspGamma.close();
             outputChispspWeights.close();
             outputChispspTotSus.close();
-            outputChispspBubble.close();
-            if (is_full)
-                outputChispspBubbleCorr.close();
+            if (is_full){
+                if (j==0)
+                    outputChispspBubbleCorr.close();
+                outputChispspGamma.close();
+                outputChispspBubble.close();
+            } else{
+                if (j==0){
+                    outputChispspGamma.close();
+                    outputChispspBubble.close();
+                }
+            }
         }
     }
     delete vecGammaSlaves; delete vecWeightsSlaves;
