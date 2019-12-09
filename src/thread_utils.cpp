@@ -671,33 +671,56 @@ void ThreadFunctor::fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_
         matTotSus(kb,kt)=std::get<2>(vecTotSusTmp->at(ii));
     }
     if (is_full){
-        delete vecGammaTmp; delete vecMidLevTmp;
+        delete vecGammaTmp;
+        delete vecMidLevTmp;
         if (j==0){
             delete vecCorrTmp;
         }
     } else{
         if (j==0){
-            delete vecGammaTmp; delete vecMidLevTmp;
+            delete vecGammaTmp;
+            delete vecMidLevTmp;
         }
     }
-    delete vecWeightsTmp; delete vecTotSusTmp; 
+    delete vecWeightsTmp;
+    delete vecTotSusTmp;
+    std::cout << "IS IT HERE?" << std::endl;
 }
 
-void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr){
+void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr, std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv){
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::vector< gamma_tensor_content >* tmpGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor); // Needs to host the data from all the processes.
     size_t kt, wt, kb, wb;
-    ierr = MPI_Allgather((void*)(vecGammaTensorContent->data()),sizeof(gamma_tensor_content)*vecGammaTensorContent->size(),
-                MPI_BYTE,(void*)(tmpGammaGathered->data()),totSizeGammaTensor*sizeof(gamma_tensor_content),MPI_BYTE,MPI_COMM_WORLD);
-    delete vecGammaTensorContent;
+    std::cout << "totSizeGammaTensor: " << totSizeGammaTensor << std::endl;
+    std::cout << "size of vec_gamma_tensor_content for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaTensorContent->size() << std::endl;
+    ierr = MPI_Allgatherv((void*)(vecGammaTensorContent->data()),sizeof(gamma_tensor_content)*vecGammaTensorContent->size(),
+                MPI_BYTE,(void*)(tmpGammaGathered->data()),(vec_counts->data()),(vec_disps->data()),MPI_BYTE,MPI_COMM_WORLD);
+    std::cout << "size of vec_gamma_tensor_content received for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaTensorContent->size() << std::endl;
+    std::cout << "The world rank is " << world_rank << std::endl;
+    std::cout << "The size of tmpGammaGathered is " << tmpGammaGathered->size() << std::endl;
+    std::cout << "The size of vecGammaTensorContent is " << vecGammaTensorContent->size() << std::endl;
+    if (world_rank==0){
+        for (auto el : *tmpGammaGathered){
+            std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
+        }
+    }
+    std::cout << "\n\n" << std::endl;
+    assert(MPI_SUCCESS==ierr);
+    //std::cout << "Should be also equal: " << vecGammaTensorContent->size() << std::endl;
     // Filling up the tensor used in determining the susceptibilities (for iqn > 0)
+    size_t num=0;
     for (size_t l=0; l<totSizeGammaTensor; l++){
         kt=tmpGammaGathered->at(l)._ktilde;
         wt=tmpGammaGathered->at(l)._wtilde;
         kb=tmpGammaGathered->at(l)._kbar;
         wb=tmpGammaGathered->at(l)._wbar;
         gamma_tensor[kt][wt][kb][wb]=tmpGammaGathered->at(l)._gamma;
+        //std::cout << num << " gt: " << gamma_tensor[kt][wt][kb][wb] << "\n";
+        num++;
     }
-    delete tmpGammaGathered;
+    delete tmpGammaGathered; delete vec_counts;
+    delete vecGammaTensorContent; delete vec_disps;
 }
 
 void ThreadFunctor::send_messages_to_root_process(bool is_full, int ierr, size_t sizeOfTuple, char* chars_to_send, size_t j){
