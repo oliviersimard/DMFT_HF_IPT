@@ -48,6 +48,7 @@ namespace ThreadFunctor{
     void get_vector_mpi(size_t totSize,bool is_jj,bool is_full,ThreadFunctor::solver_prototype sp,std::vector<mpistruct_t>* vec_root_process);
     void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j);
     void send_messages_to_root_process(bool is_full, int ierr, size_t sizeOfTuple, char* chars_to_send, size_t j);
+    void create_mpi_data_struct(MPI_Datatype& gamma_tensor_content_type);
     class ThreadWrapper{ 
         template<typename T> friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
         template<typename T> friend void ::calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool,ThreadFunctor::solver_prototype);
@@ -131,7 +132,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=Gk._kArr_l.size()*Gk._kArr_l.size(); // Nk+1 * Nk+1
     const size_t totSizeGammaTensor=totSize*Gk._size*Gk._size;
-    const size_t sizeOfElMPI_Allgatherv = Gk._size*Gk._size*sizeof(ThreadFunctor::gamma_tensor_content);
+    const size_t sizeOfElMPI_Allgatherv = Gk._size*Gk._size;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
@@ -188,6 +189,10 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
                 ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD );
                 ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
                     an_id, SEND_DATA_TAG, MPI_COMM_WORLD );
+            }
+            if (j==0){
+                for (auto el : *vec_disps) 
+                    std::cout << "yoyoyo: " << el << std::endl;
             }
             /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
             mpistruct_t tmpObj;
@@ -319,7 +324,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
     const size_t totSizeGammaTensor=totSize*GreenStuff::N_tau*GreenStuff::N_tau;
-    const size_t sizeOfElMPI_Allgatherv=GreenStuff::N_tau*GreenStuff::N_tau*sizeof(ThreadFunctor::gamma_tensor_content);
+    const size_t sizeOfElMPI_Allgatherv=GreenStuff::N_tau*GreenStuff::N_tau;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);

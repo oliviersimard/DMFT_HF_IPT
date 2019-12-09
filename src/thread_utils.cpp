@@ -690,24 +690,25 @@ void ThreadFunctor::fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_
 void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr, std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+    MPI_Datatype gamma_tensor_content_type;
     std::vector< gamma_tensor_content >* tmpGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor); // Needs to host the data from all the processes.
     size_t kt, wt, kb, wb;
+    create_mpi_data_struct(gamma_tensor_content_type); // Generates the custom MPI data type.
     std::cout << "totSizeGammaTensor: " << totSizeGammaTensor << std::endl;
-    std::cout << "size of vec_gamma_tensor_content for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaTensorContent->size() << std::endl;
-    ierr = MPI_Allgatherv((void*)(vecGammaTensorContent->data()),sizeof(gamma_tensor_content)*vecGammaTensorContent->size(),
-                MPI_BYTE,(void*)(tmpGammaGathered->data()),(vec_counts->data()),(vec_disps->data()),MPI_BYTE,MPI_COMM_WORLD);
-    std::cout << "size of vec_gamma_tensor_content received for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaTensorContent->size() << std::endl;
+    std::cout << "size in bytes of vec_gamma_tensor_content for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaTensorContent->size() << std::endl;
+    ierr = MPI_Allgatherv((void*)(vecGammaTensorContent->data()),vecGammaTensorContent->size(),gamma_tensor_content_type,
+                (void*)(tmpGammaGathered->data()),(vec_counts->data()),(vec_disps->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
+    std::cout << "size in bytes of gamma_tensor_content " << sizeof(gamma_tensor_content) << std::endl;
     std::cout << "The world rank is " << world_rank << std::endl;
     std::cout << "The size of tmpGammaGathered is " << tmpGammaGathered->size() << std::endl;
     std::cout << "The size of vecGammaTensorContent is " << vecGammaTensorContent->size() << std::endl;
-    if (world_rank==0){
-        for (auto el : *tmpGammaGathered){
-            std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
-        }
-    }
+    // if (world_rank==1){
+    //     for (auto el : *tmpGammaGathered){
+    //         std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
+    //     }
+    // }
     std::cout << "\n\n" << std::endl;
     assert(MPI_SUCCESS==ierr);
-    //std::cout << "Should be also equal: " << vecGammaTensorContent->size() << std::endl;
     // Filling up the tensor used in determining the susceptibilities (for iqn > 0)
     size_t num=0;
     for (size_t l=0; l<totSizeGammaTensor; l++){
@@ -719,6 +720,7 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
         //std::cout << num << " gt: " << gamma_tensor[kt][wt][kb][wb] << "\n";
         num++;
     }
+    MPI_Type_free(&gamma_tensor_content_type);
     delete tmpGammaGathered; delete vec_counts;
     delete vecGammaTensorContent; delete vec_disps;
 }
@@ -743,4 +745,13 @@ void ThreadFunctor::send_messages_to_root_process(bool is_full, int ierr, size_t
     ierr = MPI_Send( (void*)(vecTotSusSlaves->data()), sizeOfTuple*vecTotSusSlaves->size(), MPI_BYTE, root_process, RETURN_DATA_TAG_TOT_SUS, MPI_COMM_WORLD);
     ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
     vecWeightsSlaves->clear(); vecTotSusSlaves->clear();
+}
+
+void ThreadFunctor::create_mpi_data_struct(MPI_Datatype& gamma_tensor_content_type){
+    int lengths[5]={ 1, 1, 1, 1, 1 };
+    MPI_Aint offsets[5]={ offsetof(gamma_tensor_content,_ktilde), offsetof(gamma_tensor_content,_wtilde), 
+                        offsetof(gamma_tensor_content,_kbar), offsetof(gamma_tensor_content,_wbar), offsetof(gamma_tensor_content,_gamma) };
+    MPI_Datatype types[5]={ MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX };
+    MPI_Type_struct(5,lengths,offsets,types,&gamma_tensor_content_type);
+    MPI_Type_commit(&gamma_tensor_content_type);
 }
