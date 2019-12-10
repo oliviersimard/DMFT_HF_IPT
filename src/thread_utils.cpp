@@ -116,7 +116,7 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
 }
 
 std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_oneD_spsp(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const{
-    std::complex<double> lower_level(0.0,0.0), bubble(0.0,0.0);
+    std::complex<double> lower_level(0.0,0.0), bubble;
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<_Gk._kArr_l.size(); qttilde++){
             //lower_level += buildGK1D(wtilde-_Gk._precomp_qn[wttilde],ktilde-_Gk._kArr_l[qttilde])[0]*buildGK1D(wbar-_Gk._precomp_qn[wttilde],kbar-_Gk._kArr_l[qttilde])[1];
@@ -717,10 +717,9 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
         kb=tmpGammaGathered->at(l)._kbar;
         wb=tmpGammaGathered->at(l)._wbar;
         gamma_tensor[kt][wt][kb][wb]=tmpGammaGathered->at(l)._gamma;
-        //std::cout << num << " gt: " << gamma_tensor[kt][wt][kb][wb] << "\n";
         num++;
     }
-    MPI_Type_free(&gamma_tensor_content_type);
+    MPI_Type_free(&gamma_tensor_content_type); // Releasing type
     delete tmpGammaGathered; delete vec_counts;
     delete vecGammaTensorContent; delete vec_disps;
 }

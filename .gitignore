@@ -4,7 +4,7 @@ obj
 *.dat
 build
 *.py
-!pade.py
+!pade*.py
 !colormap.py
 mea
 build_test

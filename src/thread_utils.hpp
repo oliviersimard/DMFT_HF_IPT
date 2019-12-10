@@ -323,8 +323,8 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
-    const size_t totSizeGammaTensor=totSize*GreenStuff::N_tau*GreenStuff::N_tau;
     const size_t sizeOfElMPI_Allgatherv=GreenStuff::N_tau*GreenStuff::N_tau;
+    const size_t totSizeGammaTensor=totSize*sizeOfElMPI_Allgatherv;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
