@@ -725,7 +725,7 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
     //         std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
     //     }
     // }
-    // assert(MPI_SUCCESS==ierr);
+    assert(MPI_SUCCESS==ierr);
     // Filling up the tensor used in determining the susceptibilities (for iqn > 0)
     size_t num=0;
     for (size_t l=0; l<totSizeGammaTensor; l++){
