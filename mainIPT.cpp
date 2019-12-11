@@ -38,8 +38,6 @@ int main(int argc, char** argv){
     std::ofstream objSaveStreamGloc;
     std::ofstream objSaveStreamSE;
     std::ofstream objSaveStreamGW;
-    // Parameters to search for N_tau
-    //std::regex r("(?<=N_tau_)([0-9]*\\.[0-9]+|[0-9]+)");
 
     for (size_t k=0; k<=N_k; k++){ // Used when computing the susceptibilities.
         double epsilonk = -1.0*M_PI + 2.0*(double)k*M_PI/N_k;
@@ -62,7 +60,9 @@ int main(int argc, char** argv){
             }
         } 
     }
-    #endif
+    // To be able to initialize the static variables important to IPT (GreenStuff), one has to instantiate a GreenStuff object.
+    arma::Cube<double> initiate_double_slots; arma::Cube< std::complex<double> > initiate_cplx_double_slot;
+    #else // Saving on memory doing so. For DMFT loop, no parallelization is needed.
     arma::Cube<double> weiss_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> weiss_green_tmp_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_tmp_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> self_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), self_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
@@ -75,7 +75,7 @@ int main(int argc, char** argv){
     // To save the derivative of G(tau) and G(-tau)
     arma::Cube<double> data_dG_dtau_pos(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> data_dG_dtau_neg(2,2,2*N_tau+1,arma::fill::zeros);
-
+    #endif /* PARALLEL */
     std::string pathToDir("./data/");
     std::string pathToDirLoad("./../data/");
     std::string trailingStr("");
@@ -115,6 +115,8 @@ int main(int argc, char** argv){
                     filenameToLoad=pathToDir+customDirNameLoad+"/Self_energy_"+customDirNameLoad; // Stick to the self-energy.
                     #endif
                 }
+                // Saving memory doing so. For DMFT loop, no parallelization is needed.
+                #ifndef PARALLEL
                 // Initializing the main Green's function objects.
                 GreenStuff WeissGreenA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_A_matsubara_t_pos,weiss_green_A_matsubara_t_neg,weiss_green_A_matsubara_w);
                 GreenStuff HybA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_tmp_A_matsubara_t_pos,weiss_green_tmp_A_matsubara_t_neg,weiss_green_tmp_A_matsubara_w);
@@ -122,7 +124,7 @@ int main(int argc, char** argv){
                 GreenStuff LocalGreenA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,local_green_A_matsubara_t_pos,local_green_A_matsubara_t_neg,local_green_A_matsubara_w);
 
                 IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos,data_dG_dtau_neg,vecK,n_t_spin);
-                
+            
                 /* Performs the complete DMFT calculations if directory doesn't already exist */
                 #ifndef DEBUG
                 int message = stat( (pathToDirLoad+customDirName).c_str(), &infoDir );
@@ -131,8 +133,11 @@ int main(int argc, char** argv){
                 }
                 else
                     std::cout << "The DMFT loop has been skipped since according to the directories, it has already been created for this set of parameters." << std::endl;
-                #endif
-
+                #endif /* DEBUG */
+                #else
+                // Initializing the static member variables to GreenStuff.
+                GreenStuff IPTStaticVariables(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,initiate_double_slots,initiate_double_slots,initiate_cplx_double_slot);
+                #endif /* PARALLEL */
                 if (load_self){ // The file containing wider Matsubara frequency domain is loaded for spline.
                     std::vector<double> initVec(2*MULT_N_TAU*N_tau,0.0); // Important that it is 2*MULT_N_TAU
                     IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec,vecK,iwnArr_l,iqnArr_l);
@@ -205,6 +210,6 @@ int main(int argc, char** argv){
         delete[] gamma_tensor[i];
     }
     delete[] gamma_tensor;
-    return 0;
     #endif
+    return 0;
 }

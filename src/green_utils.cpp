@@ -35,12 +35,14 @@ arma::Cube< std::complex<double> > GreenStuff::cplxVec(2,2,1,arma::fill::zeros);
 GreenStuff::GreenStuff(const unsigned int N_tau, const unsigned int N_k, const double beta, const double U, const double hyb_c, std::vector< std::complex<double> > iwnArr_,
                                                 arma::Cube<double>& matsubara_t_pos, arma::Cube<double>& matsubara_t_neg, arma::Cube< std::complex<double> >& matsubara_w) noexcept(false) : Data(N_tau,N_k,beta,U,hyb_c), 
                                                 matsubara_t_pos(matsubara_t_pos), matsubara_t_neg(matsubara_t_neg), matsubara_w(matsubara_w), iwnArr(iwnArr_){   
+    #ifndef PARALLEL // Don't need this check when working in parallel env.
     if (!(matsubara_t_pos.size()==2*2*(2*N_tau+1)) || !(matsubara_t_neg.size()==2*2*(2*N_tau+1))){
         throw std::length_error("Vector matsubara_t has the wrong size!");
     }
     else if (!(matsubara_w.size()==2*2*2*N_tau)){
         throw std::length_error("Vector matsubara_w has the wrong size!");
     }
+    #endif
 }
 
 arma::Cube< std::complex<double> > GreenStuff::green_inf() const{

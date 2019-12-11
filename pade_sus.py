@@ -72,6 +72,15 @@ def get_corresponding_index(list_name: list, element1: float, element2: float) -
 	index2 = diff_of_vals2.index(min(diff_of_vals2))
 	return (index1,index2)
 
+def checkEqual(iterator):
+	""" Checks if all the elements in an iterable object are equal. """
+	iterator = iter(iterator)
+	try:
+		first = next(iterator)
+	except StopIteration:
+		return True
+	return all(first == rest for rest in iterator)
+
 file_vs_iqn, wmin, wmax, nbr_w, U, beta, N_tau, N_k, path_name = get_filenames()
 path_name="/".join(path_name[:-1])+"/"
 
@@ -81,22 +90,34 @@ print(U, beta, N_tau, path_name)
 dict_iqn_content_file={}
 # Getting size of square matrix
 getSizeSquare = int(os.popen('head -n1 {0} | grep -o " " | wc -l'.format(file_vs_iqn[0][0])).read())
+list_ind_where_max_forall_iqns=[]
 for filename, iqn in file_vs_iqn:
 	mesh = np.empty(shape=(getSizeSquare,getSizeSquare),dtype=complex)
 	# Transforming the complex numbers in files into tuples.
+	max_val=0.0
+	ind_max_val=tuple()
 	with open(filename) as f:
 		for k1,line in enumerate(f):
 			if k1<getSizeSquare:
 				for k2,el in enumerate(line.split(" ")):
 					if "(" in el.strip("\n"):
 						tup = tuple(float(i) for i in el.strip('()').split(','))
-						mesh[k1,k2] = tup[0]+1.0j*tup[1] ## Imaginary part of the susceptibility if 1.
+						val = tup[0]+1.0j*tup[1]
+						mesh[k1,k2] = val ## Imaginary part of the susceptibility if 1.
+						if np.abs(val)>max_val:
+							max_val=val
+							ind_max_val=(k1,k2)
 			else:
 				break
+	list_ind_where_max_forall_iqns.append(ind_max_val)
 	dict_iqn_content_file[iqn]=mesh
 
 arr_k = (np.linspace(-np.pi,np.pi,getSizeSquare,dtype=float)).tolist()
-tup_indices = get_corresponding_index(arr_k,np.pi/3.0,-np.pi/2.0) # Might just need the last tuple element in fact...
+print("The k-space array is ", arr_k, "\n")
+print("The indexes where the response is largest at iqn=0.0: ", list_ind_where_max_forall_iqns[0], 
+					" and same for all iqn: ", checkEqual(list_ind_where_max_forall_iqns),"\n")
+#tup_indices = get_corresponding_index(arr_k,np.pi/1.92,-np.pi/1.92) # Might just need the last tuple element in fact...
+tup_indices = list_ind_where_max_forall_iqns[0]
 sus_values = []
 iqn_list = []
 # Keeping values of susceptibilities corresponding to k-space point(s) we aim for.
