@@ -192,7 +192,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             }
             if (j==0){
                 for (auto el : *vec_disps) 
-                    std::cout << "yoyoyo: " << el << std::endl;
+                    std::cout << "vec_disps elements: " << el << std::endl;
             }
             /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
             mpistruct_t tmpObj;
@@ -358,8 +358,10 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             // First initialize the data array to be distributed across all the processes called in.
             ThreadFunctor::get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
             /* MPI_Allgatherv */
-            vec_counts->at(0)=(num_elements_per_proc+1)*sizeOfElMPI_Allgatherv; // MPI_Allgatherv
-            vec_disps->at(0)=0; 
+            if (j==0){
+                vec_counts->at(0)=(num_elements_per_proc+1)*sizeOfElMPI_Allgatherv; // MPI_Allgatherv
+                vec_disps->at(0)=0; 
+            }
             /*  */
             /* distribute a portion of the bector to each child process */
             for(int an_id = 1; an_id < world_size; an_id++) {
@@ -369,19 +371,25 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
                     end_arr = totSize - 1;
                 num_elems_to_send = end_arr - start_arr + 1;
                 /* MPI_Allgatherv */
-                vec_counts->at(an_id)=num_elems_to_send*sizeOfElMPI_Allgatherv;
-                vec_disps->at(an_id)=start_arr*sizeOfElMPI_Allgatherv;
+                if (j==0){
+                    vec_counts->at(an_id)=num_elems_to_send*sizeOfElMPI_Allgatherv;
+                    vec_disps->at(an_id)=start_arr*sizeOfElMPI_Allgatherv;
+                }
                 /*  */
                 ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
                 ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
                     an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
+            }
+            if (j==0){
+                for (auto el : *vec_disps) 
+                    std::cout << "vec_disps' elements: " << el << std::endl;
             }
             /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
             mpistruct_t tmpObj;
             for (int i=0; i<=num_elements_per_proc; i++){
                 tmpObj=vec_root_process->at(i);
                 #if DIM == 1
-                //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp); // Performing the calculations here...
                 #elif DIM == 2
                 threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
@@ -403,7 +411,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             for(int i = 0; i < num_elems_to_receive; i++) {
                 tmpObj = vec_slave_processes->at(i);
                 #if DIM == 1
-                //threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
+                threadObj(tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j,tmpObj._sp);
                 #elif DIM == 2
                 threadObj(tmpObj._sp,tmpObj._lkt,tmpObj._lkb,tmpObj._is_jj,tmpObj._is_full,j);
                 #endif
@@ -415,7 +423,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             /* Finally send integers to root process to notify the state of the calculations. */
             ThreadFunctor::send_messages_to_root_process(is_full,ierr,sizeOfTuple,chars_to_send,j);
         }
-        if (j==0){
+        if (j==0 && world_size>1){
             /* MPI_Allgatherv */
             MPI_Bcast( (void*)(vec_counts->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
             MPI_Bcast( (void*)(vec_disps->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );

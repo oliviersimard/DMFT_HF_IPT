@@ -48,7 +48,11 @@ endif()
 set(CMAKE_SOURCE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/cmake_source")
 message(STATUS "CMAKE_SOURCE_PREFIX for GMock setup: " ${CMAKE_SOURCE_PREFIX})
 
-set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
+if (${CMPLR} STREQUAL "clang")
+        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit)
+elseif (${CMPLR} STREQUAL "gcc")
+        set(LIBRARIES_CUSTOM fftw3 armadillo json_spirit pthread)
+endif()
 
 set(SOURCES_COMMON
         src/IPT2nd3rdorderSingle2
