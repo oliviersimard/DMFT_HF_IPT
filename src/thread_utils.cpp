@@ -458,6 +458,59 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 
 #endif /* DIM */
 
+std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj) const{
+    std::complex<double> bubble(0.0,0.0);
+    #if DIM == 1
+    for (size_t wttilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wttilde<_splInline.iwn_array.size(); wttilde++){
+        for (size_t qttilde=0; qttilde<_splInline.k_array.size(); qttilde++){
+            if (!is_jj)
+                bubble += buildGK1D_IPT(_splInline.iqn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iqn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1];
+            else
+                bubble += (-2.0*std::sin(_splInline.k_array[qttilde]))*buildGK1D_IPT(_splInline.iqn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iqn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1]*(-2.0*std::sin(_splInline.k_array[qttilde]));
+        }
+    }
+    #elif DIM == 2
+    for (size_t wttilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wttilde<_splInline.iwn_array.size(); wttilde++){
+        for (size_t qttildex=0; qttildex<_splInline.k_array.size(); qttildex++){
+            for (size_t qttildey=0; qttildey<_splInline.k_array.size(); qttildey++){
+                if (!is_jj)
+                    bubble += buildGK2D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttildex],_splInline.k_array[qttildey])[0]*buildGK2D_IPT(_splInline.iwn_array[wttilde]+_qq._iwn,_splInline.k_array[qttildex]+_qq._qx,_splInline.k_array[qttildey]+_qq._qy)[1];
+                else
+                    bubble += (-2.0*std::sin(_splInline.k_array[qttildex]))*buildGK2D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttildex],_splInline.k_array[qttildey])[0]*buildGK2D_IPT(_splInline.iwn_array[wttilde]+_qq._iwn,_splInline.k_array[qttildex]+_qq._qx,_splInline.k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline.k_array[qttildex]));
+            }
+        }
+    }
+    #endif
+    bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
+    return bubble;
+}
+
+std::complex<double> ThreadWrapper::lindhard_function(bool is_jj) const{
+    std::complex<double> bubble(0.0,0.0);
+    #if DIM == 1
+    for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
+        for (size_t qttilde=0; qttilde<_Gk._kArr_l.size(); qttilde++){
+            if (!is_jj)
+                bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])[0]*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)[1];
+            else
+                bubble += (-2.0*std::sin(_splInline.k_array[qttilde]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])[0]*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)[1]*(-2.0*std::sin(_splInline.k_array[qttilde]));
+        }
+    }
+    #elif DIM == 2 /* since one only considers the first-nearest neighbor dispersion relation */
+    for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
+        for (size_t qttildex=0; qttildex<_Gk._kArr_l.size(); qttildex++){
+            for (size_t qttildey=0; qttildey<_Gk._kArr_l.size(); qttildey++){
+                if (!is_jj)
+                    bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])[0]*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)[1];
+                else
+                    bubble += (-2.0*std::sin(_splInline.k_array[qttildex]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])[0]*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline.k_array[qttildex]));
+            }
+        }
+    }
+    #endif
+    bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
+    return bubble;
+}
 
 void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<double> tmp_val_kt_kb,std::complex<double> tmp_val_weights,std::complex<double> tmp_val_mid_lev,std::complex<double> tmp_val_corr,
                         std::complex<double> tmp_val_tot_sus,size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const{
@@ -496,7 +549,7 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<d
             vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
     } else if (is_jj){
         #if DIM == 1
-        val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline.k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[2]));
+        val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline.k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[k2]));
         matTotSus(k2,k1) = val_jj;
         #elif DIM == 2
         double kbarx;

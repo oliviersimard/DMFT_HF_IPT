@@ -79,6 +79,8 @@ namespace ThreadFunctor{
             std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
+            std::complex<double> lindhard_function(bool is_jj) const;
+            std::complex<double> lindhard_functionIPT(bool is_jj) const;
             void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr,std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv);
         private:
             void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
@@ -134,6 +136,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     const size_t totSizeGammaTensor=totSize*Gk._size*Gk._size;
     const size_t sizeOfElMPI_Allgatherv = Gk._size*Gk._size;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
+    std::complex<double> sus_non_interacting;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
     const size_t num_elements_per_proc = (world_size!=1) ? totSize/world_size : totSize-1; // Otherwise problem when calculating elements assigned to root process.
@@ -163,6 +166,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         qq2D._iwn = Gk._precomp_qn[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(Gk,qq2D,ndo_converged);
         #endif
+        sus_non_interacting=threadObj.lindhard_function(is_jj); // Non-interacting optical conductivity
         std::cout << "\n\n iqn: " << Gk._precomp_qn[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.
@@ -263,7 +267,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             }
             for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
                 for (size_t kbar=0; kbar<vecK.size(); kbar++){
-                    outputChispspWeights << matWeigths(kbar,ktilde) << " ";
+                    outputChispspWeights << matWeigths(kbar,ktilde) + sus_non_interacting << " "; // Adding the non-interacting susceptibilities...
                     outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
                     if (is_full){
                         if (j==0)
@@ -326,6 +330,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     const size_t sizeOfElMPI_Allgatherv=GreenStuff::N_tau*GreenStuff::N_tau;
     const size_t totSizeGammaTensor=totSize*sizeOfElMPI_Allgatherv;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
+    std::complex<double> sus_non_interacting;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&world_size);
     const size_t num_elements_per_proc = (world_size!=1) ? totSize/world_size : totSize-1; // Investigate this further, because there might prob with rounding.
@@ -353,6 +358,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         qq2D._iwn = iqnArr_l[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(qq2D,splInline);
         #endif
+        sus_non_interacting=threadObj.lindhard_functionIPT(is_jj);
         std::cout << "\n\n iqn: " << iqnArr_l[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.
@@ -449,7 +455,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
                 for (size_t kbar=0; kbar<vecK.size(); kbar++){
                     outputChispspWeights << matWeigths(kbar,ktilde) << " ";
-                    outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
+                    outputChispspTotSus << matTotSus(kbar,ktilde) + sus_non_interacting << " "; // Considering the non-interacting contribution...
                     if (is_full){
                         if (j==0)
                             outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";
