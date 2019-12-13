@@ -137,6 +137,10 @@ int main(int argc, char** argv){
                 #else
                 // Initializing the static member variables to GreenStuff.
                 GreenStuff IPTStaticVariables(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,initiate_double_slots,initiate_double_slots,initiate_cplx_double_slot);
+                std::cout << " U: " << GreenStuff::U << "\n";
+                std::cout << " beta: " << GreenStuff::beta << "\n";
+                std::cout << " N_k: " << GreenStuff::N_k << "\n";
+                std::cout << " N_tau: " << GreenStuff::N_tau << std::endl;
                 #endif /* PARALLEL */
                 if (load_self){ // The file containing wider Matsubara frequency domain is loaded for spline.
                     std::vector<double> initVec(2*MULT_N_TAU*N_tau,0.0); // Important that it is 2*MULT_N_TAU
