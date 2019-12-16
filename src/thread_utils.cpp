@@ -458,8 +458,9 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 
 #endif /* DIM */
 
-std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj) const{
+std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const{
     std::complex<double> bubble(0.0,0.0);
+    ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
     for (size_t wttilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wttilde<_splInline.iwn_array.size(); wttilde++){
         for (size_t qttilde=0; qttilde<_splInline.k_array.size(); qttilde++){
@@ -482,11 +483,18 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj) const{
     }
     #endif
     bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
+    #if DIM == 1
+    ofS << _q._iwn << " " << bubble << "\n";
+    #elif DIM == 2
+    ofS << _qq._iwn << " " << bubble << "\n";
+    #endif
+    ofS.close();
     return bubble;
 }
 
-std::complex<double> ThreadWrapper::lindhard_function(bool is_jj) const{
+std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const{
     std::complex<double> bubble(0.0,0.0);
+    ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<_Gk._kArr_l.size(); qttilde++){
@@ -509,6 +517,12 @@ std::complex<double> ThreadWrapper::lindhard_function(bool is_jj) const{
     }
     #endif
     bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
+    #if DIM == 1
+    ofS << _q._iwn << " " << bubble << "\n";
+    #elif DIM == 2
+    ofS << _qq._iwn << " " << bubble << "\n";
+    #endif
+    ofS.close();
     return bubble;
 }
 

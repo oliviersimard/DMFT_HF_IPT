@@ -79,8 +79,8 @@ namespace ThreadFunctor{
             std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
-            std::complex<double> lindhard_function(bool is_jj) const;
-            std::complex<double> lindhard_functionIPT(bool is_jj) const;
+            std::complex<double> lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const;
+            std::complex<double> lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const;
             void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr,std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv);
         private:
             void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
@@ -128,8 +128,8 @@ namespace ThreadFunctor{
 template<>
 inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBuildGk Gk,std::string pathToDir,std::string customDirName,bool is_full,bool is_jj,double ndo_converged,ThreadFunctor::solver_prototype sp){
     MPI_Status status;
-    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus, outputChispspBubble, outputChispspBubbleCorr;
-    std::string strOutputChispspWeights, strOutputChispspTotSus, strOutputChispspBubble, strOutputChispspGamma, strOutputChispspBubbleCorr;
+    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus, outputChispspBubble, outputChispspBubbleCorr, outputChispsNonInteracting;
+    std::string strOutputChispspWeights, strOutputChispspTotSus, strOutputChispspBubble, strOutputChispspGamma, strOutputChispspBubbleCorr, strOutputChispspNonInteracting;
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=Gk._kArr_l.size()*Gk._kArr_l.size(); // Nk+1 * Nk+1
@@ -150,6 +150,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     #elif DIM == 2
     HF::K_2D qq2D;
     #endif
+    strOutputChispspNonInteracting = pathToDir+customDirName+"/susceptibilities/ChispspNonInt_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat";
     std::cout << "totSize: " << totSize << "\n";
     std::cout << "num_elements_per_proc: " << num_elements_per_proc << std::endl;
     for (size_t j=0; j<Gk._precomp_qn.size(); j++){ // Looping over the bosonic Matsubara frequencies...
@@ -166,7 +167,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         qq2D._iwn = Gk._precomp_qn[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(Gk,qq2D,ndo_converged);
         #endif
-        sus_non_interacting=threadObj.lindhard_function(is_jj); // Non-interacting optical conductivity
+        sus_non_interacting=threadObj.lindhard_function(is_jj,outputChispsNonInteracting,strOutputChispspNonInteracting); // Non-interacting optical conductivity
         std::cout << "\n\n iqn: " << Gk._precomp_qn[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.
@@ -322,8 +323,8 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
 template<>
 inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline< std::complex<double> > splInline,std::string pathToDir,std::string customDirName,bool is_full,bool is_jj,ThreadFunctor::solver_prototype sp){
     MPI_Status status;
-    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus, outputChispspBubble, outputChispspBubbleCorr;
-    std::string strOutputChispspGamma, strOutputChispspWeights, strOutputChispspTotSus, strOutputChispspBubble, strOutputChispspBubbleCorr;
+    std::ofstream outputChispspGamma, outputChispspWeights, outputChispspTotSus, outputChispspBubble, outputChispspBubbleCorr, outputChispspNonInteracting;
+    std::string strOutputChispspGamma, strOutputChispspWeights, strOutputChispspTotSus, strOutputChispspBubble, strOutputChispspBubbleCorr, strOutputChispspNonInteracting;
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
@@ -344,6 +345,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     #elif DIM == 2
     HF::K_2D qq2D;
     #endif
+    strOutputChispspNonInteracting = pathToDir+customDirName+"/susceptibilities/ChispspNonInt_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat";;
     for (size_t j=0; j<GreenStuff::N_tau; j++){
         strOutputChispspGamma=pathToDir+customDirName+"/susceptibilities/ChispspGamma_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
         strOutputChispspWeights=pathToDir+customDirName+"/susceptibilities/ChispspWeights_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
@@ -358,7 +360,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         qq2D._iwn = iqnArr_l[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(qq2D,splInline);
         #endif
-        sus_non_interacting=threadObj.lindhard_functionIPT(is_jj);
+        sus_non_interacting=threadObj.lindhard_functionIPT(is_jj,outputChispspNonInteracting,strOutputChispspNonInteracting);
         std::cout << "\n\n iqn: " << iqnArr_l[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.
