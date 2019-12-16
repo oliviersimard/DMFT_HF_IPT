@@ -79,8 +79,8 @@ namespace ThreadFunctor{
             std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
-            std::complex<double> lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const;
-            std::complex<double> lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const;
+            std::complex<double> lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const;
+            std::complex<double> lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const;
             void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr,std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv);
         private:
             void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
@@ -167,7 +167,8 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         qq2D._iwn = Gk._precomp_qn[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(Gk,qq2D,ndo_converged);
         #endif
-        sus_non_interacting=threadObj.lindhard_function(is_jj,outputChispsNonInteracting,strOutputChispspNonInteracting); // Non-interacting optical conductivity
+        if (world_rank == root_process)
+            sus_non_interacting=threadObj.lindhard_function(is_jj,outputChispsNonInteracting,strOutputChispspNonInteracting,world_rank); // Non-interacting optical conductivity
         std::cout << "\n\n iqn: " << Gk._precomp_qn[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.
@@ -360,7 +361,8 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         qq2D._iwn = iqnArr_l[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(qq2D,splInline);
         #endif
-        sus_non_interacting=threadObj.lindhard_functionIPT(is_jj,outputChispspNonInteracting,strOutputChispspNonInteracting);
+        if (world_rank == root_process)
+            sus_non_interacting=threadObj.lindhard_functionIPT(is_jj,outputChispspNonInteracting,strOutputChispspNonInteracting,world_rank);
         std::cout << "\n\n iqn: " << iqnArr_l[j] << "\n\n";
         if (world_rank==root_process){
             // First initialize the data array to be distributed across all the processes called in.

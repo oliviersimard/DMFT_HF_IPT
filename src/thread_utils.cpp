@@ -458,16 +458,17 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 
 #endif /* DIM */
 
-std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const{
+std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const{
     std::complex<double> bubble(0.0,0.0);
     ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
+    std::cout << "world rank: " << world_rank << ", q_x: " << _q._qx << " and q_iwn: " << _q._iwn << std::endl;
     for (size_t wttilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wttilde<_splInline.iwn_array.size(); wttilde++){
         for (size_t qttilde=0; qttilde<_splInline.k_array.size(); qttilde++){
             if (!is_jj)
-                bubble += buildGK1D_IPT(_splInline.iqn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iqn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1];
+                bubble += buildGK1D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iwn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1];
             else
-                bubble += (-2.0*std::sin(_splInline.k_array[qttilde]))*buildGK1D_IPT(_splInline.iqn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iqn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1]*(-2.0*std::sin(_splInline.k_array[qttilde]));
+                bubble += (-2.0*std::sin(_splInline.k_array[qttilde]))*buildGK1D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iwn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1]*(-2.0*std::sin(_splInline.k_array[qttilde]));
         }
     }
     #elif DIM == 2
@@ -483,6 +484,7 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
     }
     #endif
     bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
+    std::cout << "non-interacting bubble: " << bubble << std::endl;
     #if DIM == 1
     ofS << _q._iwn << " " << bubble << "\n";
     #elif DIM == 2
@@ -492,7 +494,7 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
     return bubble;
 }
 
-std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput) const{
+std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const{
     std::complex<double> bubble(0.0,0.0);
     ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
