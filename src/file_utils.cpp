@@ -50,8 +50,9 @@ void mkdirTree(std::string sub, std::string dir) noexcept(false){
             throw std::runtime_error("Could not create directory hosting the data produced by the program; access permission required.");
         }
     }
-    else if( info.st_mode & S_IFDIR )  // S_ISDIR() doesn't exist on my windows 
-        printf( "%s is a directory\n", dir.c_str() );
+    else if( info.st_mode & S_IFDIR )  // S_ISDIR() doesn't exist on my windows
+        if (VERBOSE > 0)
+            printf( "%s is a directory\n", dir.c_str() );
 
     if (i+1<sub.length()){
         mkdirTree(sub.substr(i+1),dir);

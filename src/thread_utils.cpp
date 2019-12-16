@@ -433,8 +433,8 @@ std::complex<double> ThreadWrapper::getWeightsHF(double kbarx_m_tildex,double kb
         kbary = _Gk._kArr_l[ktildey] - kbary_m_tildey;
         for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
             kbarx = _Gk._kArr_l[ktildex] - kbarx_m_tildex;
-            tmp_val_weigths += _Gk(wtilde,_Gk._kArr_l[ktildex],_Gk._kArr_l[ktildey])(0,0)*_Gk(wtilde+_qq._iwn,_Gk._kArr_l[ktildex]+_qq._qx,_Gk._kArr_l[ktildey]+_qq._qy
-                )(0,0)*_Gk(wbar+_qq._iwn,kbarx+_qq._qx,kbary+_qq._qy)(1,1)*_Gk(wbar,kbarx,kbary)(1,1);
+            tmp_val_weigths += _Gk(wtilde,_Gk._kArr_l[ktildex],_Gk._kArr_l[ktildey])(0,0)*_Gk(wtilde-_qq._iwn,_Gk._kArr_l[ktildex]-_qq._qx,_Gk._kArr_l[ktildey]-_qq._qy
+                )(0,0)*_Gk(wbar-_qq._iwn,kbarx-_qq._qx,kbary-_qq._qy)(1,1)*_Gk(wbar,kbarx,kbary)(1,1);
         }      
     }
     tmp_val_weigths*=1.0/_Gk._kArr_l.size()/_Gk._kArr_l.size();
@@ -448,8 +448,8 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
         kbary = _splInline.k_array[ktildey] - kbary_m_tildey;
         for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
             kbarx = _splInline.k_array[ktildex] - kbarx_m_tildex;
-            tmp_val_weigths += buildGK2D_IPT(wtilde,ktildex,ktildey)[0] * buildGK2D_IPT(wtilde+_qq._iwn,ktildex+_qq._qx,ktildey+_qq._qy
-                                )[0] * buildGK2D_IPT(wbar+_qq._iwn,kbarx+_qq._qx,kbary+_qq._qy)[1] * buildGK2D_IPT(wbar,kbarx,kbary)[1];
+            tmp_val_weigths += buildGK2D_IPT(wtilde,ktildex,ktildey)[0] * buildGK2D_IPT(wtilde-_qq._iwn,ktildex-_qq._qx,ktildey-_qq._qy
+                                )[0] * buildGK2D_IPT(wbar-_qq._iwn,kbarx-_qq._qx,kbary-_qq._qy)[1] * buildGK2D_IPT(wbar,kbarx,kbary)[1];
         }      
     }
     tmp_val_weigths*=1.0/_splInline.k_array.size()/_splInline.k_array.size();

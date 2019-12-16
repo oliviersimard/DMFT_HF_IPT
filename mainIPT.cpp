@@ -137,6 +137,7 @@ int main(int argc, char** argv){
                 #else
                 // Initializing the static member variables to GreenStuff.
                 GreenStuff IPTStaticVariables(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,initiate_double_slots,initiate_double_slots,initiate_cplx_double_slot);
+                std::cout << " world rank is: " << world_rank << "\n";
                 std::cout << " U: " << U << "\n";
                 std::cout << " beta: " << beta << "\n";
                 std::cout << " N_k: " << N_k << "\n";

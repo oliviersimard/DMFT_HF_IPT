@@ -268,8 +268,8 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             }
             for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
                 for (size_t kbar=0; kbar<vecK.size(); kbar++){
-                    outputChispspWeights << matWeigths(kbar,ktilde) + sus_non_interacting << " "; // Adding the non-interacting susceptibilities...
-                    outputChispspTotSus << matTotSus(kbar,ktilde) << " ";
+                    outputChispspWeights << matWeigths(kbar,ktilde) << " "; 
+                    outputChispspTotSus << matTotSus(kbar,ktilde) + sus_non_interacting  << " "; // Adding the non-interacting susceptibilities...
                     if (is_full){
                         if (j==0)
                             outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";
