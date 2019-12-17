@@ -486,9 +486,13 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
     bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
     std::cout << "non-interacting bubble: " << bubble << std::endl;
     #if DIM == 1
-    ofS << _q._iwn << " " << bubble << "\n";
+    if ( static_cast<int>(_q._iwn.imag())==0 )
+        ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
+    ofS << _q._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #elif DIM == 2
-    ofS << _qq._iwn << " " << bubble << "\n";
+    if ( static_cast<int>(_qq._iwn.imag())==0 )
+        ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
+    ofS << _qq._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #endif
     ofS.close();
     return bubble;
@@ -520,9 +524,13 @@ std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream&
     #endif
     bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
     #if DIM == 1
-    ofS << _q._iwn << " " << bubble << "\n";
+    if ( static_cast<int>(_q._iwn.imag())==0 )
+        ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
+    ofS << _q._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #elif DIM == 2
-    ofS << _qq._iwn << " " << bubble << "\n";
+    if ( static_cast<int>(_qq._iwn.imag())==0 )
+        ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
+    ofS << _qq._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #endif
     ofS.close();
     return bubble;
