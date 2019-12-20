@@ -8,7 +8,9 @@ arma::Mat< std::complex<double> > matTotSus;
 arma::Mat< std::complex<double> > matCorr;
 arma::Mat< std::complex<double> > matMidLev;
 std::complex<double>**** gamma_tensor;
+std::complex<double>**** gamma_full_tensor; // Only useful when computing the full ladder diagrams. (1D)
 std::vector< gamma_tensor_content >* ThreadWrapper::vecGammaTensorContent = new std::vector< gamma_tensor_content >();
+std::vector< gamma_tensor_content >* ThreadWrapper::vecGammaFullTensorContent = new std::vector< gamma_tensor_content >(); // Only useful when computing the full ladder diagrams. (1D)
 int root_process=0;
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
 std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsSlaves = new std::vector< std::tuple< size_t,size_t,std::complex<double> > >();
@@ -27,8 +29,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
     std::tuple< std::complex<double>,std::complex<double> > tupOfVals;
     switch(sp){
     case solver_prototype::HF_prot:
-        for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
-            for (size_t wbar=0; wbar<_Gk._size; wbar++){
+        for (size_t wbar=0; wbar<_Gk._size; wbar++){
+            for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
                 tmp_val_weights_tmp = _Gk(_Gk._precomp_wn[wtilde],_Gk._kArr_l[ktilde]
                                     )(0,0)*_Gk(_Gk._precomp_wn[wtilde]+_q._iwn,_Gk._kArr_l[ktilde]+_q._qx
                                     )(0,0)*_Gk(_Gk._precomp_wn[wbar]+_q._iwn,_Gk._kArr_l[kbar]+_q._qx
@@ -47,7 +49,7 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                         tmp_val_tot_sus += gamma_tensor[ktilde][wtilde][kbar][wbar]*tmp_val_weights_tmp;
                     }
                 } else{
-                    tupOfValsFull = gamma_oneD_spsp_full_middle_plotting(_Gk._kArr_l[ktilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar],_Gk._precomp_wn[wtilde]);
+                    tupOfValsFull = gamma_oneD_spsp_full_middle_plotting(ktilde,kbar,wbar,wtilde,j);
                     tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
                     tmp_val_corr += std::get<1>(tupOfValsFull);
                     tmp_val_mid_lev += std::get<2>(tupOfValsFull);
@@ -68,8 +70,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     ktilde,kbar,is_jj,is_full,world_rank,j);
         break;
     case solver_prototype::IPT2_prot:
-        for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
-            for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
+        for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
+            for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
                 tmp_val_weights_tmp = buildGK1D_IPT(
                                     _splInline.iwn_array[wtilde],_splInline.k_array[ktilde]
                                     )[0]*buildGK1D_IPT(
@@ -83,7 +85,7 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     if (j==0){
                         tupOfVals = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
                         tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
-                        gamma_tensor_content GammaTObj(ktilde,wtilde % static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar % static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_val_kt_kb_tmp);
+                        gamma_tensor_content GammaTObj(ktilde,wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_val_kt_kb_tmp);
                         vecGammaTensorContent->push_back(std::move(GammaTObj));
                         tmp_val_mid_lev += std::get<1>(tupOfVals);
                         tmp_val_kt_kb += tmp_val_kt_kb_tmp;
@@ -92,7 +94,7 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                         tmp_val_tot_sus += gamma_tensor[ktilde][wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2)][kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)]*tmp_val_weights_tmp;
                     }
                 } else{
-                    tupOfValsFull = gamma_oneD_spsp_full_middle_plotting_IPT(_splInline.k_array[ktilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar],_splInline.iwn_array[wtilde]);
+                    tupOfValsFull = gamma_oneD_spsp_full_middle_plotting_IPT(ktilde,kbar,wbar,wtilde,j);
                     tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
                     tmp_val_corr += std::get<1>(tupOfValsFull);
                     tmp_val_mid_lev += std::get<2>(tupOfValsFull);
@@ -169,40 +171,70 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_lower_IPT(double kp,dou
     return GreenStuff::U/lower_level;
 }
 
-std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > ThreadWrapper::gamma_oneD_spsp_full_middle_plotting(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const{
+std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > ThreadWrapper::gamma_oneD_spsp_full_middle_plotting(size_t ktilde,size_t kbar,size_t wbar,size_t wtilde,size_t j) const{
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
+    std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
     for (size_t kp=0; kp<_Gk._kArr_l.size(); kp++){
         for (size_t iknp=0; iknp<_Gk._size; iknp++){
-            middle_level_inf_tmp+= _Gk(_Gk._precomp_wn[iknp],_Gk._kArr_l[kp]
-            )(0,0)*gamma_oneD_spsp_full_lower(_Gk._kArr_l[kp],kbar,_Gk._precomp_wn[iknp],wbar
-            )*_Gk(_Gk._precomp_wn[iknp]-_q._iwn,_Gk._kArr_l[kp]-_q._qx)(0,0);
+            if (j==0 && ktilde==0 && wtilde==0){ // Saving lower-most component of the full ladder susceptibility.
+                tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower(_Gk._kArr_l[kp],_Gk._kArr_l[kbar],_Gk._precomp_wn[iknp],_Gk._precomp_wn[wbar]);
+                gamma_tensor_content GammaTObj(kp,iknp,kbar,wbar,tmp_middle_level_inf_tmp);
+                vecGammaFullTensorContent->push_back(std::move(GammaTObj));
+            } else{
+                tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar][kp][iknp];
+            }
+            middle_level_corr_tmp+=middle_level_inf_tmp; // Extracting the lower level
+            middle_level_inf_tmp += _Gk(_Gk._precomp_wn[iknp],_Gk._kArr_l[kp]
+            )(0,0)*tmp_middle_level_inf_tmp*_Gk(_Gk._precomp_wn[iknp]-_q._iwn,_Gk._kArr_l[kp]-_q._qx)(0,0);
         }
     }
     middle_level_inf_tmp*=SPINDEG/(_Gk._Nk*_Gk._beta);
-    middle_level_corr_tmp+=middle_level_inf_tmp;
-    middle_level_inf_tmp+=std::get<1>(gamma_oneD_spsp(ktilde,wtilde,kbar,wbar));
+    middle_level_corr_tmp*=SPINDEG/(_Gk._Nk*_Gk._beta);
+    if (j==0){ // Saving the bare denominator of the full susceptibility.
+        tmp_bubble_without_corr_tmp = std::get<1>(gamma_oneD_spsp(_Gk._kArr_l[ktilde],_Gk._precomp_wn[wtilde],_Gk._kArr_l[kbar],_Gk._precomp_wn[wbar]));
+        gamma_tensor_content GammaTObj(ktilde,wtilde,kbar,wbar,tmp_bubble_without_corr_tmp);
+        vecGammaTensorContent->push_back(std::move(GammaTObj));
+    } else{
+        tmp_bubble_without_corr_tmp = gamma_tensor[ktilde][wtilde][kbar][wbar];
+    }
+    middle_level_inf_tmp+=tmp_bubble_without_corr_tmp;
     middle_level_tmp-=middle_level_inf_tmp;
     middle_level_tmp+=1.0;
 
     return std::make_tuple(GreenStuff::U/middle_level_tmp,middle_level_corr_tmp,middle_level_inf_tmp);
 }
 
-std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > ThreadWrapper::gamma_oneD_spsp_full_middle_plotting_IPT(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const{
+std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > ThreadWrapper::gamma_oneD_spsp_full_middle_plotting_IPT(size_t ktilde,size_t kbar,size_t wbar,size_t wtilde,size_t j) const{
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
+    std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
     for (size_t kp=0; kp<_splInline.k_array.size(); kp++){
         for (size_t iknp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknp<_splInline.iwn_array.size(); iknp++){
-            middle_level_inf_tmp+= buildGK1D_IPT(_splInline.iwn_array[iknp],_splInline.k_array[kp]
-            )[0]*gamma_oneD_spsp_full_lower_IPT(_splInline.k_array[kp],kbar,_splInline.iwn_array[iknp],wbar
-            )*buildGK1D_IPT(_splInline.iwn_array[iknp]-_q._iwn,_splInline.k_array[kp]-_q._qx)[0];
+            if (j==0 && ktilde==0 && wtilde==0){
+                tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower_IPT(_splInline.k_array[kp],_splInline.k_array[kbar],_splInline.iwn_array[iknp],_splInline.iwn_array[wbar]);
+                gamma_tensor_content GammaTObj(kp,iknp%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_middle_level_inf_tmp);
+                vecGammaFullTensorContent->push_back(std::move(GammaTObj));
+            } else{
+                tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)][kp][iknp%static_cast<size_t>(_splInline.iwn_array.size()/2)];
+            }
+            middle_level_corr_tmp += tmp_middle_level_inf_tmp; // Extracting the lower level
+            middle_level_inf_tmp += buildGK1D_IPT(_splInline.iwn_array[iknp],_splInline.k_array[kp]
+            )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline.iwn_array[iknp]-_q._iwn,_splInline.k_array[kp]-_q._qx)[0];
         }
     }
     middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
-    middle_level_corr_tmp+=middle_level_inf_tmp;
-    middle_level_inf_tmp+=std::get<1>(gamma_oneD_spsp_IPT(ktilde,wtilde,kbar,wbar));
+    middle_level_corr_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
+    if (j==0){
+        tmp_bubble_without_corr_tmp = std::get<1>(gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]));
+        gamma_tensor_content GammaTObj(ktilde,wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_bubble_without_corr_tmp);
+        vecGammaTensorContent->push_back(std::move(GammaTObj));
+    } else{
+        tmp_bubble_without_corr_tmp = gamma_tensor[ktilde][wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2)][kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)];
+    }
+    middle_level_inf_tmp+=tmp_bubble_without_corr_tmp;
     middle_level_tmp-=middle_level_inf_tmp;
     middle_level_tmp+=1.0;
 
@@ -486,13 +518,13 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
     bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
     std::cout << "non-interacting bubble: " << bubble << std::endl;
     #if DIM == 1
-    if ( static_cast<int>(_q._iwn.imag())==0 )
+    if ( _q._iwn.imag()==0.0 )
         ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
-    ofS << _q._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
+    ofS << _q._iwn.imag() << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #elif DIM == 2
-    if ( static_cast<int>(_qq._iwn.imag())==0 )
+    if ( _qq._iwn.imag()==0.0 )
         ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
-    ofS << _qq._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
+    ofS << _qq._iwn.imag() << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #endif
     ofS.close();
     return bubble;
@@ -524,13 +556,13 @@ std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream&
     #endif
     bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
     #if DIM == 1
-    if ( static_cast<int>(_q._iwn.imag())==0 )
+    if ( _q._iwn.imag()==0.0 )
         ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
-    ofS << _q._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
+    ofS << _q._iwn.imag() << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #elif DIM == 2
-    if ( static_cast<int>(_qq._iwn.imag())==0 )
+    if ( _qq._iwn.imag()==0.0 )
         ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
-    ofS << _qq._iwn << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
+    ofS << _qq._iwn.imag() << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #endif
     ofS.close();
     return bubble;
@@ -782,11 +814,14 @@ void ThreadFunctor::fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_
     delete vecTotSusTmp;
 }
 
-void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr, std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv){
+void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr, std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv,bool is_full){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Datatype gamma_tensor_content_type;
+    std::vector< gamma_tensor_content >* tmpFullGammaGathered;
     std::vector< gamma_tensor_content >* tmpGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor); // Needs to host the data from all the processes.
+    if (is_full)
+        tmpFullGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor);
     size_t kt, wt, kb, wb;
     create_mpi_data_struct(gamma_tensor_content_type); // Generates the custom MPI data type.
     std::cout << "totSizeGammaTensor: " << totSizeGammaTensor << std::endl;
@@ -797,8 +832,13 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
     std::cout << "The world rank is " << world_rank << std::endl;
     std::cout << "The size of tmpGammaGathered is " << tmpGammaGathered->size() << std::endl;
     std::cout << "The size of vecGammaTensorContent is " << vecGammaTensorContent->size() << std::endl;
+    assert(MPI_SUCCESS==ierr);
+    if (is_full){
+        ierr = MPI_Allgatherv((void*)(vecGammaFullTensorContent->data()),vecGammaFullTensorContent->size(),gamma_tensor_content_type,
+                (void*)(tmpFullGammaGathered->data()),(vec_counts->data()),(vec_disps->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
+    }
     // if (world_rank==1){
-    //     for (auto el : *tmpGammaGathered){
+    //     for (auto el : *tmpFullGammaGathered){
     //         std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
     //     }
     // }
@@ -813,9 +853,24 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
         gamma_tensor[kt][wt][kb][wb]=tmpGammaGathered->at(l)._gamma;
         num++;
     }
+    if (is_full){
+        num=0;
+        for (size_t l=0; l<totSizeGammaTensor; l++){
+            kt=tmpFullGammaGathered->at(l)._ktilde;
+            wt=tmpFullGammaGathered->at(l)._wtilde;
+            kb=tmpFullGammaGathered->at(l)._kbar;
+            wb=tmpFullGammaGathered->at(l)._wbar;
+            gamma_full_tensor[kb][wb][kt][wt]=tmpFullGammaGathered->at(l)._gamma;
+            num++;
+        }
+    }
     MPI_Type_free(&gamma_tensor_content_type); // Releasing type
     delete tmpGammaGathered; delete vec_counts;
     delete vecGammaTensorContent; delete vec_disps;
+    if (is_full){
+        delete vecGammaFullTensorContent;
+        delete tmpFullGammaGathered;
+    }
 }
 
 void ThreadFunctor::send_messages_to_root_process(bool is_full, int ierr, size_t sizeOfTuple, char* chars_to_send, size_t j){

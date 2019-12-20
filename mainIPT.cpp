@@ -19,7 +19,6 @@ int main(int argc, char** argv){
     const std::string filename("./params.json");
     #endif
     Json_utils JsonObj;
-    struct stat infoDir;
     const MembCarrier params = JsonObj.JSONLoading(filename);
     const double n_t_spin=params.db_arr[0];
     const unsigned int N_tau=(unsigned int)params.int_arr[0]; // Has to be a power of 2, i.e 512!
@@ -59,6 +58,18 @@ int main(int argc, char** argv){
                 gamma_tensor[i][j][k] = new std::complex<double>[N_tau];
             }
         } 
+    }
+    if (is_full){ // Constructing the array to store the lower-most level in the full susceptibility formula. (1D)
+        gamma_full_tensor = new std::complex<double>***[vecK.size()];
+        for (size_t i=0; i<vecK.size(); i++){
+            gamma_full_tensor[i] = new std::complex<double>**[N_tau];
+            for (size_t j=0; j<N_tau; j++){
+                gamma_full_tensor[i][j] = new std::complex<double>*[vecK.size()];
+                for (size_t k=0; k<vecK.size(); k++){
+                    gamma_full_tensor[i][j][k] = new std::complex<double>[N_tau];
+                }
+            }
+        }
     }
     // To be able to initialize the static variables important to IPT (GreenStuff), one has to instantiate a GreenStuff object.
     arma::Cube<double> initiate_double_slots; arma::Cube< std::complex<double> > initiate_cplx_double_slot;
@@ -127,6 +138,7 @@ int main(int argc, char** argv){
             
                 /* Performs the complete DMFT calculations if directory doesn't already exist */
                 #ifndef DEBUG
+                struct stat infoDir;
                 int message = stat( (pathToDirLoad+customDirName).c_str(), &infoDir );
                 if ( !(infoDir.st_mode & S_IFDIR) && message!=0 ){ // If the directory doesn't already exist in ../data/ ...
                     DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
@@ -215,6 +227,18 @@ int main(int argc, char** argv){
         delete[] gamma_tensor[i];
     }
     delete[] gamma_tensor;
+    if (is_full){
+        for (size_t i=0; i<vecK.size(); i++){
+            for (size_t j=0; j<N_tau; j++){
+                for (size_t k=0; k<vecK.size(); k++){
+                    delete[] gamma_full_tensor[i][j][k];
+                }
+                delete[] gamma_full_tensor[i][j];
+            }
+            delete[] gamma_full_tensor[i];
+        }
+        delete[] gamma_full_tensor;
+    }
     #endif
     return 0;
 }

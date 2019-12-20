@@ -116,7 +116,7 @@ arr_k = (np.linspace(-np.pi,np.pi,getSizeSquare,dtype=float)).tolist()
 print("The k-space array is ", arr_k, "\n")
 print("The indexes where the response is largest at iqn=0.0: ", list_ind_where_max_forall_iqns[0], 
 					" and same for all iqn: ", checkEqual(list_ind_where_max_forall_iqns),"\n")
-#tup_indices = get_corresponding_index(arr_k,np.pi/1.92,-np.pi/1.92) # Might just need the last tuple element in fact...
+#tup_indices = get_corresponding_index(arr_k,np.pi/2.0,-np.pi/1.8) # Might just need the last tuple element in fact...
 tup_indices = list_ind_where_max_forall_iqns[0]
 sus_values = []
 iqn_list = []

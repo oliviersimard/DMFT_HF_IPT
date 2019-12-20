@@ -21,6 +21,7 @@ extern arma::Mat< std::complex<double> > matTotSus;
 extern arma::Mat< std::complex<double> > matCorr;
 extern arma::Mat< std::complex<double> > matMidLev;
 extern std::complex<double>**** gamma_tensor;
+extern std::complex<double>**** gamma_full_tensor; // This array construction is only useful when computing the full ladder diagrams.
 extern int root_process;
 extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecGammaSlaves;
 extern std::vector< std::tuple< size_t,size_t,std::complex<double> > >* vecWeightsSlaves;
@@ -73,15 +74,15 @@ namespace ThreadFunctor{
             std::complex<double> gamma_oneD_spsp_full_lower_IPT(double kp,double kbar,std::complex<double> iknp,std::complex<double> wbar) const;
             std::complex<double> gamma_twoD_spsp_full_lower(double kpx,double kpy,double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> iknp,std::complex<double> wbar) const;
             std::complex<double> gamma_twoD_spsp_full_lower_IPT(double kpx,double kpy,double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> iknp,std::complex<double> wbar) const;
-            std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_oneD_spsp_full_middle_plotting(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const;
-            std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_oneD_spsp_full_middle_plotting_IPT(double ktilde,double kbar,std::complex<double> wbar,std::complex<double> wtilde) const;
+            std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_oneD_spsp_full_middle_plotting(size_t ktilde,size_t kbar,size_t wbar,size_t wtilde,size_t jj) const;
+            std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_oneD_spsp_full_middle_plotting_IPT(size_t ktilde,size_t kbar,size_t wbar,size_t wtilde, size_t jj) const;
             std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > gamma_twoD_spsp_full_middle_plotting_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wbar,std::complex<double> wtilde) const;
             std::complex<double> getWeightsHF(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const;
             std::complex<double> lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const;
-            void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr,std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv);
+            void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr,std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv,bool is_full);
         private:
             void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
                         size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const;
@@ -93,6 +94,7 @@ namespace ThreadFunctor{
             HF::K_2D _qq={};
             IPT2::SplineInline< std::complex<double> > _splInline={};
             static std::vector< gamma_tensor_content >* vecGammaTensorContent;
+            static std::vector< gamma_tensor_content >* vecGammaFullTensorContent;
     };
 
     inline ThreadWrapper::ThreadWrapper(HF::FunctorBuildGk Gk,HF::K_1D q,double ndo_converged) : _q(q){
@@ -250,7 +252,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             MPI_Bcast( (void*)(vec_disps->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
             /*  */
             /* Sending to all processes their respective content of gamma_tensor */
-            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,sizeOfElMPI_Allgatherv);
+            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,sizeOfElMPI_Allgatherv,is_full);
         }
         // To make sure not all the processes save at the same time in the same file.
         if (world_rank == root_process){
@@ -439,7 +441,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             MPI_Bcast( (void*)(vec_disps->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
             /*  */
             /* Sending to all processes their respective content of gamma_tensor */
-            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,sizeOfElMPI_Allgatherv);
+            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,sizeOfElMPI_Allgatherv,is_full);
         }
         // To make sure not all the processes save in the same file at the same time.
         if (world_rank == root_process){
