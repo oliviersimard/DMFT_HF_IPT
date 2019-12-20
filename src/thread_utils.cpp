@@ -178,14 +178,14 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
     for (size_t kp=0; kp<_Gk._kArr_l.size(); kp++){
         for (size_t iknp=0; iknp<_Gk._size; iknp++){
-            if (j==0 && ktilde==0 && wtilde==0){ // Saving lower-most component of the full ladder susceptibility.
+            if (j==0 && ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)){ // Saving lower-most component of the full ladder susceptibility.
                 tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower(_Gk._kArr_l[kp],_Gk._kArr_l[kbar],_Gk._precomp_wn[iknp],_Gk._precomp_wn[wbar]);
                 gamma_tensor_content GammaTObj(kp,iknp,kbar,wbar,tmp_middle_level_inf_tmp);
                 vecGammaFullTensorContent->push_back(std::move(GammaTObj));
             } else{
                 tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar][kp][iknp];
             }
-            middle_level_corr_tmp+=middle_level_inf_tmp; // Extracting the lower level
+            middle_level_corr_tmp+=tmp_middle_level_inf_tmp; // Extracting the lower level
             middle_level_inf_tmp += _Gk(_Gk._precomp_wn[iknp],_Gk._kArr_l[kp]
             )(0,0)*tmp_middle_level_inf_tmp*_Gk(_Gk._precomp_wn[iknp]-_q._iwn,_Gk._kArr_l[kp]-_q._qx)(0,0);
         }
@@ -211,12 +211,14 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
     std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
+    int counting_to_check = 0;
     for (size_t kp=0; kp<_splInline.k_array.size(); kp++){
         for (size_t iknp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknp<_splInline.iwn_array.size(); iknp++){
-            if (j==0 && ktilde==0 && wtilde==0){
+            if (j==0 && ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)){
                 tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower_IPT(_splInline.k_array[kp],_splInline.k_array[kbar],_splInline.iwn_array[iknp],_splInline.iwn_array[wbar]);
                 gamma_tensor_content GammaTObj(kp,iknp%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_middle_level_inf_tmp);
                 vecGammaFullTensorContent->push_back(std::move(GammaTObj));
+                counting_to_check++;
             } else{
                 tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)][kp][iknp%static_cast<size_t>(_splInline.iwn_array.size()/2)];
             }
@@ -225,6 +227,8 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
             )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline.iwn_array[iknp]-_q._iwn,_splInline.k_array[kp]-_q._qx)[0];
         }
     }
+    if (j==0 && ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2))
+        std::cout << "World rank: " << world_rank << " and the counting number: " << counting_to_check << std::endl;
     middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
     middle_level_corr_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
     if (j==0){
@@ -856,10 +860,10 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
     if (is_full){
         num=0;
         for (size_t l=0; l<totSizeGammaTensor; l++){
-            kt=tmpFullGammaGathered->at(l)._ktilde;
-            wt=tmpFullGammaGathered->at(l)._wtilde;
             kb=tmpFullGammaGathered->at(l)._kbar;
             wb=tmpFullGammaGathered->at(l)._wbar;
+            kt=tmpFullGammaGathered->at(l)._ktilde; // This is rather kp
+            wt=tmpFullGammaGathered->at(l)._wtilde; // This is rather iknp
             gamma_full_tensor[kb][wb][kt][wt]=tmpFullGammaGathered->at(l)._gamma;
             num++;
         }
