@@ -8,7 +8,7 @@
     "betamin": 40.0,
     "Ntau": 128,
     "N_it": 100,
-    "gridK": 2,
+    "gridK": 3,
     "q_1D": 0.0,
     "q_2D": [0.0,0.0],
     "dGdPhi": true,

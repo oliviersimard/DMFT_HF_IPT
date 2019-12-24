@@ -178,7 +178,7 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
     for (size_t kp=0; kp<_Gk._kArr_l.size(); kp++){
         for (size_t iknp=0; iknp<_Gk._size; iknp++){
-            if (j==0 && ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)){ // Saving lower-most component of the full ladder susceptibility.
+            if (j==0 && ktilde==0 && wtilde==0){ // Saving lower-most component of the full ladder susceptibility.
                 tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower(_Gk._kArr_l[kp],_Gk._kArr_l[kbar],_Gk._precomp_wn[iknp],_Gk._precomp_wn[wbar]);
                 gamma_tensor_content GammaTObj(kp,iknp,kbar,wbar,tmp_middle_level_inf_tmp);
                 vecGammaFullTensorContent->push_back(std::move(GammaTObj));
@@ -211,14 +211,12 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
     std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
-    int counting_to_check = 0;
     for (size_t kp=0; kp<_splInline.k_array.size(); kp++){
         for (size_t iknp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknp<_splInline.iwn_array.size(); iknp++){
             if (j==0 && ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)){
                 tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower_IPT(_splInline.k_array[kp],_splInline.k_array[kbar],_splInline.iwn_array[iknp],_splInline.iwn_array[wbar]);
                 gamma_tensor_content GammaTObj(kp,iknp%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_middle_level_inf_tmp);
                 vecGammaFullTensorContent->push_back(std::move(GammaTObj));
-                counting_to_check++;
             } else{
                 tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)][kp][iknp%static_cast<size_t>(_splInline.iwn_array.size()/2)];
             }
@@ -227,8 +225,6 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
             )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline.iwn_array[iknp]-_q._iwn,_splInline.k_array[kp]-_q._qx)[0];
         }
     }
-    if (j==0 && ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2))
-        std::cout << "World rank: " << world_rank << " and the counting number: " << counting_to_check << std::endl;
     middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
     middle_level_corr_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
     if (j==0){
@@ -818,34 +814,37 @@ void ThreadFunctor::fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_
     delete vecTotSusTmp;
 }
 
-void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr, std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv,bool is_full){
+void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr, std::vector<int>* vec_counts, std::vector<int>* vec_disps, 
+                            std::vector<int>* vec_counts_full, std::vector<int>* vec_disps_full,bool is_full){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Datatype gamma_tensor_content_type;
-    std::vector< gamma_tensor_content >* tmpFullGammaGathered;
+    std::vector< gamma_tensor_content >* tmpFullGammaGathered=nullptr;
     std::vector< gamma_tensor_content >* tmpGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor); // Needs to host the data from all the processes.
     if (is_full)
         tmpFullGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor);
     size_t kt, wt, kb, wb;
     create_mpi_data_struct(gamma_tensor_content_type); // Generates the custom MPI data type.
     std::cout << "totSizeGammaTensor: " << totSizeGammaTensor << std::endl;
-    std::cout << "size in bytes of vec_gamma_tensor_content for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaTensorContent->size() << std::endl;
+    std::cout << "size in bytes of vec_gamma_tensor_content for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaFullTensorContent->size() << std::endl;
     ierr = MPI_Allgatherv((void*)(vecGammaTensorContent->data()),vecGammaTensorContent->size(),gamma_tensor_content_type,
                 (void*)(tmpGammaGathered->data()),(vec_counts->data()),(vec_disps->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
     std::cout << "size in bytes of gamma_tensor_content " << sizeof(gamma_tensor_content) << std::endl;
     std::cout << "The world rank is " << world_rank << std::endl;
-    std::cout << "The size of tmpGammaGathered is " << tmpGammaGathered->size() << std::endl;
-    std::cout << "The size of vecGammaTensorContent is " << vecGammaTensorContent->size() << std::endl;
+    std::cout << "The size of tmpFullGammaGathered is " << tmpFullGammaGathered->size() << std::endl;
+    std::cout << "The size of vecGammaFullTensorContent is " << vecGammaFullTensorContent->size() << std::endl;
     assert(MPI_SUCCESS==ierr);
     if (is_full){
+        std::cout << "HERE YO" << std::endl;
         ierr = MPI_Allgatherv((void*)(vecGammaFullTensorContent->data()),vecGammaFullTensorContent->size(),gamma_tensor_content_type,
-                (void*)(tmpFullGammaGathered->data()),(vec_counts->data()),(vec_disps->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
+                (void*)(tmpFullGammaGathered->data()),(vec_counts_full->data()),(vec_disps_full->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
+        std::cout << "NOW HERE" << std::endl;
     }
-    // if (world_rank==1){
-    //     for (auto el : *tmpFullGammaGathered){
-    //         std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
-    //     }
-    // }
+    if (world_rank==1){
+        for (auto el : *tmpFullGammaGathered){
+            std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
+        }
+    }
     assert(MPI_SUCCESS==ierr);
     // Filling up the tensor used in determining the susceptibilities (for iqn > 0)
     size_t num=0;
@@ -872,8 +871,8 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
     delete tmpGammaGathered; delete vec_counts;
     delete vecGammaTensorContent; delete vec_disps;
     if (is_full){
-        delete vecGammaFullTensorContent;
-        delete tmpFullGammaGathered;
+        delete vecGammaFullTensorContent; delete vec_counts_full;
+        delete tmpFullGammaGathered; delete vec_disps_full;
     }
 }
 
@@ -906,4 +905,50 @@ void ThreadFunctor::create_mpi_data_struct(MPI_Datatype& gamma_tensor_content_ty
     MPI_Datatype types[5]={ MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX };
     MPI_Type_struct(5,lengths,offsets,types,&gamma_tensor_content_type);
     MPI_Type_commit(&gamma_tensor_content_type);
+}
+
+void ThreadFunctor::fill_up_counts_disps(std::vector<int>* vec_counts_full, std::vector<int>* vec_disps_full, size_t num_elems_per_proc, size_t sizeOfElMPI_Allgatherv_full){
+    assert(vec_counts_full->size()==vec_disps_full->size());
+    int num_of_k_bars = vecK.size(), an_id = 0, remaining_num_of_kbars, disps = 0;
+    std::cout << "starting of num_of_k_bars: " << num_of_k_bars << std::endl;
+    std::cout << "num_elements_per_proc: " << num_elems_per_proc << std::endl;
+    std::cout << "sizeOfElMPI_Allgatherv_full: " << sizeOfElMPI_Allgatherv_full << std::endl;
+    bool is_finished_dispatch=false;
+    while (an_id<vec_counts_full->size()){
+        if (!is_finished_dispatch){
+            if (an_id==0) { // One only needs to select the first array for which wtilde=ktilde=0. Hence, the dispatch of ktilde=0 across the processes is done carefully.
+                remaining_num_of_kbars = num_of_k_bars - (int)(num_elems_per_proc+1); // Need to watch out for the size_t->int conversion.
+                std::cout << "SHIT num_of_k_bars: " << num_of_k_bars << std::endl;
+                std::cout << "SHIT num_elements_per_proc: " << (int)num_elems_per_proc << std::endl;
+                std::cout << "SHIT remaining_num_of_bars: " << remaining_num_of_kbars << std::endl;
+            }else{
+                remaining_num_of_kbars = num_of_k_bars - (int)num_elems_per_proc;
+                std::cout << "SHIT2 num_of_k_bars: " << num_of_k_bars << std::endl;
+                std::cout << "SHIT2 num_elements_per_proc: " << (int)num_elems_per_proc << std::endl;
+                std::cout << "SHIT2 remaining_num_of_bars: " << remaining_num_of_kbars << std::endl;
+            }
+            if (remaining_num_of_kbars==0) {
+                vec_counts_full->at(an_id) = num_of_k_bars*(int)sizeOfElMPI_Allgatherv_full;
+                vec_disps_full->at(an_id) = (an_id!=0) ? disps*(int)sizeOfElMPI_Allgatherv_full : 0;
+                disps+=num_of_k_bars;
+                // Cannot dispatch further.
+                is_finished_dispatch=true;
+            } else if (remaining_num_of_kbars>0) {
+                vec_counts_full->at(an_id) = (an_id!=0) ? (int)(num_elems_per_proc*sizeOfElMPI_Allgatherv_full) : (int)((num_elems_per_proc+1)*sizeOfElMPI_Allgatherv_full);
+                vec_disps_full->at(an_id) = (an_id!=0) ? disps*(int)sizeOfElMPI_Allgatherv_full : 0;
+                disps += (an_id!=0) ? (int)num_elems_per_proc : (int)(num_elems_per_proc+1);
+            } else {
+                vec_counts_full->at(an_id) = (int)(num_of_k_bars*sizeOfElMPI_Allgatherv_full);
+                vec_disps_full->at(an_id) = disps*(int)sizeOfElMPI_Allgatherv_full;
+                // Cannot dispatch further.
+                is_finished_dispatch=true;
+            }
+            num_of_k_bars=remaining_num_of_kbars;
+            std::cout << "num_of_k_bars: " << num_of_k_bars << std::endl;
+        } else { // All the relevant ktilde=0 values have been dispatched.
+            vec_counts_full->at(an_id) = 0;
+            vec_disps_full->at(an_id) = disps*(int)sizeOfElMPI_Allgatherv_full;
+        }
+        an_id++;
+    }
 }

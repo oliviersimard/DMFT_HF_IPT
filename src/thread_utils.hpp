@@ -50,6 +50,7 @@ namespace ThreadFunctor{
     void fetch_data_from_slaves(int an_id,MPI_Status& status,bool is_full,int ierr,size_t num_elements_per_proc,size_t sizeOfTuple,size_t j);
     void send_messages_to_root_process(bool is_full, int ierr, size_t sizeOfTuple, char* chars_to_send, size_t j);
     void create_mpi_data_struct(MPI_Datatype& gamma_tensor_content_type);
+    void fill_up_counts_disps(std::vector<int>* vec_counts_full, std::vector<int>* vec_disps_full, size_t num_elems_per_proc, size_t sizeOfElMPI_Allgatherv_full);
     class ThreadWrapper{ 
         template<typename T> friend void ::calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
         template<typename T> friend void ::calculateSusceptibilitiesParallel(IPT2::SplineInline< std::complex<double> >,std::string,std::string,bool,bool,ThreadFunctor::solver_prototype);
@@ -82,7 +83,8 @@ namespace ThreadFunctor{
             std::complex<double> getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::complex<double> lindhard_function(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const;
             std::complex<double> lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const;
-            void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr,std::vector<int>* vec_counts, std::vector<int>* vec_disps, size_t sizeOfElMPI_Allgatherv,bool is_full);
+            void fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTensor,int ierr,std::vector<int>* vec_counts, std::vector<int>* vec_disps, std::vector<int>* vec_counts_full, 
+                        std::vector<int>* vec_disps_full,bool is_full);
         private:
             void save_data_to_local_extern_matrix_instancesIPT(std::complex<double> kt_kb,std::complex<double> weights,std::complex<double> mid_lev,std::complex<double> corr,std::complex<double> tot_sus,
                         size_t k1,size_t k2,bool is_jj,bool is_full,int world_rank,size_t j) const;
@@ -136,7 +138,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=Gk._kArr_l.size()*Gk._kArr_l.size(); // Nk+1 * Nk+1
     const size_t totSizeGammaTensor=totSize*Gk._size*Gk._size;
-    const size_t sizeOfElMPI_Allgatherv = Gk._size*Gk._size;
+    const size_t sizeOfElMPI_Allgatherv = Gk._size*Gk._size, sizeOfElMPI_Allgatherv_full = Gk._kArr_l.size()*sizeOfElMPI_Allgatherv;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     std::complex<double> sus_non_interacting;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
@@ -144,14 +146,20 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     const size_t num_elements_per_proc = (world_size!=1) ? totSize/world_size : totSize-1; // Otherwise problem when calculating elements assigned to root process.
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
     std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
-    std::vector<int>* vec_counts = new std::vector<int>(world_size); // Hosts the number of values (in bytes) to be sent by MPI_Allgatherv.
-    std::vector<int>* vec_disps = new std::vector<int>(world_size); // Displacements in recv buffer from which data is written.
+    std::vector<int>* vec_counts = new std::vector<int>(world_size), *vec_counts_full=nullptr; // Hosts the number of values (in bytes) to be sent by MPI_Allgatherv.
+    std::vector<int>* vec_disps = new std::vector<int>(world_size), *vec_disps_full=nullptr; // Displacements in recv buffer from which data is written.
+    if (is_full){
+        vec_counts_full = new std::vector<int>(world_size); // Hosts the number of values (in bytes) to be sent by MPI_Allgatherv.
+        vec_disps_full = new std::vector<int>(world_size); // Displacements in recv buffer from which data is written.
+    }
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q1D;
     #elif DIM == 2
     HF::K_2D qq2D;
     #endif
+    /* Constructing the arrays to distribute the data across the processes by means of MPI_Allgather_v */
+    ThreadFunctor::fill_up_counts_disps(vec_counts_full,vec_disps_full,num_elements_per_proc,sizeOfElMPI_Allgatherv_full);
     strOutputChispspNonInteracting = pathToDir+customDirName+"/susceptibilities/ChispspNonInt_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat";
     std::cout << "totSize: " << totSize << "\n";
     std::cout << "num_elements_per_proc: " << num_elements_per_proc << std::endl;
@@ -169,10 +177,9 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
         qq2D._iwn = Gk._precomp_qn[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(Gk,qq2D,ndo_converged);
         #endif
-        if (world_rank == root_process)
-            sus_non_interacting=threadObj.lindhard_function(is_jj,outputChispsNonInteracting,strOutputChispspNonInteracting,world_rank); // Non-interacting optical conductivity
         std::cout << "\n\n iqn: " << Gk._precomp_qn[j] << "\n\n";
         if (world_rank==root_process){
+            sus_non_interacting=threadObj.lindhard_function(is_jj,outputChispsNonInteracting,strOutputChispspNonInteracting,world_rank); // Non-interacting optical conductivity
             // First initialize the data array to be distributed across all the processes called in.
             ThreadFunctor::get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
             /* MPI_Allgatherv */
@@ -239,7 +246,6 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             }
             // The containers for weights and TotSus must remain non-zero throughout the iqn loop (for both full and not full calculations.) 
             assert(vecWeightsSlaves->size()==vecTotSusSlaves->size());
-            std::cout << "GETTING CLOSER" << std::endl;
             MPI_Barrier(MPI_COMM_WORLD);
             char chars_to_send[50];
             sprintf(chars_to_send,"vec_slave_process el %d completed", world_rank);
@@ -252,7 +258,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
             MPI_Bcast( (void*)(vec_disps->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
             /*  */
             /* Sending to all processes their respective content of gamma_tensor */
-            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,sizeOfElMPI_Allgatherv,is_full);
+            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,vec_counts_full,vec_disps_full,is_full);
         }
         // To make sure not all the processes save at the same time in the same file.
         if (world_rank == root_process){
@@ -331,7 +337,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     std::string trailingStr = is_full ? "_full" : "";
     std::string frontStr = is_jj ? "jj_" : "";
     const size_t totSize=vecK.size()*vecK.size(); // Nk+1 * Nk+1
-    const size_t sizeOfElMPI_Allgatherv=GreenStuff::N_tau*GreenStuff::N_tau;
+    const size_t sizeOfElMPI_Allgatherv=GreenStuff::N_tau*GreenStuff::N_tau, sizeOfElMPI_Allgatherv_full = vecK.size()*sizeOfElMPI_Allgatherv;
     const size_t totSizeGammaTensor=totSize*sizeOfElMPI_Allgatherv;
     int world_rank, world_size, start_arr, end_arr, num_elems_to_send, ierr, num_elems_to_receive;
     std::complex<double> sus_non_interacting;
@@ -340,14 +346,20 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     const size_t num_elements_per_proc = (world_size!=1) ? totSize/world_size : totSize-1; // Investigate this further, because there might prob with rounding.
     std::vector<mpistruct_t>* vec_root_process = new std::vector<mpistruct_t>(totSize);
     std::vector<mpistruct_t>* vec_slave_processes = new std::vector<mpistruct_t>(num_elements_per_proc+1); // Root process has one more element...
-    std::vector<int>* vec_counts = new std::vector<int>(world_size); // Hosts the number of values (in bytes) to be sent by MPI_Allgatherv.
-    std::vector<int>* vec_disps = new std::vector<int>(world_size); // Displacements in recv buffer from which data is written.
+    std::vector<int>* vec_counts = new std::vector<int>(world_size), *vec_counts_full=nullptr; // Hosts the number of values (in bytes) to be sent by MPI_Allgatherv.
+    std::vector<int>* vec_disps = new std::vector<int>(world_size), *vec_disps_full=nullptr; // Displacements in recv buffer from which data is written.
+    if (is_full){
+        vec_counts_full = new std::vector<int>(world_size); // Hosts the number of values (in bytes) to be sent by MPI_Allgatherv.
+        vec_disps_full = new std::vector<int>(world_size); // Displacements in recv buffer from which data is written.
+    }
     const size_t sizeOfTuple = sizeof(std::tuple< size_t,size_t,std::complex<double> >);
     #if DIM == 1
     HF::K_1D q1D;
     #elif DIM == 2
     HF::K_2D qq2D;
     #endif
+    /* Constructing the arrays to distribute the data across the processes by means of MPI_Allgather_v */
+    ThreadFunctor::fill_up_counts_disps(vec_counts_full,vec_disps_full,num_elements_per_proc,sizeOfElMPI_Allgatherv_full);
     strOutputChispspNonInteracting = pathToDir+customDirName+"/susceptibilities/ChispspNonInt_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat";;
     for (size_t j=0; j<GreenStuff::N_tau; j++){
         strOutputChispspGamma=pathToDir+customDirName+"/susceptibilities/ChispspGamma_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
@@ -363,10 +375,9 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
         qq2D._iwn = iqnArr_l[j]; // photon 4-vector
         ThreadFunctor::ThreadWrapper threadObj(qq2D,splInline);
         #endif
-        if (world_rank == root_process)
-            sus_non_interacting=threadObj.lindhard_functionIPT(is_jj,outputChispspNonInteracting,strOutputChispspNonInteracting,world_rank);
         std::cout << "\n\n iqn: " << iqnArr_l[j] << "\n\n";
         if (world_rank==root_process){
+            sus_non_interacting=threadObj.lindhard_functionIPT(is_jj,outputChispspNonInteracting,strOutputChispspNonInteracting,world_rank);
             // First initialize the data array to be distributed across all the processes called in.
             ThreadFunctor::get_vector_mpi(totSize,is_jj,is_full,sp,vec_root_process);
             /* MPI_Allgatherv */
@@ -393,8 +404,10 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
                     an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
             }
             if (j==0){
-                for (auto el : *vec_disps) 
-                    std::cout << "vec_disps' elements: " << el << std::endl;
+                for (auto el : *vec_disps_full) 
+                    std::cout << "vec_disps_full elements: " << el << std::endl;
+                for (auto el : *vec_counts_full) 
+                    std::cout << "vec_counts_full elements: " << el << std::endl;
             }
             /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
             mpistruct_t tmpObj;
@@ -439,9 +452,13 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             /* MPI_Allgatherv */
             MPI_Bcast( (void*)(vec_counts->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
             MPI_Bcast( (void*)(vec_disps->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
+            // if (is_full){
+            //     MPI_Bcast( (void*)(vec_counts_full->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
+            //     MPI_Bcast( (void*)(vec_disps_full->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
+            // }
             /*  */
             /* Sending to all processes their respective content of gamma_tensor */
-            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,sizeOfElMPI_Allgatherv,is_full);
+            threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,vec_counts_full,vec_disps_full,is_full);
         }
         // To make sure not all the processes save in the same file at the same time.
         if (world_rank == root_process){
