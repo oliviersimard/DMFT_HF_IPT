@@ -213,11 +213,13 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
     for (size_t kp=0; kp<_splInline.k_array.size(); kp++){
         for (size_t iknp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknp<_splInline.iwn_array.size(); iknp++){
-            if (j==0 && ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)){
+            if (j==0){ // One slice of ktilde-wtilde is necessary.
                 tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower_IPT(_splInline.k_array[kp],_splInline.k_array[kbar],_splInline.iwn_array[iknp],_splInline.iwn_array[wbar]);
-                gamma_tensor_content GammaTObj(kp,iknp%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_middle_level_inf_tmp);
-                vecGammaFullTensorContent->push_back(std::move(GammaTObj));
-            } else{
+                if (ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)){
+                    gamma_tensor_content GammaTObj(kp,iknp%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_middle_level_inf_tmp);
+                    vecGammaFullTensorContent->push_back(std::move(GammaTObj));
+                }
+            } else{ // Then one has to fetch the stored values...
                 tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)][kp][iknp%static_cast<size_t>(_splInline.iwn_array.size()/2)];
             }
             middle_level_corr_tmp += tmp_middle_level_inf_tmp; // Extracting the lower level
@@ -840,11 +842,11 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
                 (void*)(tmpFullGammaGathered->data()),(vec_counts_full->data()),(vec_disps_full->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
         std::cout << "NOW HERE" << std::endl;
     }
-    if (world_rank==1){
-        for (auto el : *tmpFullGammaGathered){
-            std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
-        }
-    }
+    // if (world_rank==1){
+    //     for (auto el : *tmpFullGammaGathered){
+    //         std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
+    //     }
+    // }
     assert(MPI_SUCCESS==ierr);
     // Filling up the tensor used in determining the susceptibilities (for iqn > 0)
     size_t num=0;
