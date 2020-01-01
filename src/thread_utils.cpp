@@ -912,9 +912,6 @@ void ThreadFunctor::create_mpi_data_struct(MPI_Datatype& gamma_tensor_content_ty
 void ThreadFunctor::fill_up_counts_disps(std::vector<int>* vec_counts_full, std::vector<int>* vec_disps_full, size_t num_elems_per_proc, size_t sizeOfElMPI_Allgatherv_full){
     assert(vec_counts_full->size()==vec_disps_full->size());
     int num_of_k_bars = vecK.size(), an_id = 0, remaining_num_of_kbars, disps = 0;
-    std::cout << "starting of num_of_k_bars: " << num_of_k_bars << std::endl;
-    std::cout << "num_elements_per_proc: " << num_elems_per_proc << std::endl;
-    std::cout << "sizeOfElMPI_Allgatherv_full: " << sizeOfElMPI_Allgatherv_full << std::endl;
     bool is_finished_dispatch=false;
     while (an_id<vec_counts_full->size()){
         if (!is_finished_dispatch){
