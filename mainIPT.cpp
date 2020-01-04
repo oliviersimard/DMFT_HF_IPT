@@ -1,4 +1,4 @@
-//#define PARALLEL
+#define PARALLEL
 #ifdef PARALLEL
 #include "src/thread_utils.hpp"
 #else

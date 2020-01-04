@@ -837,10 +837,8 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
     std::cout << "The size of vecGammaFullTensorContent is " << vecGammaFullTensorContent->size() << std::endl;
     assert(MPI_SUCCESS==ierr);
     if (is_full){
-        std::cout << "HERE YO" << std::endl;
         ierr = MPI_Allgatherv((void*)(vecGammaFullTensorContent->data()),vecGammaFullTensorContent->size(),gamma_tensor_content_type,
                 (void*)(tmpFullGammaGathered->data()),(vec_counts_full->data()),(vec_disps_full->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
-        std::cout << "NOW HERE" << std::endl;
     }
     // if (world_rank==1){
     //     for (auto el : *tmpFullGammaGathered){
@@ -917,14 +915,8 @@ void ThreadFunctor::fill_up_counts_disps(std::vector<int>* vec_counts_full, std:
         if (!is_finished_dispatch){
             if (an_id==0) { // One only needs to select the first array for which wtilde=ktilde=0. Hence, the dispatch of ktilde=0 across the processes is done carefully.
                 remaining_num_of_kbars = num_of_k_bars - (int)(num_elems_per_proc+1); // Need to watch out for the size_t->int conversion.
-                std::cout << "SHIT num_of_k_bars: " << num_of_k_bars << std::endl;
-                std::cout << "SHIT num_elements_per_proc: " << (int)num_elems_per_proc << std::endl;
-                std::cout << "SHIT remaining_num_of_bars: " << remaining_num_of_kbars << std::endl;
             }else{
                 remaining_num_of_kbars = num_of_k_bars - (int)num_elems_per_proc;
-                std::cout << "SHIT2 num_of_k_bars: " << num_of_k_bars << std::endl;
-                std::cout << "SHIT2 num_elements_per_proc: " << (int)num_elems_per_proc << std::endl;
-                std::cout << "SHIT2 remaining_num_of_bars: " << remaining_num_of_kbars << std::endl;
             }
             if (remaining_num_of_kbars==0) {
                 vec_counts_full->at(an_id) = num_of_k_bars*(int)sizeOfElMPI_Allgatherv_full;

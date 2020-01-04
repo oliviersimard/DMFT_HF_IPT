@@ -159,7 +159,8 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
     HF::K_2D qq2D;
     #endif
     /* Constructing the arrays to distribute the data across the processes by means of MPI_Allgather_v */
-    ThreadFunctor::fill_up_counts_disps(vec_counts_full,vec_disps_full,num_elements_per_proc,sizeOfElMPI_Allgatherv_full);
+    if (is_full)
+        ThreadFunctor::fill_up_counts_disps(vec_counts_full,vec_disps_full,num_elements_per_proc,sizeOfElMPI_Allgatherv_full);
     strOutputChispspNonInteracting = pathToDir+customDirName+"/susceptibilities/ChispspNonInt_HF_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(Gk._u)+"_beta_"+std::to_string(Gk._beta)+"_N_tau_"+std::to_string(Gk._size)+"_Nk_"+std::to_string(Gk._Nk)+trailingStr+".dat";
     std::cout << "totSize: " << totSize << "\n";
     std::cout << "num_elements_per_proc: " << num_elements_per_proc << std::endl;
@@ -359,7 +360,8 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
     HF::K_2D qq2D;
     #endif
     /* Constructing the arrays to distribute the data across the processes by means of MPI_Allgather_v */
-    ThreadFunctor::fill_up_counts_disps(vec_counts_full,vec_disps_full,num_elements_per_proc,sizeOfElMPI_Allgatherv_full);
+    if (is_full)
+        ThreadFunctor::fill_up_counts_disps(vec_counts_full,vec_disps_full,num_elements_per_proc,sizeOfElMPI_Allgatherv_full);
     strOutputChispspNonInteracting = pathToDir+customDirName+"/susceptibilities/ChispspNonInt_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+trailingStr+".dat";;
     for (size_t j=0; j<GreenStuff::N_tau; j++){
         strOutputChispspGamma=pathToDir+customDirName+"/susceptibilities/ChispspGamma_IPT2_parallelized_"+frontStr+std::to_string(DIM)+"D_U_"+std::to_string(GreenStuff::U)+"_beta_"+std::to_string(GreenStuff::beta)+"_N_tau_"+std::to_string(GreenStuff::N_tau)+"_Nk_"+std::to_string(GreenStuff::N_k)+"_iqn_"+std::to_string(iqnArr_l[j].imag())+trailingStr+".dat";
@@ -402,12 +404,6 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
                 ierr = MPI_Send( &num_elems_to_send, 1 , MPI_INT, an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
                 ierr = MPI_Send( (void*)(vec_root_process->data()+start_arr), sizeof(mpistruct_t)*num_elems_to_send, MPI_BYTE,
                     an_id, SEND_DATA_TAG, MPI_COMM_WORLD);
-            }
-            if (j==0){
-                for (auto el : *vec_disps_full) 
-                    std::cout << "vec_disps_full elements: " << el << std::endl;
-                for (auto el : *vec_counts_full) 
-                    std::cout << "vec_counts_full elements: " << el << std::endl;
             }
             /* Calculate the susceptilities for the elements assigned to the root process, that is the beginning of the vector. */
             mpistruct_t tmpObj;
@@ -452,10 +448,6 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             /* MPI_Allgatherv */
             MPI_Bcast( (void*)(vec_counts->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
             MPI_Bcast( (void*)(vec_disps->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
-            // if (is_full){
-            //     MPI_Bcast( (void*)(vec_counts_full->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
-            //     MPI_Bcast( (void*)(vec_disps_full->data()), world_size, MPI_INT, root_process, MPI_COMM_WORLD );
-            // }
             /*  */
             /* Sending to all processes their respective content of gamma_tensor */
             threadObj.fetch_data_gamma_tensor_alltogether(totSizeGammaTensor,ierr,vec_counts,vec_disps,vec_counts_full,vec_disps_full,is_full);
