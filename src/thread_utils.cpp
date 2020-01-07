@@ -821,31 +821,31 @@ void ThreadWrapper::fetch_data_gamma_tensor_alltogether(size_t totSizeGammaTenso
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     MPI_Datatype gamma_tensor_content_type;
-    std::vector< gamma_tensor_content >* tmpFullGammaGathered=nullptr;
+    std::vector< gamma_tensor_content >* tmpFullGammaGathered = nullptr;
     std::vector< gamma_tensor_content >* tmpGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor); // Needs to host the data from all the processes.
     if (is_full)
         tmpFullGammaGathered = new std::vector< gamma_tensor_content >(totSizeGammaTensor);
     size_t kt, wt, kb, wb;
     create_mpi_data_struct(gamma_tensor_content_type); // Generates the custom MPI data type.
     std::cout << "totSizeGammaTensor: " << totSizeGammaTensor << std::endl;
-    std::cout << "size in bytes of vec_gamma_tensor_content for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaFullTensorContent->size() << std::endl;
+    // std::cout << "size in bytes of vec_gamma_tensor_content for process " << world_rank << " : " << sizeof(gamma_tensor_content)*vecGammaFullTensorContent->size() << std::endl;
     ierr = MPI_Allgatherv((void*)(vecGammaTensorContent->data()),vecGammaTensorContent->size(),gamma_tensor_content_type,
                 (void*)(tmpGammaGathered->data()),(vec_counts->data()),(vec_disps->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
     std::cout << "size in bytes of gamma_tensor_content " << sizeof(gamma_tensor_content) << std::endl;
     std::cout << "The world rank is " << world_rank << std::endl;
-    std::cout << "The size of tmpFullGammaGathered is " << tmpFullGammaGathered->size() << std::endl;
-    std::cout << "The size of vecGammaFullTensorContent is " << vecGammaFullTensorContent->size() << std::endl;
+    // std::cout << "The size of tmpFullGammaGathered is " << tmpFullGammaGathered->size() << std::endl;
+    // std::cout << "The size of vecGammaFullTensorContent is " << vecGammaFullTensorContent->size() << std::endl;
     assert(MPI_SUCCESS==ierr);
     if (is_full){
         ierr = MPI_Allgatherv((void*)(vecGammaFullTensorContent->data()),vecGammaFullTensorContent->size(),gamma_tensor_content_type,
                 (void*)(tmpFullGammaGathered->data()),(vec_counts_full->data()),(vec_disps_full->data()),gamma_tensor_content_type,MPI_COMM_WORLD);
+        assert(MPI_SUCCESS==ierr);
     }
     // if (world_rank==1){
     //     for (auto el : *tmpFullGammaGathered){
     //         std::cout << el._ktilde << "," << el._kbar << "," << el._wtilde << "," << el._wbar << std::endl;
     //     }
     // }
-    assert(MPI_SUCCESS==ierr);
     // Filling up the tensor used in determining the susceptibilities (for iqn > 0)
     size_t num=0;
     for (size_t l=0; l<totSizeGammaTensor; l++){
