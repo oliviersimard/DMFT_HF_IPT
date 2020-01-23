@@ -191,7 +191,7 @@ while i<tot_axs:
 	axs[i].set_ylabel(r"a. u.")
 	if i == 0:
 		#axs[i].set_title(r"$2^{\text{nd}}$-order IPT-D results for "+r"$\beta={0}$, $U={1}$".format(beta,U))
-		axs[i].set_title(r"Optical conductivity for "+r"$\beta={0}$, $U={1}$, ".format(beta,U)+r"$N_{\tau}$"+r"$={0}$, and $N_k={1}$".format(N_tau,N_k)+r" (HF)")
+		axs[i].set_title(r"Optical conductivity for "+r"$\beta={0}$, $U={1}$, ".format(beta,U)+r"$N_{\tau}$"+r"$={0}$, and $N_k={1}$".format(N_tau,N_k))
 	if i != tot_axs-1:
 		axs[i].tick_params(axis='x',bottom=False)
 	else:

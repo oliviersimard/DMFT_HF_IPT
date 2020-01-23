@@ -12,9 +12,13 @@ std::vector<std::string> glob(const std::string& pattern) noexcept(false){
     if(return_value == GLOB_NOMATCH){
         globfree(&glob_result);
         stringstream ss;
-        ss << "glob() failed with return_value " << return_value << " for "+pattern+"; pattern was not found." << "\n";
-        if (VERBOSE > 0)
+        if (VERBOSE > 0) {
+            ss << "glob() failed with return_value " << return_value << " for "+pattern+"; pattern was not found." << "\n";
             std::cerr << ss.str() << "\n";
+        } else { // Mainly for testing 
+            ss << GLOB_NOMATCH;
+            std::cerr << ss.str() << "\n";
+        }
     } else if (return_value == 0){
         if (VERBOSE > 0)
             std::cerr << "The file "+pattern+" was found!!" << "\n";

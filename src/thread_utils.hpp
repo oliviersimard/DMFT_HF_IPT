@@ -189,7 +189,7 @@ inline void calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(HF::FunctorBui
                 vec_disps->at(0)=0;
             }
             /*  */
-            /* distribute a portion of the bector to each child process */
+            /* distribute a portion of the vector to each child process */
             for(int an_id = 1; an_id < world_size; an_id++){
                 start_arr = an_id*num_elements_per_proc + 1;
                 end_arr = (an_id + 1)*num_elements_per_proc;

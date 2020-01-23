@@ -4,7 +4,6 @@
 #include<tuple>
 #include<algorithm>
 #include "IPT2nd3rdorderSingle2.hpp"
-#define MULT_N_TAU 2
 
 template<typename T>
 inline void calculateSusceptibilities(T&,const IPT2::SplineInline< std::complex<double> >&,const std::string&,const std::string&,const bool&,const bool&);

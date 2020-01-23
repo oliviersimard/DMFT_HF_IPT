@@ -70,28 +70,28 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     ktilde,kbar,is_jj,is_full,world_rank,j);
         break;
     case solver_prototype::IPT2_prot:
-        for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
-            for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
+        for (size_t wbar=static_cast<size_t>(_splInline._iwn_array.size()/2); wbar<_splInline._iwn_array.size(); wbar++){
+            for (size_t wtilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wtilde<_splInline._iwn_array.size(); wtilde++){
                 tmp_val_weights_tmp = buildGK1D_IPT(
-                                    _splInline.iwn_array[wtilde],_splInline.k_array[ktilde]
+                                    _splInline._iwn_array[wtilde],_splInline._k_array[ktilde]
                                     )[0]*buildGK1D_IPT(
-                                    _splInline.iwn_array[wtilde]+_q._iwn,_splInline.k_array[ktilde]+_q._qx
+                                    _splInline._iwn_array[wtilde]+_q._iwn,_splInline._k_array[ktilde]+_q._qx
                                     )[0]*buildGK1D_IPT(
-                                    _splInline.iwn_array[wbar]+_q._iwn,_splInline.k_array[kbar]+_q._qx
+                                    _splInline._iwn_array[wbar]+_q._iwn,_splInline._k_array[kbar]+_q._qx
                                     )[1]*buildGK1D_IPT(
-                                    _splInline.iwn_array[wbar],_splInline.k_array[kbar]
+                                    _splInline._iwn_array[wbar],_splInline._k_array[kbar]
                                     )[1];
                 if (!is_full){
                     if (j==0){
-                        tupOfVals = gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]);
+                        tupOfVals = gamma_oneD_spsp_IPT(_splInline._k_array[ktilde],_splInline._iwn_array[wtilde],_splInline._k_array[kbar],_splInline._iwn_array[wbar]);
                         tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
-                        gamma_tensor_content GammaTObj(ktilde,wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_val_kt_kb_tmp);
+                        gamma_tensor_content GammaTObj(ktilde,wtilde%static_cast<size_t>(_splInline._iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline._iwn_array.size()/2),tmp_val_kt_kb_tmp);
                         vecGammaTensorContent->push_back(std::move(GammaTObj));
                         tmp_val_mid_lev += std::get<1>(tupOfVals);
                         tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                         tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                     } else{
-                        tmp_val_tot_sus += gamma_tensor[ktilde][wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2)][kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)]*tmp_val_weights_tmp;
+                        tmp_val_tot_sus += gamma_tensor[ktilde][wtilde%static_cast<size_t>(_splInline._iwn_array.size()/2)][kbar][wbar%static_cast<size_t>(_splInline._iwn_array.size()/2)]*tmp_val_weights_tmp;
                     }
                 } else{
                     tupOfValsFull = gamma_oneD_spsp_full_middle_plotting_IPT(ktilde,kbar,wbar,wtilde,j);
@@ -102,10 +102,10 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                     tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 }
                 tmp_val_weights += tmp_val_weights_tmp;
-                if ((wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline.iwn_array.size()/2))){
+                if ((wtilde==static_cast<size_t>(_splInline._iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline._iwn_array.size()/2))){
                     std::cout << "Process id: " << world_rank << "\n";
-                    std::cout << "ktilde: " << _splInline.k_array[ktilde] << "\n";
-                    std::cout << "kbar: " << _splInline.k_array[kbar] << "\n";
+                    std::cout << "ktilde: " << _splInline._k_array[ktilde] << "\n";
+                    std::cout << "kbar: " << _splInline._k_array[kbar] << "\n";
                     std::cout << "Tot Sus IPT: " << tmp_val_tot_sus << "\n";
                     std::cout << "Weights: " << tmp_val_weights << std::endl;
                 }
@@ -133,9 +133,9 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_one
 
 std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_oneD_spsp_IPT(double ktilde,std::complex<double> wtilde,double kbar,std::complex<double> wbar) const{
     std::complex<double> lower_level(0.0,0.0), bubble(0.0,0.0);
-    for (size_t wttilde=0; wttilde<_splInline.iqn_array.size(); wttilde++){
-        for (size_t qttilde=0; qttilde<_splInline.k_array.size(); qttilde++){
-            lower_level += buildGK1D_IPT(wtilde-_splInline.iqn_array[wttilde],ktilde-_splInline.k_array[qttilde])[0]*buildGK1D_IPT(wbar-_splInline.iqn_array[wttilde],kbar-_splInline.k_array[qttilde])[1];
+    for (size_t wttilde=0; wttilde<_splInline._iqn_array.size(); wttilde++){
+        for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
+            lower_level += buildGK1D_IPT(wtilde-_splInline._iqn_array[wttilde],ktilde-_splInline._k_array[qttilde])[0]*buildGK1D_IPT(wbar-_splInline._iqn_array[wttilde],kbar-_splInline._k_array[qttilde])[1];
         }
     }
     
@@ -160,9 +160,9 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_lower(double kp,double 
 
 std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_lower_IPT(double kp,double kbar,std::complex<double> iknp,std::complex<double> wbar) const{
     std::complex<double> lower_level(0.0,0.0);
-    for (size_t iknpp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknpp<_splInline.iwn_array.size(); iknpp++){
-        for (size_t kpp=0; kpp<_splInline.k_array.size(); kpp++){
-            lower_level+=buildGK1D_IPT(_splInline.iwn_array[iknpp]+iknp-wbar,_splInline.k_array[kpp]+kp-kbar)[0] * buildGK1D_IPT(_splInline.iwn_array[iknpp],_splInline.k_array[kpp])[1];
+    for (size_t iknpp=static_cast<size_t>(_splInline._iwn_array.size()/2); iknpp<_splInline._iwn_array.size(); iknpp++){
+        for (size_t kpp=0; kpp<_splInline._k_array.size(); kpp++){
+            lower_level+=buildGK1D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kpp]+kp-kbar)[0] * buildGK1D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kpp])[1];
         }
     }
     lower_level*=SPINDEG*GreenStuff::U/(GreenStuff::beta*GreenStuff::N_k);
@@ -178,10 +178,12 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
     for (size_t kp=0; kp<_Gk._kArr_l.size(); kp++){
         for (size_t iknp=0; iknp<_Gk._size; iknp++){
-            if (j==0 && ktilde==0 && wtilde==0){ // Saving lower-most component of the full ladder susceptibility.
+            if (j==0){ // Saving lower-most component of the full ladder susceptibility.
                 tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower(_Gk._kArr_l[kp],_Gk._kArr_l[kbar],_Gk._precomp_wn[iknp],_Gk._precomp_wn[wbar]);
-                gamma_tensor_content GammaTObj(kp,iknp,kbar,wbar,tmp_middle_level_inf_tmp);
-                vecGammaFullTensorContent->push_back(std::move(GammaTObj));
+                if (ktilde==0 && wtilde==0){
+                    gamma_tensor_content GammaTObj(kp,iknp,kbar,wbar,tmp_middle_level_inf_tmp);
+                    vecGammaFullTensorContent->push_back(std::move(GammaTObj));
+                }
             } else{
                 tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar][kp][iknp];
             }
@@ -211,30 +213,30 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
     std::complex<double> tmp_middle_level_inf_tmp, tmp_bubble_without_corr_tmp;
-    for (size_t kp=0; kp<_splInline.k_array.size(); kp++){
-        for (size_t iknp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknp<_splInline.iwn_array.size(); iknp++){
+    for (size_t kp=0; kp<_splInline._k_array.size(); kp++){
+        for (size_t iknp=static_cast<size_t>(_splInline._iwn_array.size()/2); iknp<_splInline._iwn_array.size(); iknp++){
             if (j==0){ // One slice of ktilde-wtilde is necessary.
-                tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower_IPT(_splInline.k_array[kp],_splInline.k_array[kbar],_splInline.iwn_array[iknp],_splInline.iwn_array[wbar]);
-                if (ktilde==0 && wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)){
-                    gamma_tensor_content GammaTObj(kp,iknp%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_middle_level_inf_tmp);
+                tmp_middle_level_inf_tmp = gamma_oneD_spsp_full_lower_IPT(_splInline._k_array[kp],_splInline._k_array[kbar],_splInline._iwn_array[iknp],_splInline._iwn_array[wbar]);
+                if (ktilde==0 && wtilde==static_cast<size_t>(_splInline._iwn_array.size()/2)){
+                    gamma_tensor_content GammaTObj(kp,iknp%static_cast<size_t>(_splInline._iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline._iwn_array.size()/2),tmp_middle_level_inf_tmp);
                     vecGammaFullTensorContent->push_back(std::move(GammaTObj));
                 }
             } else{ // Then one has to fetch the stored values...
-                tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)][kp][iknp%static_cast<size_t>(_splInline.iwn_array.size()/2)];
+                tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar%static_cast<size_t>(_splInline._iwn_array.size()/2)][kp][iknp%static_cast<size_t>(_splInline._iwn_array.size()/2)];
             }
             middle_level_corr_tmp += tmp_middle_level_inf_tmp; // Extracting the lower level
-            middle_level_inf_tmp += buildGK1D_IPT(_splInline.iwn_array[iknp],_splInline.k_array[kp]
-            )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline.iwn_array[iknp]-_q._iwn,_splInline.k_array[kp]-_q._qx)[0];
+            middle_level_inf_tmp += buildGK1D_IPT(_splInline._iwn_array[iknp],_splInline._k_array[kp]
+            )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline._iwn_array[iknp]-_q._iwn,_splInline._k_array[kp]-_q._qx)[0];
         }
     }
     middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
     middle_level_corr_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
     if (j==0){
-        tmp_bubble_without_corr_tmp = std::get<1>(gamma_oneD_spsp_IPT(_splInline.k_array[ktilde],_splInline.iwn_array[wtilde],_splInline.k_array[kbar],_splInline.iwn_array[wbar]));
-        gamma_tensor_content GammaTObj(ktilde,wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_bubble_without_corr_tmp);
+        tmp_bubble_without_corr_tmp = std::get<1>(gamma_oneD_spsp_IPT(_splInline._k_array[ktilde],_splInline._iwn_array[wtilde],_splInline._k_array[kbar],_splInline._iwn_array[wbar]));
+        gamma_tensor_content GammaTObj(ktilde,wtilde%static_cast<size_t>(_splInline._iwn_array.size()/2),kbar,wbar%static_cast<size_t>(_splInline._iwn_array.size()/2),tmp_bubble_without_corr_tmp);
         vecGammaTensorContent->push_back(std::move(GammaTObj));
     } else{
-        tmp_bubble_without_corr_tmp = gamma_tensor[ktilde][wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2)][kbar][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)];
+        tmp_bubble_without_corr_tmp = gamma_tensor[ktilde][wtilde%static_cast<size_t>(_splInline._iwn_array.size()/2)][kbar][wbar%static_cast<size_t>(_splInline._iwn_array.size()/2)];
     }
     middle_level_inf_tmp+=tmp_bubble_without_corr_tmp;
     middle_level_tmp-=middle_level_inf_tmp;
@@ -293,24 +295,24 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
                     kbarx_m_tildex,kbary_m_tildey,is_jj,is_full,world_rank,j);
         break;
     case solver_prototype::IPT2_prot:
-        for (size_t wtilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wtilde<_splInline.iwn_array.size(); wtilde++){
-            for (size_t wbar=static_cast<size_t>(_splInline.iwn_array.size()/2); wbar<_splInline.iwn_array.size(); wbar++){
-                tmp_val_weights_tmp = getWeightsIPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],wtilde,wbar);
+        for (size_t wtilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wtilde<_splInline._iwn_array.size(); wtilde++){
+            for (size_t wbar=static_cast<size_t>(_splInline._iwn_array.size()/2); wbar<_splInline._iwn_array.size(); wbar++){
+                tmp_val_weights_tmp = getWeightsIPT(_splInline._k_array[kbarx_m_tildex],_splInline._k_array[kbary_m_tildey],wtilde,wbar);
                 if (!is_full){
                     if (j==0){
-                        tupOfVals = gamma_twoD_spsp_IPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],_splInline.iwn_array[wtilde],_splInline.iwn_array[wbar]);
+                        tupOfVals = gamma_twoD_spsp_IPT(_splInline._k_array[kbarx_m_tildex],_splInline._k_array[kbary_m_tildey],_splInline._iwn_array[wtilde],_splInline._iwn_array[wbar]);
                         tmp_val_kt_kb_tmp = std::get<0>(tupOfVals);
-                        gamma_tensor_content GammaTObj(kbarx_m_tildex,wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2),kbary_m_tildey,wbar%static_cast<size_t>(_splInline.iwn_array.size()/2),tmp_val_kt_kb_tmp);
+                        gamma_tensor_content GammaTObj(kbarx_m_tildex,wtilde%static_cast<size_t>(_splInline._iwn_array.size()/2),kbary_m_tildey,wbar%static_cast<size_t>(_splInline._iwn_array.size()/2),tmp_val_kt_kb_tmp);
                         vecGammaTensorContent->push_back(std::move(GammaTObj));
                         tmp_val_mid_lev += std::get<1>(tupOfVals);
                         tmp_val_kt_kb += tmp_val_kt_kb_tmp;
                         tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                     } else{
-                        tmp_val_tot_sus += gamma_tensor[kbarx_m_tildex][wtilde%static_cast<size_t>(_splInline.iwn_array.size()/2)][kbary_m_tildey][wbar%static_cast<size_t>(_splInline.iwn_array.size()/2)]*tmp_val_weights_tmp;
+                        tmp_val_tot_sus += gamma_tensor[kbarx_m_tildex][wtilde%static_cast<size_t>(_splInline._iwn_array.size()/2)][kbary_m_tildey][wbar%static_cast<size_t>(_splInline._iwn_array.size()/2)]*tmp_val_weights_tmp;
                     }
                 }
                 else{
-                    tupOfValsFull = gamma_twoD_spsp_full_middle_plotting_IPT(_splInline.k_array[kbarx_m_tildex],_splInline.k_array[kbary_m_tildey],_splInline.iwn_array[wbar],_splInline.iwn_array[wtilde]);
+                    tupOfValsFull = gamma_twoD_spsp_full_middle_plotting_IPT(_splInline._k_array[kbarx_m_tildex],_splInline._k_array[kbary_m_tildey],_splInline._iwn_array[wbar],_splInline._iwn_array[wtilde]);
                     tmp_val_kt_kb_tmp = std::get<0>(tupOfValsFull);
                     tmp_val_corr += std::get<1>(tupOfValsFull);
                     tmp_val_mid_lev += std::get<2>(tupOfValsFull);
@@ -318,10 +320,10 @@ void ThreadWrapper::operator()(solver_prototype sp, size_t kbarx_m_tildex, size_
                     tmp_val_tot_sus += tmp_val_kt_kb_tmp*tmp_val_weights_tmp;
                 }
                 tmp_val_weights+=tmp_val_weights_tmp;
-                if ((wtilde==static_cast<size_t>(_splInline.iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline.iwn_array.size()/2))){
+                if ((wtilde==static_cast<size_t>(_splInline._iwn_array.size()/2)) && (wbar==static_cast<size_t>(_splInline._iwn_array.size()/2))){
                     std::cout << "Process id: " << world_rank << "\n";
-                    std::cout << "kbarx_m_tildex: " << _splInline.k_array[kbarx_m_tildex] << "\n";
-                    std::cout << "kbary_m_tildey: " << _splInline.k_array[kbary_m_tildey] << "\n";
+                    std::cout << "kbarx_m_tildex: " << _splInline._k_array[kbarx_m_tildex] << "\n";
+                    std::cout << "kbary_m_tildey: " << _splInline._k_array[kbary_m_tildey] << "\n";
                     std::cout << "Tot Sus: " << tmp_val_tot_sus << "\n";
                     std::cout << "Weights: " << tmp_val_weights << std::endl;
                 }
@@ -355,10 +357,10 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_two
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> lower_level(0.0,0.0), bubble(0.0,0.0);
-    for (size_t wttilde=0; wttilde<_splInline.iqn_array.size(); wttilde++){
-        for (size_t qttildey=0; qttildey<_splInline.k_array.size(); qttildey++){
-            for (size_t qttildex=0; qttildex<_splInline.k_array.size(); qttildex++){ // the change of variable only applies to k-space, due to periodicity modulo 2pi.
-                lower_level += buildGK2D_IPT((wtilde-_splInline.iqn_array[wttilde]),_splInline.k_array[qttildex],_splInline.k_array[qttildey])[0]*buildGK2D_IPT((wbar-_splInline.iqn_array[wttilde]),(_splInline.k_array[qttildex]+kbarx_m_tildex),(_splInline.k_array[qttildey]+kbary_m_tildey))[1];
+    for (size_t wttilde=0; wttilde<_splInline._iqn_array.size(); wttilde++){
+        for (size_t qttildey=0; qttildey<_splInline._k_array.size(); qttildey++){
+            for (size_t qttildex=0; qttildex<_splInline._k_array.size(); qttildex++){ // the change of variable only applies to k-space, due to periodicity modulo 2pi.
+                lower_level += buildGK2D_IPT((wtilde-_splInline._iqn_array[wttilde]),_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT((wbar-_splInline._iqn_array[wttilde]),(_splInline._k_array[qttildex]+kbarx_m_tildex),(_splInline._k_array[qttildey]+kbary_m_tildey))[1];
             }
         }
     }
@@ -384,10 +386,10 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower(double kpx,double
 
 std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower_IPT(double kpx,double kpy,double kbarx,double kbary,std::complex<double> iknp,std::complex<double> wbar) const{
     std::complex<double> lower_level(0.0,0.0);
-    for (size_t iknpp=static_cast<size_t>(_splInline.iwn_array.size()/2); iknpp<_splInline.iwn_array.size(); iknpp++){
-        for (size_t kppx=0; kppx<_splInline.k_array.size(); kppx++){
-            for (size_t kppy=0; kppy<_splInline.k_array.size(); kppy++){
-                lower_level += buildGK2D_IPT(_splInline.iwn_array[iknpp]+iknp-wbar,_splInline.k_array[kppx]+kpx-kbarx,_splInline.k_array[kppy]+kpy-kbary)[0]*buildGK2D_IPT(_splInline.iwn_array[iknpp],_splInline.k_array[kppx],_splInline.k_array[kppy])[1];
+    for (size_t iknpp=static_cast<size_t>(_splInline._iwn_array.size()/2); iknpp<_splInline._iwn_array.size(); iknpp++){
+        for (size_t kppx=0; kppx<_splInline._k_array.size(); kppx++){
+            for (size_t kppy=0; kppy<_splInline._k_array.size(); kppy++){
+                lower_level += buildGK2D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kppx]+kpx-kbarx,_splInline._k_array[kppy]+kpy-kbary)[0]*buildGK2D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kppx],_splInline._k_array[kppy])[1];
             }
         }
     }
@@ -434,16 +436,16 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     std::complex<double> middle_level_tmp(0.0,0.0), middle_level_inf_tmp(0.0,0.0), middle_level_corr_tmp(0.0,0.0);
     double kbarx, kbary;
-    for (size_t kpx=0; kpx<_splInline.k_array.size(); kpx++){
-        for (size_t kpy=0; kpy<_splInline.k_array.size(); kpy++){
-            for (size_t ikpn=static_cast<size_t>(_splInline.iwn_array.size()/2); ikpn<_splInline.iwn_array.size(); ikpn++){
-                for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
-                    kbarx=_splInline.k_array[ktildex]-kbarx_m_tildex;
-                    for (size_t ktildey=0; ktildey<_splInline.k_array.size(); ktildey++){
-                        kbary=_splInline.k_array[ktildey]-kbary_m_tildey;
-                        middle_level_inf_tmp+=_Gk(_splInline.iwn_array[ikpn],_splInline.k_array[kpx],_splInline.k_array[kpy]
-                        )(0,0) * gamma_twoD_spsp_full_lower_IPT(_splInline.k_array[kpx],_splInline.k_array[kpy],kbarx,kbary,_splInline.iwn_array[ikpn],wbar
-                        ) * _Gk(_splInline.iwn_array[ikpn]-_qq._iwn,_splInline.k_array[kpx]-_qq._qx,_splInline.k_array[kpy]-_qq._qy)(0,0);
+    for (size_t kpx=0; kpx<_splInline._k_array.size(); kpx++){
+        for (size_t kpy=0; kpy<_splInline._k_array.size(); kpy++){
+            for (size_t ikpn=static_cast<size_t>(_splInline._iwn_array.size()/2); ikpn<_splInline._iwn_array.size(); ikpn++){
+                for (size_t ktildex=0; ktildex<_splInline._k_array.size(); ktildex++){
+                    kbarx=_splInline._k_array[ktildex]-kbarx_m_tildex;
+                    for (size_t ktildey=0; ktildey<_splInline._k_array.size(); ktildey++){
+                        kbary=_splInline._k_array[ktildey]-kbary_m_tildey;
+                        middle_level_inf_tmp+=_Gk(_splInline._iwn_array[ikpn],_splInline._k_array[kpx],_splInline._k_array[kpy]
+                        )(0,0) * gamma_twoD_spsp_full_lower_IPT(_splInline._k_array[kpx],_splInline._k_array[kpy],kbarx,kbary,_splInline._iwn_array[ikpn],wbar
+                        ) * _Gk(_splInline._iwn_array[ikpn]-_qq._iwn,_splInline._k_array[kpx]-_qq._qx,_splInline._k_array[kpy]-_qq._qy)(0,0);
                     }
                 }
                 middle_level_inf_tmp*=1.0/GreenStuff::N_k*1.0/GreenStuff::N_k;
@@ -478,15 +480,15 @@ std::complex<double> ThreadWrapper::getWeightsHF(double kbarx_m_tildex,double kb
 std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const{
     std::complex<double> tmp_val_weigths(0.0,0.0);
     double kbary, kbarx;
-    for (size_t ktildey=0; ktildey<_splInline.k_array.size(); ktildey++){
-        kbary = _splInline.k_array[ktildey] - kbary_m_tildey;
-        for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
-            kbarx = _splInline.k_array[ktildex] - kbarx_m_tildex;
+    for (size_t ktildey=0; ktildey<_splInline._k_array.size(); ktildey++){
+        kbary = _splInline._k_array[ktildey] - kbary_m_tildey;
+        for (size_t ktildex=0; ktildex<_splInline._k_array.size(); ktildex++){
+            kbarx = _splInline._k_array[ktildex] - kbarx_m_tildex;
             tmp_val_weigths += buildGK2D_IPT(wtilde,ktildex,ktildey)[0] * buildGK2D_IPT(wtilde-_qq._iwn,ktildex-_qq._qx,ktildey-_qq._qy
                                 )[0] * buildGK2D_IPT(wbar-_qq._iwn,kbarx-_qq._qx,kbary-_qq._qy)[1] * buildGK2D_IPT(wbar,kbarx,kbary)[1];
         }      
     }
-    tmp_val_weigths*=1.0/_splInline.k_array.size()/_splInline.k_array.size();
+    tmp_val_weigths*=1.0/_splInline._k_array.size()/_splInline._k_array.size();
     return tmp_val_weigths;
 }
 
@@ -497,22 +499,22 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
     ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
     std::cout << "world rank: " << world_rank << ", q_x: " << _q._qx << " and q_iwn: " << _q._iwn << std::endl;
-    for (size_t wttilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wttilde<_splInline.iwn_array.size(); wttilde++){
-        for (size_t qttilde=0; qttilde<_splInline.k_array.size(); qttilde++){
+    for (size_t wttilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wttilde<_splInline._iwn_array.size(); wttilde++){
+        for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
             if (!is_jj)
-                bubble += buildGK1D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iwn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1];
+                bubble += buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[0];
             else
-                bubble += (-2.0*std::sin(_splInline.k_array[qttilde]))*buildGK1D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttilde])[0]*buildGK1D_IPT(_splInline.iwn_array[wttilde]+_q._iwn,_splInline.k_array[qttilde]+_q._qx)[1]*(-2.0*std::sin(_splInline.k_array[qttilde]));
+                bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[0]*(-2.0*std::sin(_splInline._k_array[qttilde])); // Do I have to add _q._qx to the current??
         }
     }
     #elif DIM == 2
-    for (size_t wttilde=static_cast<size_t>(_splInline.iwn_array.size()/2); wttilde<_splInline.iwn_array.size(); wttilde++){
-        for (size_t qttildex=0; qttildex<_splInline.k_array.size(); qttildex++){
-            for (size_t qttildey=0; qttildey<_splInline.k_array.size(); qttildey++){
+    for (size_t wttilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wttilde<_splInline._iwn_array.size(); wttilde++){
+        for (size_t qttildex=0; qttildex<_splInline._k_array.size(); qttildex++){
+            for (size_t qttildey=0; qttildey<_splInline._k_array.size(); qttildey++){
                 if (!is_jj)
-                    bubble += buildGK2D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttildex],_splInline.k_array[qttildey])[0]*buildGK2D_IPT(_splInline.iwn_array[wttilde]+_qq._iwn,_splInline.k_array[qttildex]+_qq._qx,_splInline.k_array[qttildey]+_qq._qy)[1];
+                    bubble += buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1];
                 else
-                    bubble += (-2.0*std::sin(_splInline.k_array[qttildex]))*buildGK2D_IPT(_splInline.iwn_array[wttilde],_splInline.k_array[qttildex],_splInline.k_array[qttildey])[0]*buildGK2D_IPT(_splInline.iwn_array[wttilde]+_qq._iwn,_splInline.k_array[qttildex]+_qq._qx,_splInline.k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline.k_array[qttildex]));
+                    bubble += (-2.0*std::sin(_splInline._k_array[qttildex]))*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline._k_array[qttildex]));
             }
         }
     }
@@ -539,9 +541,9 @@ std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream&
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<_Gk._kArr_l.size(); qttilde++){
             if (!is_jj)
-                bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])[0]*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)[1];
+                bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0);
             else
-                bubble += (-2.0*std::sin(_splInline.k_array[qttilde]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])[0]*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)[1]*(-2.0*std::sin(_splInline.k_array[qttilde]));
+                bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0)*(-2.0*std::sin(_splInline._k_array[qttilde]));
         }
     }
     #elif DIM == 2 /* since one only considers the first-nearest neighbor dispersion relation */
@@ -549,9 +551,9 @@ std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream&
         for (size_t qttildex=0; qttildex<_Gk._kArr_l.size(); qttildex++){
             for (size_t qttildey=0; qttildey<_Gk._kArr_l.size(); qttildey++){
                 if (!is_jj)
-                    bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])[0]*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)[1];
+                    bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)(0,0);
                 else
-                    bubble += (-2.0*std::sin(_splInline.k_array[qttildex]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])[0]*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline.k_array[qttildex]));
+                    bubble += (-2.0*std::sin(_splInline._k_array[qttildex]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)(0,0)*(-2.0*std::sin(_splInline._k_array[qttildex]));
             }
         }
     }
@@ -607,13 +609,13 @@ void ThreadWrapper::save_data_to_local_extern_matrix_instancesIPT(std::complex<d
             vecTotSusSlaves->push_back( std::make_tuple( k2,k1,beta_div*tmp_val_tot_sus ) );
     } else if (is_jj){
         #if DIM == 1
-        val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline.k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline.k_array[k2]));
+        val_jj = -1.0*beta_div*(-2.0*std::sin(_splInline._k_array[k1]))*tmp_val_tot_sus*(-2.0*std::sin(_splInline._k_array[k2]));
         matTotSus(k2,k1) = val_jj;
         #elif DIM == 2
         double kbarx;
-        for (size_t ktildex=0; ktildex<_splInline.k_array.size(); ktildex++){
-            kbarx = (_splInline.k_array[ktildex]-_splInline.k_array[k1]); // It brakets within [-2pi,2pi].
-            val_jj += -1.0*(-2.0*std::sin(_splInline.k_array[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
+        for (size_t ktildex=0; ktildex<_splInline._k_array.size(); ktildex++){
+            kbarx = (_splInline._k_array[ktildex]-_splInline._k_array[k1]); // It brakets within [-2pi,2pi].
+            val_jj += -1.0*(-2.0*std::sin(_splInline._k_array[ktildex]))*tmp_val_tot_sus*(-2.0*std::sin(kbarx));
         }
         matTotSus(k2,k1) = val_jj*(1.0/GreenStuff::N_k)*beta_div;
         #endif

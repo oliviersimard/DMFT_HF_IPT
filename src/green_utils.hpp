@@ -11,6 +11,7 @@
 #define DIM 1
 #define SPINDEG 2
 #define VERBOSE 0
+#define MULT_N_TAU 2
 
 // Some declarations
 namespace IPT2{ class DMFTproc; };
@@ -18,6 +19,7 @@ namespace IPT2{ template<class T> class SplineInline; };
 namespace HF{ class FunctorBuildGk; };
 namespace ThreadFunctor{ class ThreadWrapper; };
 namespace ThreadFunctor{ enum solver_prototype : short; };
+namespace IPT2{ enum spline_type : short; };
 //class FFTtools;
 template<class T> class Susceptibility;
 namespace ThreadFunctor{ struct mpistruct; };

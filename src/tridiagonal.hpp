@@ -88,7 +88,7 @@ inline void LUtools< std::complex<double> >::tridiagonal_LU_decomposition( std::
   
    for (size_t i=0; i<size; i++){
       if (diagonal[i]==std::complex<double>(0.0,0.0)){
-         throw std::invalid_argument("There should be zeros along the diagonal, because this would lead to division by complex zero.");
+         throw std::invalid_argument("There shouldn't be zeros along the diagonal, because this would lead to division by complex zero.");
       }
       else{
          subdiagonal[i] /= diagonal[i];
@@ -96,7 +96,7 @@ inline void LUtools< std::complex<double> >::tridiagonal_LU_decomposition( std::
       }
    }
    if (diagonal[size] == std::complex<double>(0.0,0.0)){
-      throw std::invalid_argument("There should be zeros along the diagonal, because this would lead to division by complex zero.");
+      throw std::invalid_argument("There shouldn't be zeros along the diagonal, because this would lead to division by complex zero.");
    }
 }
 
@@ -353,11 +353,11 @@ T spline<T>::deriv(int order, double x) const{
 
 template<class T>
 void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double beta, const unsigned int N_tau){
-    // Setting the boundary conditions. The spline f_i starts at i=1, because f_0(x) = b_1(x-x_1) + c_1(x-x_1) + y_1, x <= x_1.
+    // Setting the boundary conditions. The spline f_i starts at i=1, because f_0(x) = b_1(x-x_1)^2 + c_1(x-x_1) + y_1, x <= x_1.
     _S_1_0=m_y.slice(0)(0,0); // f_1(x_0) = a_1(x_0-x_1)^3 + b_1(x_0-x_1)^2 + c_1(x_0-x_1) + y_1 = y_0
     _Sp_1_0=m_c0; // f'_1(x_0) = 3a_1(x_0-x_1)^2 + 2b_1(x_0-x_1)^1 + c_1 = c_0
     _Spp_1_0=2.0*m_b[0]; // f''_1(x_0) = 6a_1(x_0-x_1) + 2b_1 = b_0
-    // The spline f_i ends at i=N, because f_N(x) = b_N(x-x_N) + c_N(x-x_N) + y_N, x >= x_1.
+    // The spline f_i ends at i=N, because f_N(x) = b_N(x-x_N)^2 + c_N(x-x_N) + y_N, x >= x_N.
     std::vector<double>::const_iterator it = m_x.end(); // returns pointer after last element.
     const double h_last = *(it-1)-*(it-2); // This is kind of beta^{-}: f_{N-1}(x_N)
     _S_N_beta=m_a[2*N_tau-1]*h_last*h_last*h_last+m_b[2*N_tau-1]*h_last*h_last+m_c[2*N_tau-1]*h_last+m_y.slice(2*N_tau-1)(0,0); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
@@ -383,7 +383,7 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
             Fp[2*i] = F[timeGrid+2*i];
             Fp[2*i+1] = F[timeGrid+2*i+1];
         }else{
-            Fp[2*i]= F[2*i-timeGrid];
+            Fp[2*i] = F[2*i-timeGrid];
             Fp[2*i+1] = F[2*i+1-timeGrid];
         }
     }

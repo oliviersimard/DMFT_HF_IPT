@@ -9,6 +9,13 @@
             EXPECT_NEAR(expected[idx], actual[idx], thresh) << "at index: " << idx;\
         }
 
+#define EXPECT_CMPLX_NEARLY_EQ(expected, actual, thresh) \
+        for (size_t idx = 0; idx < std::min(expected.size(), actual.size()); ++idx) \
+        { \
+            EXPECT_NEAR(expected[idx+static_cast<size_t>(expected.size()/2)].real(), actual[idx].real(), thresh) << "RE at index: " << idx;\
+            EXPECT_NEAR(expected[idx+static_cast<size_t>(expected.size()/2)].imag(), actual[idx].imag(), thresh) << "IM at index: " << idx;\
+        }
+
 #define EXPECT_COMPLEX_DOUBLE_EQ(a, b, thresh) \
   EXPECT_NEAR(a.real(), b.real(), thresh); \
   EXPECT_NEAR(a.imag(), b.imag(), thresh); 
@@ -208,7 +215,45 @@ namespace{
     }
     std::string stdoutval = buffer.str();
     redirectObj.~cerr_redirect(); // redirect to standard output buffer.
-    EXPECT_EQ("glob() failed with return_value -3 for "+strTest+"\n\n", stdoutval) << "Glob should return -3 to std output.";
+    EXPECT_EQ("-3\n", stdoutval) << "Glob should return -3 to std output. Check if Verbose > 0.";
+  }
+
+  TEST_F(TestUtilities, LoadingSplineInline){
+    const unsigned int N_tau = 128;
+    const double beta = 50.0;
+    // std::vector<double> generated_random_numbers; // simulates random iwn array to plot the spline data
+    // Saving the interpolated data from the computed self-energy
+    std::ofstream oSelf("../test/data/self_energy_as_interpolated_from_linear_spline.dat", std::ofstream::out | std::ofstream::app);
+
+    for (signed int j=(-(signed int)N_tau); j<(signed int)N_tau; j++){ // Fermionic frequencies.
+      std::complex<double> matFreq(0.0 , (2.0*(double)j+1.0)*M_PI/beta );
+      iwnArr_l.push_back( matFreq );
+    }
+    for (size_t j=0; j<N_tau; j++){ // Bosonic frequencies.
+      std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
+      iqnArr_l.push_back( matFreq );
+    }
+    // Loading the test file in ./data
+    std::string fileToLoad("../test/data/Self_energy_1D_U_11.000000_beta_50.000000_n_0.500000_N_tau_128");
+    std::vector<double> initVec(2*N_tau,0.0); // Important that it is 2*MULT_N_TAU, but changed it to be used in this test.
+    IPT2::SplineInline< std::complex<double> > splInlineObj(N_tau,initVec,vecK,iwnArr_l,iqnArr_l);
+    splInlineObj.loadFileSpline(fileToLoad,IPT2::spline_type::linear);
+    std::vector< std::complex<double> > result_before_spline = splInlineObj.get_loaded_data_interpolated();
+    std::vector< std::complex<double> > result_after_spline;
+    // Generating the random iwn numbers properly bracketed (positive Matsubara frequencies)
+    // const double max_val = (2.0*N_tau-1.0)*M_PI/beta, min_val = M_PI/beta;
+    // generated_random_numbers = generate_random_numbers(10*N_tau,min_val,max_val);
+
+    std::complex<double> self_energy_spline;
+    for (size_t i=static_cast<size_t>(iwnArr_l.size()/2); i<iwnArr_l.size(); i++){
+      self_energy_spline = splInlineObj.calculateSpline(iwnArr_l[i].imag());
+      result_after_spline.push_back(self_energy_spline);
+      if (i==0)
+        oSelf << "/" << "\n";
+      oSelf << iwnArr_l[i].imag() << "\t\t" << self_energy_spline.real() << "\t\t" << self_energy_spline.imag() << "\n";
+    }
+    oSelf.close();
+    EXPECT_CMPLX_NEARLY_EQ(result_before_spline,result_after_spline,1e-3);
   }
 
   // TEST_F(TestGreenStuff, copyAssignment){

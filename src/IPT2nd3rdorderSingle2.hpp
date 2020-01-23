@@ -9,6 +9,8 @@ extern "C" {
 #include<stdexcept>
 //#include<algorithm> // copy() and assign()
 #include<armadillo>
+//#include<limits> // numeric_limits
+#include<iomanip> // set_precision
 #include "tridiagonal.hpp"
 #include "file_utils.hpp"
 #include "integral_utils.hpp"
@@ -39,6 +41,7 @@ class FFTtools{
 };
 
 namespace IPT2{
+enum spline_type : short { linear, cubic };
 
 class DMFTproc{
     friend void ::saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW);
@@ -74,20 +77,25 @@ template<class T>
 class SplineInline{
     friend class ::ThreadFunctor::ThreadWrapper;
     public:
-        void loadFileSpline(const std::string&) noexcept(false);
+        void loadFileSpline(const std::string&, const spline_type&) noexcept(false);
         T calculateSpline(double) const;
+        std::vector< T > get_loaded_data_interpolated() const{
+            return _iwn_cplx;
+        }
         //SplineInline(const size_t,const std::vector<double>&);
         SplineInline(const size_t,std::vector<double>,std::vector<double>,std::vector< std::complex<double> >,std::vector< std::complex<double> >);
         SplineInline()=default;
         SplineInline<T>& operator=(const SplineInline<T>& obj);
     private:
-        const size_t N_tau_size {0};
-        std::vector<double> iwn={}, iwn_re={}, iwn_im={}, k_array={};
-        std::vector< std::complex<double> > iwn_array={}, iqn_array={};
-        static spline<T> spl;
+        const size_t _N_tau_size {0};
+        std::vector<double> _iwn={}, _iwn_re={}, _iwn_im={}, _k_array={};
+        std::vector< T > _iwn_array={}, _iqn_array={}, _iwn_cplx={};
+        spline_type _spline_choice=cubic;
+        static spline<T> _spl;
+        T compute_linear_spline(double reIwn, std::vector< T > y) const;
 };
 
-template<class T> spline<T> SplineInline<T>::spl=spline<T>();
+template<class T> spline<T> SplineInline<T>::_spl=spline<T>();
 
 }
 
@@ -96,35 +104,67 @@ template<class T> spline<T> SplineInline<T>::spl=spline<T>();
 //                                             iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
 
 template<typename T>
-IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec,std::vector<double> k_arr,std::vector< std::complex<double> > iwn_arr,std::vector< std::complex<double> > iqn_arr) : N_tau_size(sizeArr),
-                                                                iwn(initVec),iwn_re(initVec),iwn_im(initVec),k_array(k_arr),iwn_array(iwn_arr),iqn_array(iqn_arr){}
+IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec,std::vector<double> k_arr,std::vector< std::complex<double> > iwn_arr,std::vector< std::complex<double> > iqn_arr) : _N_tau_size(sizeArr),
+                                                                _iwn(initVec),_iwn_re(initVec),_iwn_im(initVec),_k_array(k_arr),_iwn_array(iwn_arr),_iqn_array(iqn_arr){
+
+                                                                }
 
 template<typename T>
 IPT2::SplineInline<T>& IPT2::SplineInline<T>::operator=(const IPT2::SplineInline<T>& obj){
     if (this!=&obj){
-        *(const_cast<size_t*>(&this->N_tau_size)) = obj.N_tau_size;
-        this->iwn=obj.iwn;
-        this->iwn_re=obj.iwn_re;
-        this->iwn_im=obj.iwn_im;
-        this->k_array=obj.k_array;
-        this->iwn_array=obj.iwn_array;
-        this->iqn_array=obj.iqn_array;
+        *(const_cast<size_t*>(&this->_N_tau_size)) = obj._N_tau_size;
+        this->_iwn=obj._iwn;
+        this->_iwn_re=obj._iwn_re;
+        this->_iwn_im=obj._iwn_im;
+        this->_iwn_cplx=obj._iwn_cplx;
+        this->_k_array=obj._k_array;
+        this->_iwn_array=obj._iwn_array;
+        this->_iqn_array=obj._iqn_array;
+        this->_spline_choice=obj._spline_choice;
     }
     return *this;
 }
 
+template<typename T>
+T IPT2::SplineInline<T>::compute_linear_spline(double reIwn, std::vector< T > y) const {
+    assert(_iwn.size()==y.size());
+    assert(_iwn.size()>2);
+    size_t n = _iwn.size();
+    std::vector<double>::const_iterator it;
+    it=std::lower_bound(_iwn.begin(),_iwn.end(),reIwn);
+    if (VERBOSE>0)
+        std::cout << std::setprecision(10) << "it: " << *it << " and reIwn: " << reIwn << " and it+1: " << *(it+1) << std::endl; //" and _iwn[idx]: " << _iwn[idx] << std::endl;
+    int idx=std::max( int( it - _iwn.begin() ) - 1, 0);
+    // Have to correct for the boundaries. Loaded iwn data doesn't have the same precision as the values iwn produced in main, so the 
+    // function lower_bound returns "it" has the iwn.size()/2 value: with the -1 in the definition of "idx", it means one jumps across the discontinuity..
+    // Also, since the Matsubara values that the Green's function take in are always fermionic, it ALWAYS remains on the positive branch.
+    if ( idx == (static_cast<int>(n/2)-1) ){
+        idx++;
+    } else if ( idx == (static_cast<int>(n)-1) ){
+        idx--;
+    }
+    // std::cout << std::setprecision(10) << "idx: " << idx << " and iwn[idx]: " << _iwn[idx] << " reIwn: " << reIwn << " iwn[idx+1] " << _iwn[idx+1] << std::endl;
+    double h = reIwn-_iwn[idx];
+    T interpol;
+    // interpol = y_i + (y_{i+1}-y_i) / (x_{i+1}-x_i) * (x - x_i). h and x_i would be purely imaginary, so no need to transform back to imaginary data, because it cancels out due to division.
+    interpol = y[idx] + ( (y[idx+1]-y[idx]) / (_iwn[idx+1]-_iwn[idx]) ) * h;
+
+    return interpol;
+}
+
 template<>
-inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std::string& filename) noexcept(false){
+inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std::string& filename, const IPT2::spline_type& spl_t) noexcept(false){
     std::ifstream infile;   
     std::string firstline("");
     std::string patternFile = filename+"*";
     std::vector< std::string > vecStr;
     try{
         vecStr=glob(patternFile);
-    }catch (const std::invalid_argument& err){
+    }catch (const std::runtime_error& err){
         std::cerr << err.what() << "\n";
         exit(1);
     }
+    
     int largestNum=1; // Numbers after N_it are always positive.
     for (auto str : vecStr){ // Getting the largest iteration number to eventually load for interpolation.
         int tempNum=extractIntegerLastWords(str);
@@ -132,8 +172,8 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
             largestNum=tempNum;
     }
     unsigned int num = 0; // num must start at 0
-    arma::Cube< std::complex<double> > inputFunct(2,2,2*N_tau_size);
-    std::cout << 2*N_tau_size << "\n";
+    arma::Cube< std::complex<double> > inputFunct(2,2,2*_N_tau_size);
+    std::cout << 2*_N_tau_size << "\n";
     std::string finalFile=filename+"_Nit_"+std::to_string(largestNum)+".dat";
     infile.open(finalFile);// file containing numbers in 3 columns
     std::cout << "The file from which the spline is done: "+finalFile << "\n";
@@ -150,24 +190,34 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
             throw std::invalid_argument("The files loaded should have the marker \"/\" in front of the lines commented.");
         }
         }else{
-	        infile >> iwn[num]; // Spoiled by the last two arrays
-            infile >> iwn_re[num];
-            infile >> iwn_im[num];
+	        infile >> _iwn[num]; // Spoiled by the last two arrays
+            infile >> _iwn_re[num];
+            infile >> _iwn_im[num];
 
             ++num;
         }
     }
     infile.close();
-    std::cout << iwn.size() << "\n";
-    for (size_t i=0; i<2*N_tau_size; i++){
-        inputFunct.slice(i)(0,0)=std::complex<double>(iwn_re[i],iwn_im[i]);
+    for (size_t i=0; i<2*_N_tau_size; i++){
+        inputFunct.slice(i)(0,0)=std::complex<double>(_iwn_re[i],_iwn_im[i]);
+        _iwn_cplx.push_back(std::complex<double>(_iwn_re[i],_iwn_im[i])); // For the linear spline..
     }
-    spl.set_points(iwn,inputFunct);
+    // Only if cubic spline
+    _spline_choice=spl_t;
+    if (spl_t==IPT2::spline_type::cubic)
+        _spl.set_points(_iwn,inputFunct);
 }
 
 template<>
 inline std::complex<double> IPT2::SplineInline< std::complex<double> >::calculateSpline(double reIwn) const{
-    return spl(reIwn);
+    switch (_spline_choice){
+    case IPT2::spline_type::linear:
+        return compute_linear_spline(reIwn,_iwn_cplx);
+        break;
+    default:
+        return _spl(reIwn);
+        break;
+    }
 }
 
 #endif /* end of IPT2Single_H_ */
