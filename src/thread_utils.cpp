@@ -32,8 +32,8 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
         for (size_t wbar=0; wbar<_Gk._size; wbar++){
             for (size_t wtilde=0; wtilde<_Gk._size; wtilde++){
                 tmp_val_weights_tmp = _Gk(_Gk._precomp_wn[wtilde],_Gk._kArr_l[ktilde]
-                                    )(0,0)*_Gk(_Gk._precomp_wn[wtilde]+_q._iwn,_Gk._kArr_l[ktilde]+_q._qx
-                                    )(0,0)*_Gk(_Gk._precomp_wn[wbar]+_q._iwn,_Gk._kArr_l[kbar]+_q._qx
+                                    )(0,0)*_Gk(_Gk._precomp_wn[wtilde]-_q._iwn,_Gk._kArr_l[ktilde]-_q._qx
+                                    )(0,0)*_Gk(_Gk._precomp_wn[wbar]-_q._iwn,_Gk._kArr_l[kbar]-_q._qx
                                     )(1,1)*_Gk(_Gk._precomp_wn[wbar],_Gk._kArr_l[kbar]
                                     )(1,1);
                 if (!is_full){
@@ -75,9 +75,9 @@ void ThreadWrapper::operator()(size_t ktilde, size_t kbar, bool is_jj, bool is_f
                 tmp_val_weights_tmp = buildGK1D_IPT(
                                     _splInline._iwn_array[wtilde],_splInline._k_array[ktilde]
                                     )[0]*buildGK1D_IPT(
-                                    _splInline._iwn_array[wtilde]+_q._iwn,_splInline._k_array[ktilde]+_q._qx
+                                    _splInline._iwn_array[wtilde]-_q._iwn,_splInline._k_array[ktilde]-_q._qx
                                     )[0]*buildGK1D_IPT(
-                                    _splInline._iwn_array[wbar]+_q._iwn,_splInline._k_array[kbar]+_q._qx
+                                    _splInline._iwn_array[wbar]-_q._iwn,_splInline._k_array[kbar]-_q._qx
                                     )[1]*buildGK1D_IPT(
                                     _splInline._iwn_array[wbar],_splInline._k_array[kbar]
                                     )[1];
@@ -135,7 +135,10 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_one
     std::complex<double> lower_level(0.0,0.0), bubble(0.0,0.0);
     for (size_t wttilde=0; wttilde<_splInline._iqn_array.size(); wttilde++){
         for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
-            lower_level += buildGK1D_IPT(wtilde-_splInline._iqn_array[wttilde],ktilde-_splInline._k_array[qttilde])[0]*buildGK1D_IPT(wbar-_splInline._iqn_array[wttilde],kbar-_splInline._k_array[qttilde])[1];
+            if ( (qttilde==0) || (qttilde==_splInline._k_array.size()-1) )
+                lower_level += 0.5*buildGK1D_IPT(wtilde-_splInline._iqn_array[wttilde],ktilde-_splInline._k_array[qttilde])[0]*buildGK1D_IPT(wbar-_splInline._iqn_array[wttilde],kbar-_splInline._k_array[qttilde])[1];
+            else
+                lower_level += buildGK1D_IPT(wtilde-_splInline._iqn_array[wttilde],ktilde-_splInline._k_array[qttilde])[0]*buildGK1D_IPT(wbar-_splInline._iqn_array[wttilde],kbar-_splInline._k_array[qttilde])[1];
         }
     }
     
@@ -162,7 +165,10 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_lower_IPT(double kp,dou
     std::complex<double> lower_level(0.0,0.0);
     for (size_t iknpp=static_cast<size_t>(_splInline._iwn_array.size()/2); iknpp<_splInline._iwn_array.size(); iknpp++){
         for (size_t kpp=0; kpp<_splInline._k_array.size(); kpp++){
-            lower_level+=buildGK1D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kpp]+kp-kbar)[0] * buildGK1D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kpp])[1];
+            if ( (kpp==0) || (kpp==_splInline._k_array.size()-1) )
+                lower_level += 0.5*buildGK1D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kpp]+kp-kbar)[0] * buildGK1D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kpp])[1];
+            else
+                lower_level += buildGK1D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kpp]+kp-kbar)[0] * buildGK1D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kpp])[1];
         }
     }
     lower_level*=SPINDEG*GreenStuff::U/(GreenStuff::beta*GreenStuff::N_k);
@@ -225,8 +231,13 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
                 tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar%static_cast<size_t>(_splInline._iwn_array.size()/2)][kp][iknp%static_cast<size_t>(_splInline._iwn_array.size()/2)];
             }
             middle_level_corr_tmp += tmp_middle_level_inf_tmp; // Extracting the lower level
-            middle_level_inf_tmp += buildGK1D_IPT(_splInline._iwn_array[iknp],_splInline._k_array[kp]
-            )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline._iwn_array[iknp]-_q._iwn,_splInline._k_array[kp]-_q._qx)[0];
+            if ( (kp==0) || (kp==(_splInline._k_array.size()-1)) ){
+                middle_level_inf_tmp += 0.5*buildGK1D_IPT(_splInline._iwn_array[iknp],_splInline._k_array[kp]
+                )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline._iwn_array[iknp]-_q._iwn,_splInline._k_array[kp]-_q._qx)[0];
+            } else{
+                middle_level_inf_tmp += buildGK1D_IPT(_splInline._iwn_array[iknp],_splInline._k_array[kp]
+                )[0]*tmp_middle_level_inf_tmp*buildGK1D_IPT(_splInline._iwn_array[iknp]-_q._iwn,_splInline._k_array[kp]-_q._qx)[0];
+            }
         }
     }
     middle_level_inf_tmp*=SPINDEG/(GreenStuff::N_k*GreenStuff::beta);
@@ -499,22 +510,51 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
     ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
     std::cout << "world rank: " << world_rank << ", q_x: " << _q._qx << " and q_iwn: " << _q._iwn << std::endl;
+    std::ofstream testing_Self("test_spline_bubble_iqn_"+std::to_string(_q._iwn.imag())+".dat", std::ofstream::app | std::ofstream::out);
     for (size_t wttilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wttilde<_splInline._iwn_array.size(); wttilde++){
         for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
-            if (!is_jj)
-                bubble += buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[0];
-            else
-                bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[0]*(-2.0*std::sin(_splInline._k_array[qttilde])); // Do I have to add _q._qx to the current??
+            if (!is_jj){
+                if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) )
+                    bubble += 0.5*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0];
+                else
+                    bubble += buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0];
+            }
+            else{
+                if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) )
+                    bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0]*(-2.0*std::sin(_splInline._k_array[qttilde]));
+                else
+                    bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0]*(-2.0*std::sin(_splInline._k_array[qttilde])); // Do I have to add _q._qx to the current??
+            }
         }
+        testing_Self << _splInline._iwn_array[wttilde].imag() << "\t\t" << _splInline.calculateSpline( (_splInline._iwn_array[wttilde]-_q._iwn).imag() ).imag() << "\n";
     }
+    testing_Self.close();
     #elif DIM == 2
     for (size_t wttilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wttilde<_splInline._iwn_array.size(); wttilde++){
         for (size_t qttildex=0; qttildex<_splInline._k_array.size(); qttildex++){
             for (size_t qttildey=0; qttildey<_splInline._k_array.size(); qttildey++){
-                if (!is_jj)
-                    bubble += buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1];
-                else
-                    bubble += (-2.0*std::sin(_splInline._k_array[qttildex]))*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline._k_array[qttildex]));
+                if (!is_jj){
+                    if ( ( (qttildex==0) || (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) || (qttildey==_splInline._iwn_array.size()-1) ) ){
+                        if ( ( (qttildex==0) && (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) && (qttildey==_splInline._iwn_array.size()-1) ) ){
+                            bubble += 0.25*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1];
+                        } else{
+                            bubble += 0.5*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1];
+                        }
+                    } else{
+                        bubble += buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1];
+                    }
+                }
+                else{
+                    if ( ( (qttildex==0) || (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) || (qttildey==_splInline._iwn_array.size()-1) ) ){
+                        if ( ( (qttildex==0) && (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) && (qttildey==_splInline._iwn_array.size()-1) ) ){
+                            bubble += 0.25*(-2.0*std::sin(_splInline._k_array[qttildex]))*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline._k_array[qttildex]));
+                        } else{
+                            bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttildex]))*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline._k_array[qttildex]));
+                        }
+                    } else {
+                        bubble += (-2.0*std::sin(_splInline._k_array[qttildex]))*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline._k_array[qttildex]));
+                    }
+                }
             }
         }
     }

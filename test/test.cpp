@@ -221,7 +221,7 @@ namespace{
   TEST_F(TestUtilities, LoadingSplineInline){
     const unsigned int N_tau = 128;
     const double beta = 50.0;
-    // std::vector<double> generated_random_numbers; // simulates random iwn array to plot the spline data
+    std::vector<double> generated_random_numbers; // simulates random iwn array to plot the spline data
     // Saving the interpolated data from the computed self-energy
     std::ofstream oSelf("../test/data/self_energy_as_interpolated_from_linear_spline.dat", std::ofstream::out | std::ofstream::app);
 
@@ -241,16 +241,16 @@ namespace{
     std::vector< std::complex<double> > result_before_spline = splInlineObj.get_loaded_data_interpolated();
     std::vector< std::complex<double> > result_after_spline;
     // Generating the random iwn numbers properly bracketed (positive Matsubara frequencies)
-    // const double max_val = (2.0*N_tau-1.0)*M_PI/beta, min_val = M_PI/beta;
-    // generated_random_numbers = generate_random_numbers(10*N_tau,min_val,max_val);
+    const double max_val = -M_PI/beta, min_val = -(2.0*N_tau+1.0)*M_PI/beta;
+    generated_random_numbers = generate_random_numbers(20*N_tau,min_val,max_val);
 
     std::complex<double> self_energy_spline;
     for (size_t i=static_cast<size_t>(iwnArr_l.size()/2); i<iwnArr_l.size(); i++){
-      self_energy_spline = splInlineObj.calculateSpline(iwnArr_l[i].imag());
+      self_energy_spline = splInlineObj.calculateSpline(generated_random_numbers[i]);
       result_after_spline.push_back(self_energy_spline);
       if (i==0)
         oSelf << "/" << "\n";
-      oSelf << iwnArr_l[i].imag() << "\t\t" << self_energy_spline.real() << "\t\t" << self_energy_spline.imag() << "\n";
+      oSelf << generated_random_numbers[i] << "\t\t" << self_energy_spline.real() << "\t\t" << self_energy_spline.imag() << "\n";
     }
     oSelf.close();
     EXPECT_CMPLX_NEARLY_EQ(result_before_spline,result_after_spline,1e-3);

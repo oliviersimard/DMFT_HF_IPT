@@ -137,11 +137,16 @@ T IPT2::SplineInline<T>::compute_linear_spline(double reIwn, std::vector< T > y)
     int idx=std::max( int( it - _iwn.begin() ) - 1, 0);
     // Have to correct for the boundaries. Loaded iwn data doesn't have the same precision as the values iwn produced in main, so the 
     // function lower_bound returns "it" has the iwn.size()/2 value: with the -1 in the definition of "idx", it means one jumps across the discontinuity..
-    // Also, since the Matsubara values that the Green's function take in are always fermionic, it ALWAYS remains on the positive branch.
-    if ( idx == (static_cast<int>(n/2)-1) ){
-        idx++;
-    } else if ( idx == (static_cast<int>(n)-1) ){
-        idx--;
+    if (reIwn>0.0){ // Taking care of the boundary conditions (rounding errors especially)
+        if ( idx == (static_cast<int>(n/2)-1) ){
+            idx++;
+        } else if ( idx == (static_cast<int>(n)-1) ){
+            idx--;
+        }
+    } else if (reIwn<0.0){
+        if ( idx == (static_cast<int>(n/2)-1) ){
+            idx--;
+        }
     }
     // std::cout << std::setprecision(10) << "idx: " << idx << " and iwn[idx]: " << _iwn[idx] << " reIwn: " << reIwn << " iwn[idx+1] " << _iwn[idx+1] << std::endl;
     double h = reIwn-_iwn[idx];
