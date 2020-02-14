@@ -84,15 +84,16 @@ print(U, beta, nn)
 omega = [ wmin+i*(wmax-wmin)/(nbr_w-1.) for i in range(nbr_w) ]
 dict_names={}
 for name in filenames:
-	print("name: ", name)
+	#print("name: ", name)
 	R = np.genfromtxt(name,skip_header=1,dtype=float,usecols=(0,1,2),delimiter='\t\t') # Watch out for the nan at the end of the file. Have to add the proper delimiter '\t\t' at the end.
 	omega_n = R[:,0]
 	Rf_n = R[:,1]
 	If_n = R[:,2]
-	# Keeping only the positive Matsubara frequencies.
+	#Keeping only the positive Matsubara frequencies.
 	Rf_n = np.array([el[1] for el in zip(omega_n,Rf_n) if el[0]>=0.0],dtype=float)
 	If_n = np.array([el[1] for el in zip(omega_n,If_n) if el[0]>=0.0],dtype=float)
-	omega_n = omega_n[omega_n>=0.0]
+	omega_n = omega_n[omega_n>=0.0] ##<------------------------------------------------------------- WATCH OUT because important to keep
+
 	#indexNan, = list(zip(*np.where(np.isnan(omega_n))))[0]
 	#omega_n = np.delete(omega_n,indexNan)
 	#Rf_n = np.delete(Rf_n,indexNan) # Nan value is located at same row.
@@ -102,8 +103,8 @@ for name in filenames:
 	assert len(omega_n)==len(Rf_n)==len(If_n), "The lengths of Matsubara array, Re F(iwn) and Im F(iwn) have to be equal."
 
 	f_n = Rf_n +1j*If_n
-	N = len(omega_n)-7
-	g = np.zeros((N, N), dtype = complex)
+	N = len(omega_n)-7 # Substracting the last Matsubara frequencies
+	g = np.zeros((N, N), dtype = np.clongdouble)
 	omega_n = omega_n[0:N]
 
 	f_n = f_n[0:N]
@@ -114,9 +115,9 @@ for name in filenames:
 
 	a = np.diagonal(g)
 
-	A = np.zeros((N, ), dtype = complex)
-	B = np.zeros((N, ), dtype = complex)
-	P = np.zeros((N, ), dtype = complex)
+	A = np.zeros((N, ), dtype = np.clongdouble)
+	B = np.zeros((N, ), dtype = np.clongdouble)
+	P = np.zeros((N, ), dtype = np.clongdouble)
 	fw = []
 	kern_ikn_w = [] ; kern_tau_pos_w = []
 	kern_ikn = [] ; kern_tau_pos = []
@@ -195,12 +196,18 @@ while i<len(keys_list):
 		axs.grid()
 		axs.set_xlabel(r"Energy $\omega$")
 		axs.set_ylabel(r"a. u.")
-		axs.set_title(r"$2^{\text{nd}}$-order IPT-D results for "+r"$\beta={0}$, $U={1}$".format(beta,U))
+		if is_Green_component:
+			axs.set_title(r"$2^{\text{nd}}$-order IPT-D results for "+r"$\beta={0}$, $U={1}$".format(beta,U))
+		else:
+			axs.set_title(r"Test results for "+r"$\beta=40.0, q_x=0.0001$") # Have to change beta by hand 
 	else:
 		axs[i].grid()
 		axs[i].set_ylabel(r"a. u.")
 		if i == 0:
-			axs[i].set_title(r"$2^{\text{nd}}$-order IPT-D results for "+r"$\beta={0}$, $U={1}$ and $n={2}$".format(beta,U,nn))
+			if is_Green_component:
+				axs[i].set_title(r"$2^{\text{nd}}$-order IPT-D results for "+r"$\beta={0}$, $U={1}$ and $n={2}$".format(beta,U,nn))
+			else:
+				axs[i].set_title(r"Test results for "+r"$\beta=40.0, q_x=0.0001$") # Have to change beta by hand
 		if i != len(keys_list)-1:
 			axs[i].tick_params(axis='x',bottom=False)
 		else:
@@ -208,9 +215,15 @@ while i<len(keys_list):
 	
 	if "Green_loc" in str_filename:
 		real_values=list( map( lambda x: x.real, dict_names[str_filename] ) )
-		imag_values=list( map( lambda x: -1./np.pi*x.imag, dict_names[str_filename] ) )
-		label_imag=r"$-\frac{1}{\pi}\operatorname{Im}G_{\text{loc}}$"
-		label_real=r"$\operatorname{Re}G_{\text{loc}}$"
+		if is_Green_component:
+			label_imag=r"$-\frac{1}{\pi}\operatorname{Im}G_{\text{loc}}$"
+			label_real=r"$\operatorname{Re}G_{\text{loc}}$"
+			imag_values=list( map( lambda x: -1./np.pi*x.imag, dict_names[str_filename] ) )
+		else:
+			imag_values=list( map( lambda x: x.imag, dict_names[str_filename] ) )
+			label_imag=r"$\operatorname{Im}\chi^0(\omega)$"
+			label_real=r"$\operatorname{Re}\chi^0(\omega)$"
+		
 	elif "Weiss" in str_filename:
 		real_values=list( map( lambda x: x.real, dict_names[str_filename] ) )
 		imag_values=list( map( lambda x: -1./np.pi*x.imag, dict_names[str_filename] ) )

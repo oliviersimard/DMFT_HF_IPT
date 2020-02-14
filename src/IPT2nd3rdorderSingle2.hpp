@@ -178,7 +178,7 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
     }
     unsigned int num = 0; // num must start at 0
     arma::Cube< std::complex<double> > inputFunct(2,2,2*_N_tau_size);
-    std::cout << 2*_N_tau_size << "\n";
+    std::cout << "Size of loaded self-energy array: " << 2*_N_tau_size << "\n";
     std::string finalFile=filename+"_Nit_"+std::to_string(largestNum)+".dat";
     infile.open(finalFile);// file containing numbers in 3 columns
     std::cout << "The file from which the spline is done: "+finalFile << "\n";

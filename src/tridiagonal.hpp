@@ -55,6 +55,8 @@ class spline{
         T operator() (double x) const;
         T deriv(int order, double x) const;
         void iwn_tau_spl_extrm(const GreenStuff&, const double, const unsigned int);
+        std::vector< std::complex<T> > fermionic_propagator(const std::vector< std::complex<T> >& iwn_arr,double beta);
+        std::vector< std::complex<T> > bosonic_corr(const std::vector< std::complex<T> >& iqn_arr,double beta);
 };
 
 template<>
@@ -111,7 +113,7 @@ inline void LUtools<double>::tridiagonal_LU_solve( std::vector<double>& subdiago
    }
    //   Solve the linear equation Ly = B for y, where L is a lower
    //   triangular matrix.
-   x[0]=B[0]; // x has been initialized.
+   x[0]=B[0]; // x has been initialized. (x --> m_b, B --> rhs)
    for (size_t i=1; i<size; i++){
       x[i] = B[i] - subdiagonal[i-1] * x[i-1];
    }
@@ -353,10 +355,10 @@ T spline<T>::deriv(int order, double x) const{
 
 template<class T>
 void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double beta, const unsigned int N_tau){
-    // Setting the boundary conditions. The spline f_i starts at i=1, because f_0(x) = b_1(x-x_1)^2 + c_1(x-x_1) + y_1, x <= x_1.
-    _S_1_0=m_y.slice(0)(0,0); // f_1(x_0) = a_1(x_0-x_1)^3 + b_1(x_0-x_1)^2 + c_1(x_0-x_1) + y_1 = y_0
-    _Sp_1_0=m_c0; // f'_1(x_0) = 3a_1(x_0-x_1)^2 + 2b_1(x_0-x_1)^1 + c_1 = c_0
-    _Spp_1_0=2.0*m_b[0]; // f''_1(x_0) = 6a_1(x_0-x_1) + 2b_1 = b_0
+    // Setting the boundary conditions. The spline f_i starts at i=1, because f_0(x) = b_0(x-x_0)^2 + c_0(x-x_0) + y_0,  x_0 <= x <= x_1.
+    _S_1_0=m_y.slice(0)(0,0); // f_0(x_0) = a_0(x_0-x_0)^3 + b_0(x_0-x_0)^2 + c_0(x_0-x_0) + y_0
+    _Sp_1_0=m_c0; // f'_0(x_0) = 3a_0(x_0-x_0)^2 + 2b_0(x_0-x_0)^1 + c_0 
+    _Spp_1_0=2.0*m_b[0]; // f''_0(x_0) = 6a_0(x_0-x_0) + 2b_0
     // The spline f_i ends at i=N, because f_N(x) = b_N(x-x_N)^2 + c_N(x-x_N) + y_N, x >= x_N.
     std::vector<double>::const_iterator it = m_x.end(); // returns pointer after last element.
     const double h_last = *(it-1)-*(it-2); // This is kind of beta^{-}: f_{N-1}(x_N)
@@ -390,6 +392,102 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
     for(size_t i=0; i<timeGrid; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
         SelfEnergy.matsubara_w.slice(i)(0,0)=( -1.0*( -(_S_1_0+_S_N_beta)/iwnArr_l[i] + (_Sp_1_0+_Sp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]) - (_Spp_1_0+_Spp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]) + (1.0-std::exp(1.0*iwnArr_l[i]*beta/(double)timeGrid))/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i])*(Fp[2*i]+im*Fp[2*i+1]) ) );
     }
+}
+
+template<class T>
+std::vector< std::complex<T> > spline<T>::fermionic_propagator(const std::vector< std::complex<T> >& iwn_arr,double beta){
+    size_t size = iwn_arr.size();
+    const std::complex<T> im(0.0,1.0);
+    _S_1_0=m_y.slice(0)(0,0); // f_0(x_0) = a_0(x_0-x_0)^3 + b_0(x_0-x_0)^2 + c_0(x_0-x_0) + y_0
+    _Sp_1_0=m_c0; // f'_0(x_0) = 3a_0(x_0-x_0)^2 + 2b_0(x_0-x_0)^1 + c_0 
+    _Spp_1_0=2.0*m_b[0]; // f''_0(x_0) = 6a_0(x_0-x_0) + 2b_0
+
+    std::vector<double>::const_iterator it = m_x.end(); // returns pointer after last element.
+    const double h_last = *(it-1)-*(it-2);
+    _S_N_beta=m_a[size-1]*h_last*h_last*h_last+m_b[size-1]*h_last*h_last+m_c[size-1]*h_last+m_y.slice(size-1)(0,0); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
+    _Sp_N_beta=3.0*m_a[size-1]*h_last*h_last+2.0*m_b[size-1]*h_last+m_c[size-1];
+    _Spp_N_beta=6.0*m_a[size-1]*h_last+2.0*m_b[size-1];
+    
+    // This will be used later for IFFT.
+    for (size_t n=0; n<m_x.size()-1; n++){
+        _Sppp.push_back(6.0*m_a[n]);
+    }
+    // Putting the _S's to use in the Fourier transformation from tau (double) to complex<double> (iwn).
+    double F[2*size],Fp[2*size];
+    for(size_t i=0; i<size; i++){
+        F[2*i] = (std::exp(im*M_PI*(double)i/(double)size)*_Sppp[i]).real();
+        F[2*i+1] = (std::exp(im*M_PI*(double)i/(double)size)*_Sppp[i]).imag();
+    }
+    
+    gsl_fft_complex_radix2_backward(F, 1, size);
+    
+    for(size_t i=0; i<size; i++){
+        if(i<size/2){ // Mirroring the data.
+            Fp[2*i] = F[size+2*i];
+            Fp[2*i+1] = F[size+2*i+1];
+        }else{
+            Fp[2*i] = F[2*i-size];
+            Fp[2*i+1] = F[2*i+1-size];
+        }
+    }
+    std::vector< std::complex<T> > cubic_spline(size,0.0);
+    for(size_t i=0; i<size; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
+        cubic_spline[i] = ( -(_S_1_0+_S_N_beta)/iwn_arr[i] + (_Sp_1_0+_Sp_N_beta)/(iwn_arr[i]*iwn_arr[i]) - (_Spp_1_0+_Spp_N_beta)/(iwn_arr[i]*iwn_arr[i]*iwn_arr[i]) + (1.0-std::exp(1.0*iwn_arr[i]*beta/(double)size))/(iwn_arr[i]*iwn_arr[i]*iwn_arr[i]*iwn_arr[i])*(Fp[2*i]+im*Fp[2*i+1]) );
+    }
+
+    return cubic_spline;
+}
+
+template<class T>
+std::vector< std::complex<T> > spline<T>::bosonic_corr(const std::vector< std::complex<T> >& iqn_arr,double beta){
+    size_t size = iqn_arr.size();
+    const std::complex<T> im(0.0,1.0);
+    _S_1_0=m_y.slice(0)(0,0); // f_0(x_0) = a_0(x_0-x_0)^3 + b_0(x_0-x_0)^2 + c_0(x_0-x_0) + y_0
+    _Sp_1_0=m_c0; // f'_0(x_0) = 3a_0(x_0-x_0)^2 + 2b_0(x_0-x_0)^1 + c_0 
+    _Spp_1_0=2.0*m_b[0]; // f''_0(x_0) = 6a_0(x_0-x_0) + 2b_0
+
+    std::vector<double>::const_iterator it = m_x.end(); // returns pointer after last element.
+    const double h_last = *(it-1)-*(it-2);
+    _S_N_beta=m_a[size-1]*h_last*h_last*h_last+m_b[size-1]*h_last*h_last+m_c[size-1]*h_last+m_y.slice(size-1)(0,0); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
+    _Sp_N_beta=3.0*m_a[size-1]*h_last*h_last+2.0*m_b[size-1]*h_last+m_c[size-1];
+    _Spp_N_beta=6.0*m_a[size-1]*h_last+2.0*m_b[size-1];
+    
+    // This will be used later for IFFT.
+    for (size_t n=0; n<m_x.size()-1; n++){
+        _Sppp.push_back(6.0*m_a[n]);
+    }
+    // Putting the _S's to use in the Fourier transformation from tau (double) to complex<double> (iwn).
+    double F[2*size],Fp[2*size];
+    for(size_t i=0; i<size; i++){
+        F[2*i] = (_Sppp[i]).real();
+        F[2*i+1] = (_Sppp[i]).imag();
+    }
+    
+    gsl_fft_complex_radix2_backward(F, 1, size);
+    
+    for(size_t i=0; i<size; i++){
+        if(i<size/2){ // Mirroring the data.
+            Fp[2*i] = F[size+2*i];
+            Fp[2*i+1] = F[size+2*i+1];
+        }else{
+            Fp[2*i] = F[2*i-size];
+            Fp[2*i+1] = F[2*i+1-size];
+        }
+    }
+    std::vector< std::complex<T> > cubic_spline(size,0.0);
+    for(size_t i=0; i<size; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
+        if (iqn_arr[i]!=std::complex<T>(0.0,0.0)){
+            cubic_spline[i] = ( (_S_1_0-_S_N_beta)/iqn_arr[i] - (_Sp_N_beta-_Sp_1_0)/(iqn_arr[i]*iqn_arr[i]) + (_Spp_N_beta-_Spp_1_0)/(iqn_arr[i]*iqn_arr[i]*iqn_arr[i]) + (1.0-std::exp(1.0*iqn_arr[i]*beta/(double)size))/(iqn_arr[i]*iqn_arr[i]*iqn_arr[i]*iqn_arr[i])*(Fp[2*i]+im*Fp[2*i+1]) );
+        } else{
+            for (size_t j=1; j<m_x.size(); j++){ // Dealing with the 0th bosonic Matsubara frequency...
+                cubic_spline[i] += m_a[j]*( m_x[i]*m_x[i]*m_x[i]*m_x[i] - m_x[i-1]*m_x[i-1]*m_x[i-1]*m_x[i-1] )/4.0 +
+                m_b[j]*( m_x[j]*m_x[j]*m_x[j] - m_x[j-1]*m_x[j-1]*m_x[j-1] )/3.0 + m_c[j]*( m_x[j]*m_x[j] - m_x[j-1]*m_x[j-1] )/2.0 +
+                m_y[j]*( m_x[j] - m_x[j-1] );
+            }
+        }
+    }
+
+    return cubic_spline;
 }
 
 #endif /* end of Tridiagonal_H_ */

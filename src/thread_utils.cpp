@@ -121,7 +121,10 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_one
     std::complex<double> lower_level(0.0,0.0), bubble;
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<_Gk._kArr_l.size(); qttilde++){
-            lower_level += _Gk(wtilde-_Gk._precomp_qn[wttilde],ktilde-_Gk._kArr_l[qttilde])(0,0) * _Gk(wbar-_Gk._precomp_qn[wttilde],kbar-_Gk._kArr_l[qttilde])(1,1);
+            if ( ( qttilde==0 ) || ( qttilde==(_Gk._kArr_l.size()-1) ) )
+                lower_level += 0.5*_Gk(wtilde-_Gk._precomp_qn[wttilde],ktilde-_Gk._kArr_l[qttilde])(0,0) * _Gk(wbar-_Gk._precomp_qn[wttilde],kbar-_Gk._kArr_l[qttilde])(1,1);
+            else
+                lower_level += _Gk(wtilde-_Gk._precomp_qn[wttilde],ktilde-_Gk._kArr_l[qttilde])(0,0) * _Gk(wbar-_Gk._precomp_qn[wttilde],kbar-_Gk._kArr_l[qttilde])(1,1);
         }
     }
     
@@ -152,7 +155,10 @@ std::complex<double> ThreadWrapper::gamma_oneD_spsp_full_lower(double kp,double 
     std::complex<double> lower_level(0.0,0.0);
     for (size_t iknpp=0; iknpp<_Gk._size; iknpp++){
         for (size_t kpp=0; kpp<_Gk._kArr_l.size(); kpp++){
-            lower_level+=_Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kpp]+kp-kbar)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kpp])(1,1);
+            if ( ( kpp==0 ) || ( kpp==(_Gk._kArr_l.size()-1) ) )
+                lower_level += 0.5*_Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kpp]+kp-kbar)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kpp])(1,1);
+            else
+                lower_level += _Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kpp]+kp-kbar)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kpp])(1,1);
         }
     }
     lower_level*=SPINDEG*_Gk._u/(_Gk._beta*_Gk._Nk);
@@ -194,8 +200,13 @@ std::tuple< std::complex<double>,std::complex<double>,std::complex<double> > Thr
                 tmp_middle_level_inf_tmp = gamma_full_tensor[kbar][wbar][kp][iknp];
             }
             middle_level_corr_tmp+=tmp_middle_level_inf_tmp; // Extracting the lower level
-            middle_level_inf_tmp += _Gk(_Gk._precomp_wn[iknp],_Gk._kArr_l[kp]
-            )(0,0)*tmp_middle_level_inf_tmp*_Gk(_Gk._precomp_wn[iknp]-_q._iwn,_Gk._kArr_l[kp]-_q._qx)(0,0);
+            if ( ( kp==0 ) || ( kp==(_Gk._kArr_l.size()-1) ) ){
+                middle_level_inf_tmp += 0.5*_Gk(_Gk._precomp_wn[iknp],_Gk._kArr_l[kp]
+                )(0,0)*tmp_middle_level_inf_tmp*_Gk(_Gk._precomp_wn[iknp]-_q._iwn,_Gk._kArr_l[kp]-_q._qx)(0,0);
+            } else{
+                middle_level_inf_tmp += _Gk(_Gk._precomp_wn[iknp],_Gk._kArr_l[kp]
+                )(0,0)*tmp_middle_level_inf_tmp*_Gk(_Gk._precomp_wn[iknp]-_q._iwn,_Gk._kArr_l[kp]-_q._qx)(0,0);
+            }
         }
     }
     middle_level_inf_tmp*=SPINDEG/(_Gk._Nk*_Gk._beta);
@@ -354,7 +365,15 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_two
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttildey=0; qttildey<_Gk._kArr_l.size(); qttildey++){
             for (size_t qttildex=0; qttildex<_Gk._kArr_l.size(); qttildex++){ // the change of variable only applies to k-space, due to periodicity modulo 2pi.
-                lower_level += _Gk((wtilde-_Gk._precomp_qn[wttilde]),_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk((wbar-_Gk._precomp_qn[wttilde]),(_Gk._kArr_l[qttildex]+kbarx_m_tildex),(_Gk._kArr_l[qttildey]+kbary_m_tildey))(1,1);
+                if ( ( (qttildey==0) || (qttildey==(_Gk._kArr_l.size()-1)) ) || ( (qttildex==0) || (qttildex==(_Gk._kArr_l.size()-1)) ) ){
+                    if ( ( (qttildey==0) || (qttildey==(_Gk._kArr_l.size()-1)) ) && ( (qttildex==0) || (qttildex==(_Gk._kArr_l.size()-1)) ) ){
+                        lower_level += 0.25*_Gk((wtilde-_Gk._precomp_qn[wttilde]),_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk((wbar-_Gk._precomp_qn[wttilde]),(_Gk._kArr_l[qttildex]+kbarx_m_tildex),(_Gk._kArr_l[qttildey]+kbary_m_tildey))(1,1);
+                    } else{
+                        lower_level += 0.5*_Gk((wtilde-_Gk._precomp_qn[wttilde]),_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk((wbar-_Gk._precomp_qn[wttilde]),(_Gk._kArr_l[qttildex]+kbarx_m_tildex),(_Gk._kArr_l[qttildey]+kbary_m_tildey))(1,1);
+                    }
+                } else{
+                    lower_level += _Gk((wtilde-_Gk._precomp_qn[wttilde]),_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk((wbar-_Gk._precomp_qn[wttilde]),(_Gk._kArr_l[qttildex]+kbarx_m_tildex),(_Gk._kArr_l[qttildey]+kbary_m_tildey))(1,1);
+                }
             }
         }
     }
@@ -371,7 +390,15 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_two
     for (size_t wttilde=0; wttilde<_splInline._iqn_array.size(); wttilde++){
         for (size_t qttildey=0; qttildey<_splInline._k_array.size(); qttildey++){
             for (size_t qttildex=0; qttildex<_splInline._k_array.size(); qttildex++){ // the change of variable only applies to k-space, due to periodicity modulo 2pi.
-                lower_level += buildGK2D_IPT((wtilde-_splInline._iqn_array[wttilde]),_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT((wbar-_splInline._iqn_array[wttilde]),(_splInline._k_array[qttildex]+kbarx_m_tildex),(_splInline._k_array[qttildey]+kbary_m_tildey))[1];
+                if ( ( (qttildey==0) || (qttildey==(static_cast<size_t>(_splInline._k_array.size()-1))) ) || ( (qttildex==0) || (qttildex==(static_cast<size_t>(_splInline._k_array.size()-1))) ) ){
+                    if ( ( (qttildey==0) || (qttildey==(static_cast<size_t>(_splInline._k_array.size()-1))) ) && ( (qttildex==0) || (qttildex==(static_cast<size_t>(_splInline._k_array.size()-1))) ) ){
+                        lower_level += 0.25*buildGK2D_IPT((wtilde-_splInline._iqn_array[wttilde]),_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT((wbar-_splInline._iqn_array[wttilde]),(_splInline._k_array[qttildex]+kbarx_m_tildex),(_splInline._k_array[qttildey]+kbary_m_tildey))[1];
+                    } else{
+                        lower_level += 0.5*buildGK2D_IPT((wtilde-_splInline._iqn_array[wttilde]),_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT((wbar-_splInline._iqn_array[wttilde]),(_splInline._k_array[qttildex]+kbarx_m_tildex),(_splInline._k_array[qttildey]+kbary_m_tildey))[1];
+                    }
+                } else{
+                    lower_level += buildGK2D_IPT((wtilde-_splInline._iqn_array[wttilde]),_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT((wbar-_splInline._iqn_array[wttilde]),(_splInline._k_array[qttildex]+kbarx_m_tildex),(_splInline._k_array[qttildey]+kbary_m_tildey))[1];
+                }
             }
         }
     }
@@ -386,7 +413,15 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower(double kpx,double
     for (size_t iknpp=0; iknpp<_Gk._size; iknpp++){
         for (size_t kppx=0; kppx<_Gk._kArr_l.size(); kppx++){
             for (size_t kppy=0; kppy<_Gk._kArr_l.size(); kppy++){
-                lower_level += _Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])(1,1);
+                if ( ( (kppy==0) || (kppy==(_Gk._kArr_l.size()-1)) ) || ( (kppx==0) || (kppx==(_Gk._kArr_l.size()-1)) ) ){
+                    if ( ( (kppy==0) || (kppy==(_Gk._kArr_l.size()-1)) ) && ( (kppx==0) || (kppx==(_Gk._kArr_l.size()-1)) ) ){
+                        lower_level += 0.25*_Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])(1,1);
+                    } else{
+                        lower_level += 0.5*_Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])(1,1);
+                    }
+                } else{
+                    lower_level += _Gk(_Gk._precomp_wn[iknpp]+iknp-wbar,_Gk._kArr_l[kppx]+kpx-kbarx,_Gk._kArr_l[kppy]+kpy-kbary)(0,0)*_Gk(_Gk._precomp_wn[iknpp],_Gk._kArr_l[kppx],_Gk._kArr_l[kppy])(1,1);
+                }
             }
         }
     }
@@ -400,7 +435,15 @@ std::complex<double> ThreadWrapper::gamma_twoD_spsp_full_lower_IPT(double kpx,do
     for (size_t iknpp=static_cast<size_t>(_splInline._iwn_array.size()/2); iknpp<_splInline._iwn_array.size(); iknpp++){
         for (size_t kppx=0; kppx<_splInline._k_array.size(); kppx++){
             for (size_t kppy=0; kppy<_splInline._k_array.size(); kppy++){
-                lower_level += buildGK2D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kppx]+kpx-kbarx,_splInline._k_array[kppy]+kpy-kbary)[0]*buildGK2D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kppx],_splInline._k_array[kppy])[1];
+                if ( ( (kppy==0) || (kppy==(static_cast<size_t>(_splInline._k_array.size()-1))) ) || ( (kppx==0) || (kppx==(static_cast<size_t>(_splInline._k_array.size()-1))) ) ){
+                    if ( ( (kppy==0) || (kppy==(static_cast<size_t>(_splInline._k_array.size()-1))) ) && ( (kppx==0) || (kppx==(static_cast<size_t>(_splInline._k_array.size()-1))) ) ){
+                        lower_level += 0.25*buildGK2D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kppx]+kpx-kbarx,_splInline._k_array[kppy]+kpy-kbary)[0]*buildGK2D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kppx],_splInline._k_array[kppy])[1];
+                    } else{
+                        lower_level += 0.5*buildGK2D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kppx]+kpx-kbarx,_splInline._k_array[kppy]+kpy-kbary)[0]*buildGK2D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kppx],_splInline._k_array[kppy])[1];
+                    }
+                } else{
+                    lower_level += buildGK2D_IPT(_splInline._iwn_array[iknpp]+iknp-wbar,_splInline._k_array[kppx]+kpx-kbarx,_splInline._k_array[kppy]+kpy-kbary)[0]*buildGK2D_IPT(_splInline._iwn_array[iknpp],_splInline._k_array[kppx],_splInline._k_array[kppy])[1];
+                }
             }
         }
     }
@@ -480,11 +523,21 @@ std::complex<double> ThreadWrapper::getWeightsHF(double kbarx_m_tildex,double kb
         kbary = _Gk._kArr_l[ktildey] - kbary_m_tildey;
         for (size_t ktildex=0; ktildex<_Gk._kArr_l.size(); ktildex++){
             kbarx = _Gk._kArr_l[ktildex] - kbarx_m_tildex;
-            tmp_val_weigths += _Gk(wtilde,_Gk._kArr_l[ktildex],_Gk._kArr_l[ktildey])(0,0)*_Gk(wtilde-_qq._iwn,_Gk._kArr_l[ktildex]-_qq._qx,_Gk._kArr_l[ktildey]-_qq._qy
+            if ( ( (ktildey==0) || (ktildey==(_Gk._kArr_l.size()-1)) ) || ( (ktildex==0) || (ktildex==(_Gk._kArr_l.size()-1)) ) ){
+                if ( ( (ktildey==0) || (ktildey==(_Gk._kArr_l.size()-1)) ) && ( (ktildex==0) || (ktildex==(_Gk._kArr_l.size()-1)) ) ){
+                    tmp_val_weigths += 0.25*_Gk(wtilde,_Gk._kArr_l[ktildex],_Gk._kArr_l[ktildey])(0,0)*_Gk(wtilde-_qq._iwn,_Gk._kArr_l[ktildex]-_qq._qx,_Gk._kArr_l[ktildey]-_qq._qy
+                    )(0,0)*_Gk(wbar-_qq._iwn,kbarx-_qq._qx,kbary-_qq._qy)(1,1)*_Gk(wbar,kbarx,kbary)(1,1);
+                } else{
+                    tmp_val_weigths += 0.5*_Gk(wtilde,_Gk._kArr_l[ktildex],_Gk._kArr_l[ktildey])(0,0)*_Gk(wtilde-_qq._iwn,_Gk._kArr_l[ktildex]-_qq._qx,_Gk._kArr_l[ktildey]-_qq._qy
+                    )(0,0)*_Gk(wbar-_qq._iwn,kbarx-_qq._qx,kbary-_qq._qy)(1,1)*_Gk(wbar,kbarx,kbary)(1,1);
+                }
+            } else{
+                tmp_val_weigths += _Gk(wtilde,_Gk._kArr_l[ktildex],_Gk._kArr_l[ktildey])(0,0)*_Gk(wtilde-_qq._iwn,_Gk._kArr_l[ktildex]-_qq._qx,_Gk._kArr_l[ktildey]-_qq._qy
                 )(0,0)*_Gk(wbar-_qq._iwn,kbarx-_qq._qx,kbary-_qq._qy)(1,1)*_Gk(wbar,kbarx,kbary)(1,1);
+            }
         }      
     }
-    tmp_val_weigths*=1.0/_Gk._kArr_l.size()/_Gk._kArr_l.size();
+    tmp_val_weigths*=1.0/_Gk._Nk/_Gk._Nk;
     return tmp_val_weigths;
 }
 
@@ -499,43 +552,52 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
                                 )[0] * buildGK2D_IPT(wbar-_qq._iwn,kbarx-_qq._qx,kbary-_qq._qy)[1] * buildGK2D_IPT(wbar,kbarx,kbary)[1];
         }      
     }
-    tmp_val_weigths*=1.0/_splInline._k_array.size()/_splInline._k_array.size();
+    tmp_val_weigths*=1.0/GreenStuff::N_k/GreenStuff::N_k;
     return tmp_val_weigths;
 }
 
 #endif /* DIM */
 
 std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const{
-    std::complex<double> bubble(0.0,0.0);
+    std::complex<double> bubble(0.0,0.0); // G_aver is used to output the averaged bubble function over the lattice.
     ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
     std::cout << "world rank: " << world_rank << ", q_x: " << _q._qx << " and q_iwn: " << _q._iwn << std::endl;
-    std::ofstream testing_Self("test_spline_bubble_iqn_"+std::to_string(_q._iwn.imag())+".dat", std::ofstream::app | std::ofstream::out);
-    for (size_t wttilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wttilde<_splInline._iwn_array.size(); wttilde++){
+    std::ofstream testing_Self;
+    if (_q._iwn==*(iqnArr_l.begin())){
+        testing_Self.open("test_spline_bubble_iqn_"+std::to_string(_q._iwn.imag())+".dat", std::ofstream::app | std::ofstream::out);
+    }
+    for (size_t wttilde=0; wttilde<_splInline._iwn_array.size(); wttilde++){ //static_cast<size_t>(_splInline._iwn_array.size()/2)
         for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
             if (!is_jj){
-                if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) )
-                    bubble += 0.5*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0];
-                else
-                    bubble += buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0];
+                if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) ){
+                    bubble += 0.5*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[1];
+                }
+                else{
+                    bubble += buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[1];
+                }
             }
             else{
                 if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) )
-                    bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0]*(-2.0*std::sin(_splInline._k_array[qttilde]));
+                    bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[1]*(-2.0*std::sin(_splInline._k_array[qttilde]));
                 else
-                    bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[0]*(-2.0*std::sin(_splInline._k_array[qttilde])); // Do I have to add _q._qx to the current??
+                    bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[1]*(-2.0*std::sin(_splInline._k_array[qttilde])); // Do I have to add _q._qx to the current??
             }
         }
-        testing_Self << _splInline._iwn_array[wttilde].imag() << "\t\t" << _splInline.calculateSpline( (_splInline._iwn_array[wttilde]-_q._iwn).imag() ).imag() << "\n";
+        if (_q._iwn==*(iqnArr_l.begin())){
+            testing_Self << (_splInline._iwn_array[wttilde]-_q._iwn).imag() << "\t\t" << _splInline.calculateSpline( (_splInline._iwn_array[wttilde]-_q._iwn).imag() ).imag() << "\n";
+        }
     }
-    testing_Self.close();
+    if (_q._iwn==*(iqnArr_l.begin())){
+        testing_Self.close();
+    }
     #elif DIM == 2
     for (size_t wttilde=static_cast<size_t>(_splInline._iwn_array.size()/2); wttilde<_splInline._iwn_array.size(); wttilde++){
         for (size_t qttildex=0; qttildex<_splInline._k_array.size(); qttildex++){
             for (size_t qttildey=0; qttildey<_splInline._k_array.size(); qttildey++){
                 if (!is_jj){
                     if ( ( (qttildex==0) || (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) || (qttildey==_splInline._iwn_array.size()-1) ) ){
-                        if ( ( (qttildex==0) && (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) && (qttildey==_splInline._iwn_array.size()-1) ) ){
+                        if ( ( (qttildex==0) || (qttildex==_splInline._iwn_array.size()-1) ) && ( (qttildey==0) || (qttildey==_splInline._iwn_array.size()-1) ) ){
                             bubble += 0.25*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1];
                         } else{
                             bubble += 0.5*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1];
@@ -546,7 +608,7 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
                 }
                 else{
                     if ( ( (qttildex==0) || (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) || (qttildey==_splInline._iwn_array.size()-1) ) ){
-                        if ( ( (qttildex==0) && (qttildex==_splInline._iwn_array.size()-1) ) || ( (qttildey==0) && (qttildey==_splInline._iwn_array.size()-1) ) ){
+                        if ( ( (qttildex==0) || (qttildex==_splInline._iwn_array.size()-1) ) && ( (qttildey==0) || (qttildey==_splInline._iwn_array.size()-1) ) ){
                             bubble += 0.25*(-2.0*std::sin(_splInline._k_array[qttildex]))*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline._k_array[qttildex]));
                         } else{
                             bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttildex]))*buildGK2D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttildex],_splInline._k_array[qttildey])[0]*buildGK2D_IPT(_splInline._iwn_array[wttilde]+_qq._iwn,_splInline._k_array[qttildex]+_qq._qx,_splInline._k_array[qttildey]+_qq._qy)[1]*(-2.0*std::sin(_splInline._k_array[qttildex]));
@@ -559,10 +621,10 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
         }
     }
     #endif
-    bubble *= -1.0*SPINDEG*1.0/(GreenStuff::beta*GreenStuff::N_k);
+    bubble *= -1.0*SPINDEG/(GreenStuff::beta*GreenStuff::N_k);
     std::cout << "non-interacting bubble: " << bubble << std::endl;
     #if DIM == 1
-    if ( _q._iwn.imag()==0.0 )
+    if ( _q._iwn == *(iqnArr_l.begin()) )
         ofS << "/iwn" << "\t\t" << "iwn re" << "\t\t" << "iwn im" << "\n";
     ofS << _q._iwn.imag() << "\t\t" << bubble.real() << "\t\t" << bubble.imag() << "\n";
     #elif DIM == 2
@@ -580,18 +642,35 @@ std::complex<double> ThreadWrapper::lindhard_function(bool is_jj, std::ofstream&
     #if DIM == 1
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttilde=0; qttilde<_Gk._kArr_l.size(); qttilde++){
-            if (!is_jj)
-                bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0);
-            else
-                bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0)*(-2.0*std::sin(_splInline._k_array[qttilde]));
-        }
+            if (!is_jj){
+                if ( ( qttilde==0 ) || ( qttilde==(_Gk._kArr_l.size()-1) ) )
+                    bubble += 0.5*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0);
+                else
+                    bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0);
+            }
+            else{
+                if ( ( qttilde==0 ) || ( qttilde==(_Gk._kArr_l.size()-1) ) )
+                    bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttilde]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0)*(-2.0*std::sin(_splInline._k_array[qttilde]));
+                else
+                    bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttilde])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_q._iwn,_Gk._kArr_l[qttilde]+_q._qx)(0,0)*(-2.0*std::sin(_splInline._k_array[qttilde]));
+            }
+        }   
     }
     #elif DIM == 2 /* since one only considers the first-nearest neighbor dispersion relation */
     for (size_t wttilde=0; wttilde<_Gk._size; wttilde++){
         for (size_t qttildex=0; qttildex<_Gk._kArr_l.size(); qttildex++){
             for (size_t qttildey=0; qttildey<_Gk._kArr_l.size(); qttildey++){
-                if (!is_jj)
-                    bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)(0,0);
+                if (!is_jj){
+                    if ( ( (qttildey==0) || (qttildey==(_Gk._kArr_l.size()-1)) ) || ( (qttildex==0) || (qttildex==(_Gk._kArr_l.size()-1)) ) ){
+                        if ( ( (qttildey==0) || (qttildey==(_Gk._kArr_l.size()-1)) ) && ( (qttildex==0) || (qttildex==(_Gk._kArr_l.size()-1)) ) ){
+                            bubble += 0.25*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)(0,0);
+                        } else{
+                            bubble += 0.5*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)(0,0);
+                        }
+                    } else{
+                        bubble += _Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)(0,0);
+                    }
+                }
                 else
                     bubble += (-2.0*std::sin(_splInline._k_array[qttildex]))*_Gk(_Gk._precomp_wn[wttilde],_Gk._kArr_l[qttildex],_Gk._kArr_l[qttildey])(0,0)*_Gk(_Gk._precomp_wn[wttilde]+_qq._iwn,_Gk._kArr_l[qttildex]+_qq._qx,_Gk._kArr_l[qttildey]+_qq._qy)(0,0)*(-2.0*std::sin(_splInline._k_array[qttildex]));
             }

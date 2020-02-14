@@ -117,7 +117,7 @@ namespace ThreadFunctor{
     }
     #if DIM == 1
     inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D_IPT(std::complex<double> ik, double k) const{
-        std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ), 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ) }; // UP, DOWN
+        std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ), 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ) }; // UP, DOWN + GreenStuff::mu - GreenStuff::mu
         return GK;
     }
     #elif DIM == 2
@@ -470,7 +470,7 @@ inline void calculateSusceptibilitiesParallel<IPT2::DMFTproc>(IPT2::SplineInline
             for (size_t ktilde=0; ktilde<vecK.size(); ktilde++){
                 for (size_t kbar=0; kbar<vecK.size(); kbar++){
                     outputChispspWeights << matWeigths(kbar,ktilde) << " ";
-                    outputChispspTotSus << matTotSus(kbar,ktilde) + sus_non_interacting << " "; // Considering the non-interacting contribution...
+                    outputChispspTotSus << matTotSus(kbar,ktilde) << " "; //+ sus_non_interacting << " "; // Considering the non-interacting contribution...
                     if (is_full){
                         if (j==0)
                             outputChispspBubbleCorr << matCorr(kbar,ktilde) << " ";

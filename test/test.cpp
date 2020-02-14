@@ -241,7 +241,7 @@ namespace{
     std::vector< std::complex<double> > result_before_spline = splInlineObj.get_loaded_data_interpolated();
     std::vector< std::complex<double> > result_after_spline;
     // Generating the random iwn numbers properly bracketed (positive Matsubara frequencies)
-    const double max_val = -M_PI/beta, min_val = -(2.0*N_tau+1.0)*M_PI/beta;
+    const double max_val = -(2.0*N_tau+1.0)*M_PI/beta, min_val = (2.0*N_tau+1.0)*M_PI/beta;
     generated_random_numbers = generate_random_numbers(20*N_tau,min_val,max_val);
 
     std::complex<double> self_energy_spline;

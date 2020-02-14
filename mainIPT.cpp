@@ -97,7 +97,7 @@ int main(int argc, char** argv){
             iwnArr_l.push_back( matFreq );
         }
         iqnArr_l.clear();
-        for (size_t j=0; j<N_tau; j++){ // Bosonic frequencies.
+        for (signed int j=(-(signed int)N_tau)+1; j<(signed int)N_tau; j++){ // Bosonic frequencies.
             std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
             iqnArr_l.push_back( matFreq );
         }
@@ -167,6 +167,7 @@ int main(int argc, char** argv){
                 if (load_self){ // The file containing wider Matsubara frequency domain is loaded for spline.
                     std::vector<double> initVec(2*MULT_N_TAU*N_tau,0.0); // Important that it is 2*MULT_N_TAU
                     IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec,vecK,iwnArr_l,iqnArr_l);
+                    HF::K_1D q1D; //
                     try{
                         splInlineObj.loadFileSpline(filenameToLoad,IPT2::spline_type::linear); // Spline is ready for use by calling function calculateSpline()-
                     } catch(const std::invalid_argument& err){ // If filenameToLoad is not found...
@@ -176,8 +177,6 @@ int main(int argc, char** argv){
                     } catch(const std::runtime_error& err){
                         std::cerr << err.what() << "\n";
                     }
-                    //std::complex<double> test = splInlineObj.calculateSpline(0.4); // Should include this into test file with the proper file to load.
-                    //std::cout << test << std::endl;
 
                     /* Calculation Susceptibilities. The second template argument specifies the type of the SplineInline object. */
                     #ifdef PARALLEL
@@ -186,9 +185,23 @@ int main(int argc, char** argv){
                     #else
                     calculateSusceptibilities<IPT2::DMFTproc>(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
                     #endif
+                    /* Testing */
+                    // #ifdef PARALLEL
+                    // #if DIM == 1
+                    // std::ofstream test_bubble_output;
+                    // std::string test_bubble_str("test_bubble_1.dat");
+                    // q1D._qx=0.0;
+                    // for (size_t j=0; j<iqnArr_l.size();j++){
+                    //     q1D._iwn = iqnArr_l[j]; //
+                    //     ThreadFunctor::ThreadWrapper threadObjTest(q1D,splInlineObj); // Must be loaded after loadSpline called...some inner variables are then set
+                    //     std::complex<double> sus_non_interacting = threadObjTest.lindhard_functionIPT(is_jj,test_bubble_output,test_bubble_str,0);
+                    //     std::cout << "For iqn " << q1D._iwn << " the susceptibility is " << sus_non_interacting << std::endl;
+                    // }
+                    // #endif
+                    // #endif
                 } else{
                     std::cout << "To compute the susceptibilities, you must load a self-energy defined on a wider Matsubara frequency" << "\n";
-                    std::cout << "range (MULT_N_TAU times larger) to be able to interpolate it using a cubic spline." << std::endl;
+                    std::cout << "range (MULT_N_TAU times larger) to be able to interpolate it using a linear spline." << std::endl;
                 }
             }
             else if ( (solver_type_s.compare("HF")==0) ){

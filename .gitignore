@@ -6,5 +6,7 @@ build
 *.py
 !pade*.py
 !colormap.py
-mea
 build_test
+mea
+!mea/*.py
+.DS_Store

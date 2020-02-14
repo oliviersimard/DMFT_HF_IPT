@@ -8,10 +8,10 @@
 #include <iostream>
 #include <assert.h> // For assert()
 
-#define DIM 1
-#define SPINDEG 2
+#define DIM 1 // 1 or 2
+#define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
-#define MULT_N_TAU 2
+#define MULT_N_TAU 2 // Has to be an even number
 
 // Some declarations
 namespace IPT2{ class DMFTproc; };
