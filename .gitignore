@@ -8,6 +8,7 @@ build
 !colormap.py
 build_test
 !mea/*.py
+!mea/python_modules/*.py
 .DS_Store
 mea/*.dat.pade
 *.pdf
