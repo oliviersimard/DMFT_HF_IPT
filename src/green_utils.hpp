@@ -7,6 +7,9 @@
 #include <armadillo>
 #include <iostream>
 #include <assert.h> // For assert()
+extern "C" {
+#include<fftw3.h>
+}
 
 #define DIM 1 // 1 or 2
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used

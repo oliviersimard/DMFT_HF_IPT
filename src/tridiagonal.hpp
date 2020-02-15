@@ -441,7 +441,7 @@ std::vector< std::complex<T> > spline<T>::fermionic_propagator(const std::vector
 template<class T>
 std::vector< std::complex<T> > spline<T>::bosonic_corr(const std::vector< std::complex<T> >& iqn_arr,double beta){
     size_t size = iqn_arr.size();
-    const std::complex<T> im(0.0,1.0);
+
     _S_1_0=m_y.slice(0)(0,0); // f_0(x_0) = a_0(x_0-x_0)^3 + b_0(x_0-x_0)^2 + c_0(x_0-x_0) + y_0
     _Sp_1_0=m_c0; // f'_0(x_0) = 3a_0(x_0-x_0)^2 + 2b_0(x_0-x_0)^1 + c_0 
     _Spp_1_0=2.0*m_b[0]; // f''_0(x_0) = 6a_0(x_0-x_0) + 2b_0
@@ -451,41 +451,42 @@ std::vector< std::complex<T> > spline<T>::bosonic_corr(const std::vector< std::c
     _S_N_beta=m_a[size-1]*h_last*h_last*h_last+m_b[size-1]*h_last*h_last+m_c[size-1]*h_last+m_y.slice(size-1)(0,0); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
     _Sp_N_beta=3.0*m_a[size-1]*h_last*h_last+2.0*m_b[size-1]*h_last+m_c[size-1];
     _Spp_N_beta=6.0*m_a[size-1]*h_last+2.0*m_b[size-1];
-    
-    // This will be used later for IFFT.
-    for (size_t n=0; n<m_x.size()-1; n++){
+
+    std::cout << "S_beta: " << _S_N_beta << " S_0 " << _S_1_0 << "\n";
+    std::cout << "Sp_beta: " << _Sp_N_beta << " Sp_0 " << _Sp_1_0 << "\n";
+    std::cout << "Spp_beta: " << _Spp_N_beta << " Spp_0 " << _Spp_1_0 << "\n";
+
+    // This will be used later for FFT.
+    for (size_t n=0; n<size; n++){
         _Sppp.push_back(6.0*m_a[n]);
     }
-    // Putting the _S's to use in the Fourier transformation from tau (double) to complex<double> (iwn).
-    double F[2*size],Fp[2*size];
-    for(size_t i=0; i<size; i++){
-        F[2*i] = (_Sppp[i]).real();
-        F[2*i+1] = (_Sppp[i]).imag();
+
+    // FFT
+    std::complex<double>* input = new std::complex<double>[size];
+    std::complex<double>* output = new std::complex<double>[size];
+    for (size_t i=0; i<size; i++){
+        input[i] = _Sppp[i];
     }
+    fftw_plan plan;
+    plan = fftw_plan_dft_1d(size,reinterpret_cast<fftw_complex*>(input),reinterpret_cast<fftw_complex*>(output),FFTW_BACKWARD,FFTW_ESTIMATE);
+    fftw_execute(plan);
     
-    gsl_fft_complex_radix2_backward(F, 1, size);
-    
-    for(size_t i=0; i<size; i++){
-        if(i<size/2){ // Mirroring the data.
-            Fp[2*i] = F[size+2*i];
-            Fp[2*i+1] = F[size+2*i+1];
-        }else{
-            Fp[2*i] = F[2*i-size];
-            Fp[2*i+1] = F[2*i+1-size];
-        }
-    }
     std::vector< std::complex<T> > cubic_spline(size,0.0);
     for(size_t i=0; i<size; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
         if (iqn_arr[i]!=std::complex<T>(0.0,0.0)){
-            cubic_spline[i] = ( (_S_1_0-_S_N_beta)/iqn_arr[i] - (_Sp_N_beta-_Sp_1_0)/(iqn_arr[i]*iqn_arr[i]) + (_Spp_N_beta-_Spp_1_0)/(iqn_arr[i]*iqn_arr[i]*iqn_arr[i]) + (1.0-std::exp(1.0*iqn_arr[i]*beta/(double)size))/(iqn_arr[i]*iqn_arr[i]*iqn_arr[i]*iqn_arr[i])*(Fp[2*i]+im*Fp[2*i+1]) );
+            cubic_spline[i] = ( (_S_1_0-_S_N_beta)/iqn_arr[i] - (_Sp_N_beta-_Sp_1_0)/(iqn_arr[i]*iqn_arr[i]) + (_Spp_N_beta-_Spp_1_0)/(iqn_arr[i]*iqn_arr[i]*iqn_arr[i]) + (1.0-std::exp(1.0*iqn_arr[i]*beta/(double)size))/(iqn_arr[i]*iqn_arr[i]*iqn_arr[i]*iqn_arr[i])*(output[i]) );
         } else{
             for (size_t j=1; j<m_x.size(); j++){ // Dealing with the 0th bosonic Matsubara frequency...
-                cubic_spline[i] += m_a[j]*( m_x[i]*m_x[i]*m_x[i]*m_x[i] - m_x[i-1]*m_x[i-1]*m_x[i-1]*m_x[i-1] )/4.0 +
-                m_b[j]*( m_x[j]*m_x[j]*m_x[j] - m_x[j-1]*m_x[j-1]*m_x[j-1] )/3.0 + m_c[j]*( m_x[j]*m_x[j] - m_x[j-1]*m_x[j-1] )/2.0 +
-                m_y[j]*( m_x[j] - m_x[j-1] );
+                //std::cout << "j: " << j << " val: " << cubic_spline[i] << " ma: " << m_a[j-1] << " mb: " << m_b[j-1] << " mc: " << m_c[j-1] << " my: " << m_y[j-1] << "\n";
+                cubic_spline[i] += m_a[j-1]*( (m_x[j]-m_x[j-1])*(m_x[j]-m_x[j-1])*(m_x[j]-m_x[j-1])*(m_x[j]-m_x[j-1]) )/4.0 +
+                m_b[j-1]*( (m_x[j]-m_x[j-1])*(m_x[j]-m_x[j-1])*(m_x[j]-m_x[j-1]) )/3.0 + m_c[j-1]*( (m_x[j]-m_x[j-1])*(m_x[j]-m_x[j-1]) )/2.0 +
+                m_y.slice(j-1)(0,0)*( (m_x[j]-m_x[j-1]) );
             }
         }
     }
+
+    delete[] input;
+    delete[] output;
 
     return cubic_spline;
 }

@@ -2,9 +2,6 @@
 #define IPT2Single_H_
 
 #include<functional>
-extern "C" {
-#include<fftw3.h>
-}
 #include<cmath> // double abs(double)
 #include<stdexcept>
 //#include<algorithm> // copy() and assign()

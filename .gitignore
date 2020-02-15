@@ -8,5 +8,5 @@ build
 !colormap.py
 build_test
 mea
-!mea/*.py
+mea/*.py
 .DS_Store
