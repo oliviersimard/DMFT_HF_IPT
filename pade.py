@@ -47,10 +47,11 @@ def get_filenames() -> tuple:
 	if path_to_name_arr != []:
 		path_to_name = "/".join(path_to_name_arr)
 		path_to_name = path_to_name+"/"
-	U=float(re.findall(r"(?<=U_)(\d*\.\d+|\d+)",name)[0])
-	beta=float(re.findall(r"(?<=beta_)(\d*\.\d+|\d+)",name)[0])
+	
 	good_filenames=[] # Can't remove filenames while looping over the same list.
 	if is_Green_component:
+		U=float(re.findall(r"(?<=U_)(\d*\.\d+|\d+)",name)[0])
+		beta=float(re.findall(r"(?<=beta_)(\d*\.\d+|\d+)",name)[0])
 		nn=float(re.findall(r"(?<=n_)(\d*\.\d+|\d+)",name)[-1])
 		m=re.findall(r"^(?!analytic)(^[a-zA-Z]+_[a-zA-Z]+)",name)
 		name=name.replace(m[0],'')
@@ -69,7 +70,8 @@ def get_filenames() -> tuple:
 			if str(largest_int)+".dat" in filename:
 				good_filenames.append(filename)
 	else:
-		nn=0.0 # The non_interacting susceptibility is computed instead and nn is not part of the filename description
+		nn=0.0 # dummy variables
+		beta=0.0; U=0.0
 		good_filenames.append(path_to_name+name)
 		print(good_filenames)
 
@@ -102,8 +104,8 @@ for name in filenames:
 
 	assert len(omega_n)==len(Rf_n)==len(If_n), "The lengths of Matsubara array, Re F(iwn) and Im F(iwn) have to be equal."
 
-	f_n = Rf_n +1j*If_n
-	N = len(omega_n)-7 # Substracting the last Matsubara frequencies
+	f_n = Rf_n + 1j*If_n
+	N = len(omega_n)-0 # Substracting the last Matsubara frequencies
 	g = np.zeros((N, N), dtype = np.clongdouble)
 	omega_n = omega_n[0:N]
 
@@ -137,6 +139,7 @@ for name in filenames:
 	dict_names[name]=fw
 
 	try:
+		path_to_name=""
 		if is_Green_component:
 			path_to_name_arr = name.split("/")[0:-1]
 		else:
@@ -145,10 +148,11 @@ for name in filenames:
 		if path_to_name_arr != []:
 			path_to_name = "/".join(path_to_name_arr)
 			path_to_name=path_to_name+"/"
+
 		print(path_to_name+"analytic_continuations/"+"analytic_continuation_"+name)
 		f = open(path_to_name+"analytic_continuations/"+"analytic_continuation_"+name, "w")
 		for i in range(len(fw)):
-			f.write(str(omega[i])+"	"+str(fw[i].real)+"	"+str(fw[i].imag)+"\n")
+			f.write(str(omega[i])+"\t"+str(fw[i].real)+"\t"+str(fw[i].imag)+"\n")
 
 		f.close()
 	except:
@@ -161,28 +165,28 @@ for name in filenames:
 		beta_array = np.linspace(0,beta,201)
 		print("norm of the spectral function = ", -(1./np.pi)*sci.simps(Spec_func, omega))
 		# files to write to
-		file_G_taus = open("mea/tau_greens_functions_from_pade.dat", "w+")
-		# This block is used to check reversibility of the Pade analitical continuation (omega->iwn)
-		for iwn in omega_n:
-			for w in range(len(omega)):
-				kern = -(1./np.pi)*fw[w].imag/(1j*iwn - omega[w])
-				kern_ikn_w.append(kern)
-			kern_ikn.append(sci.simps(kern_ikn_w,omega))
-			kern_ikn_w = []
-		# print("Reverse analytical continuation: ", kern_ikn)
-		# This block is used to check the reversibility of the Pade analytical continuation (omega->tau)
-		for i,tau in enumerate(beta_array):
-			if i==0:
-				file_G_taus.write("/\n")
-			for w in range(len(omega)):
-				kern_pos = -(1./np.pi)*fw[w].imag*( np.exp(-tau*omega[w])/( 1.0 + np.exp(-beta*omega[w]) ) )
-				kern_tau_pos_w.append(-1.0*kern_pos)
-			kern_tau_pos.append(sci.simps(kern_tau_pos_w,omega))
-			kern_tau_pos_w = []
-		# saving
-		for i in range(len(beta_array)):
-			file_G_taus.write("{0:.10f}\t\t{1:.10f}\t\t{2:.10f}\t\t{3:.10f}\n".format(beta_array[i],kern_tau_pos[i],-1.0*kern_tau_pos[len(beta_array)-i-1],-1.0*kern_tau_pos[i]*kern_tau_pos[len(beta_array)-i-1]))
-		file_G_taus.close()
+		# file_G_taus = open("mea/tau_greens_functions_from_pade.dat", "w+")
+		# # This block is used to check reversibility of the Pade analitical continuation (omega->iwn)
+		# for iwn in omega_n:
+		# 	for w in range(len(omega)):
+		# 		kern = -(1./np.pi)*fw[w].imag/(1j*iwn - omega[w])
+		# 		kern_ikn_w.append(kern)
+		# 	kern_ikn.append(sci.simps(kern_ikn_w,omega))
+		# 	kern_ikn_w = []
+		# # print("Reverse analytical continuation: ", kern_ikn)
+		# # This block is used to check the reversibility of the Pade analytical continuation (omega->tau)
+		# for i,tau in enumerate(beta_array):
+		# 	if i==0:
+		# 		file_G_taus.write("/\n")
+		# 	for w in range(len(omega)):
+		# 		kern_pos = -(1./np.pi)*fw[w].imag*( np.exp(-tau*omega[w])/( 1.0 + np.exp(-beta*omega[w]) ) )
+		# 		kern_tau_pos_w.append(-1.0*kern_pos)
+		# 	kern_tau_pos.append(sci.simps(kern_tau_pos_w,omega))
+		# 	kern_tau_pos_w = []
+		# # saving
+		# for i in range(len(beta_array)):
+		# 	file_G_taus.write("{0:.10f}\t\t{1:.10f}\t\t{2:.10f}\t\t{3:.10f}\n".format(beta_array[i],kern_tau_pos[i],-1.0*kern_tau_pos[len(beta_array)-i-1],-1.0*kern_tau_pos[i]*kern_tau_pos[len(beta_array)-i-1]))
+		# file_G_taus.close()
 # Plotting
 keys_list=list(dict_names.keys()) # Getting the keys of the dictionnary to properly plot the components.
 list_gen=file_generator(keys_list)
@@ -199,7 +203,7 @@ while i<len(keys_list):
 		if is_Green_component:
 			axs.set_title(r"$2^{\text{nd}}$-order IPT-D results for "+r"$\beta={0}$, $U={1}$".format(beta,U))
 		else:
-			axs.set_title(r"Test results for "+r"$\beta=40.0, q_x=0.0001$") # Have to change beta by hand 
+			axs.set_title(r"Test results") # Have to change beta by hand 
 	else:
 		axs[i].grid()
 		axs[i].set_ylabel(r"a. u.")
@@ -207,7 +211,7 @@ while i<len(keys_list):
 			if is_Green_component:
 				axs[i].set_title(r"$2^{\text{nd}}$-order IPT-D results for "+r"$\beta={0}$, $U={1}$ and $n={2}$".format(beta,U,nn))
 			else:
-				axs[i].set_title(r"Test results for "+r"$\beta=40.0, q_x=0.0001$") # Have to change beta by hand
+				axs[i].set_title(r"Test results") # Have to change beta by hand
 		if i != len(keys_list)-1:
 			axs[i].tick_params(axis='x',bottom=False)
 		else:

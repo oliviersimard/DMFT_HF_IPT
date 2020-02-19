@@ -61,6 +61,7 @@ class Integrals{
         //double I2DRec(std::function<double(double,double)>,double,double,double,double,unsigned int,double tol=0.001,unsigned int maxVal=10,bool is_converged=false,double prevResult=0.0) const;
         double I2D(std::function<double(double,double)>,double,double,double,double,const double tol=0.0001,unsigned int maxVal=10,bool is_converged=false) const;
         std::complex<double> I2D(std::function<std::complex<double>(double,double,std::complex<double>)>,double,double,double,double,std::complex<double>,const double tol=0.0001,unsigned int maxVal=10,bool is_converged=false) const;
+        std::complex<double> I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,double tol=0.0001,unsigned int maxDelta=10) const;
 
         // False position method to find roots
         double falsePosMethod(std::function<double(double)>,double,double,const double tol=ROOT_FINDING_TOL) const noexcept(false);

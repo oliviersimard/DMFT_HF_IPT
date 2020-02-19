@@ -151,7 +151,7 @@ class Cubic_spline(object):
         # print("left_der ", left_most_val)
         # print("right_der ", right_most_val)
         
-        assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-6), "The derivative end points have to be similar, otherwise the method lacks precision."
+        assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
         
         der_f = np.insert(der_f,0,left_most_val)
         der_f = np.append(der_f,right_most_val)
@@ -182,6 +182,14 @@ class FermionsvsBosons(Cubic_spline):
         assert np.mod(cubic_spline_funct_size,2)==1, "The imaginary-time length has got to be odd. (iwn has to be even for mirroring reasons.)"
     
     @classmethod
+    def reset(cls) -> None:
+        """Needed to reset the internal data to FermionvsBosons class.
+        """
+        cls._one_instance = True
+        
+        return None
+    
+    @classmethod
     def bosonic_corr_funct(cls):
         size_iqn = len(cls._iqn_array)
         # Relevant coefficients to enter Fourier transform
@@ -190,8 +198,8 @@ class FermionsvsBosons(Cubic_spline):
         Spp_0 = 2.0*Cubic_spline._mb[0]; Spp_beta = 6.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta + 2.0*Cubic_spline._mb[-2]
         
         print("S_beta: ", S_beta, " S_0 ", S_0)
-        print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
-        print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
+        # print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
+        # print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
         
         # print("S_beta: ", S_beta, " S_0 ", S_0)
         Sppp = np.empty((size_iqn,),dtype=complex)
@@ -223,8 +231,8 @@ class FermionsvsBosons(Cubic_spline):
         Sp_0 = Cubic_spline._mc[0]; Sp_beta = 3.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta**2 + 2.0*Cubic_spline._mb[-2]*Cubic_spline._delta_beta + Cubic_spline._mc[-2]
         Spp_0 = 2.0*Cubic_spline._mb[0]; Spp_beta = 6.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta + 2.0*Cubic_spline._mb[-2]
         print("S_beta: ", S_beta, " S_0 ", S_0)
-        print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
-        print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
+        # print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
+        # print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
         Sppp = np.zeros((size_iwn,),dtype=complex)
         
         for i in range(size_iwn):

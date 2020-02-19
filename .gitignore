@@ -2,7 +2,7 @@
 *.code-workspace
 obj
 *.dat
-build
+build*
 *.py
 !pade*.py
 !colormap.py
@@ -13,3 +13,6 @@ build_test
 mea/*.dat.pade
 *.pdf
 mea/Figs
+__pycache__
+data
+mea/test_bb_splines

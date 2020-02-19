@@ -560,6 +560,7 @@ std::complex<double> ThreadWrapper::getWeightsIPT(double kbarx_m_tildex,double k
 
 std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstream& ofS, const std::string& strOutput, int world_rank) const{
     std::complex<double> bubble(0.0,0.0); // G_aver is used to output the averaged bubble function over the lattice.
+    const Integrals integralsObj;
     ofS.open(strOutput, std::ios::app | std::ios::out);
     #if DIM == 1
     std::cout << "world rank: " << world_rank << ", q_x: " << _q._qx << " and q_iwn: " << _q._iwn << std::endl;
@@ -567,23 +568,34 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
     if (_q._iwn==*(iqnArr_l.begin())){
         testing_Self.open("test_spline_bubble_iqn_"+std::to_string(_q._iwn.imag())+".dat", std::ofstream::app | std::ofstream::out);
     }
+    std::function<std::complex<double>(double,std::complex<double>)> chi_spsp = [&](double kx, std::complex<double> iwn){
+        return buildGK1D_IPT(iwn,kx)[0]*buildGK1D_IPT(iwn+_q._iwn,kx+_q._qx)[1];;
+    };
+    std::function<std::complex<double>(double,std::complex<double>)> chi_jj = [&](double kx, std::complex<double> iwn){
+        return (-2.0*std::sin(kx))*buildGK1D_IPT(iwn,kx)[0]*buildGK1D_IPT(iwn+_q._iwn,kx+_q._qx)[1]*(-2.0*std::sin(kx));
+    };
     for (size_t wttilde=0; wttilde<_splInline._iwn_array.size(); wttilde++){ //static_cast<size_t>(_splInline._iwn_array.size()/2)
-        for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
-            if (!is_jj){
-                if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) ){
-                    bubble += 0.5*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[1];
-                }
-                else{
-                    bubble += buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[1];
-                }
-            }
-            else{
-                if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) )
-                    bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[1]*(-2.0*std::sin(_splInline._k_array[qttilde]));
-                else
-                    bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[1]*(-2.0*std::sin(_splInline._k_array[qttilde])); // Do I have to add _q._qx to the current??
-            }
+        if (!is_jj){
+            bubble+=1./(2.*M_PI)*integralsObj.I1D(chi_spsp,-M_PI,M_PI,_splInline._iwn_array[wttilde]);
+        } else{
+            bubble+=1./(2.*M_PI)*integralsObj.I1D(chi_jj,-M_PI,M_PI,_splInline._iwn_array[wttilde]);
         }
+        // for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
+        //     if (!is_jj){
+        //         if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) ){
+        //             bubble += 0.5*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[1];
+        //         }
+        //         else{
+        //             bubble += buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]+_q._iwn,_splInline._k_array[qttilde]+_q._qx)[1];
+        //         }
+        //     }
+        //     else{
+        //         if ( (qttilde==0) || (qttilde==(_splInline._k_array.size()-1)) )
+        //             bubble += 0.5*(-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[1]*(-2.0*std::sin(_splInline._k_array[qttilde]));
+        //         else
+        //             bubble += (-2.0*std::sin(_splInline._k_array[qttilde]))*buildGK1D_IPT(_splInline._iwn_array[wttilde],_splInline._k_array[qttilde])[0]*buildGK1D_IPT(_splInline._iwn_array[wttilde]-_q._iwn,_splInline._k_array[qttilde]-_q._qx)[1]*(-2.0*std::sin(_splInline._k_array[qttilde])); // Do I have to add _q._qx to the current??
+        //     }
+        // }
         if (_q._iwn==*(iqnArr_l.begin())){
             testing_Self << (_splInline._iwn_array[wttilde]-_q._iwn).imag() << "\t\t" << _splInline.calculateSpline( (_splInline._iwn_array[wttilde]-_q._iwn).imag() ).imag() << "\n";
         }
@@ -621,7 +633,7 @@ std::complex<double> ThreadWrapper::lindhard_functionIPT(bool is_jj, std::ofstre
         }
     }
     #endif
-    bubble *= -1.0*SPINDEG/(GreenStuff::beta*GreenStuff::N_k);
+    bubble *= -1.0*SPINDEG/(GreenStuff::beta); //*GreenStuff::N_k
     std::cout << "non-interacting bubble: " << bubble << std::endl;
     #if DIM == 1
     if ( _q._iwn == *(iqnArr_l.begin()) )

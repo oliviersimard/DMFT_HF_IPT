@@ -49,28 +49,28 @@ int main(int argc, char** argv){
     matCorr = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
     matMidLev = arma::Mat< std::complex<double> >(vecK.size(),vecK.size(),arma::fill::zeros);
     // Allocating
-    gamma_tensor = new std::complex<double>***[vecK.size()];
-    for (size_t i=0; i<vecK.size(); i++){
-        gamma_tensor[i] = new std::complex<double>**[N_tau];
-        for (size_t j=0; j<N_tau; j++){
-            gamma_tensor[i][j] = new std::complex<double>*[vecK.size()];
-            for (size_t k=0; k<vecK.size(); k++){
-                gamma_tensor[i][j][k] = new std::complex<double>[N_tau];
-            }
-        } 
-    }
-    if (is_full){ // Constructing the array to store the lower-most level in the full susceptibility formula. (1D)
-        gamma_full_tensor = new std::complex<double>***[vecK.size()];
-        for (size_t i=0; i<vecK.size(); i++){
-            gamma_full_tensor[i] = new std::complex<double>**[N_tau];
-            for (size_t j=0; j<N_tau; j++){
-                gamma_full_tensor[i][j] = new std::complex<double>*[vecK.size()];
-                for (size_t k=0; k<vecK.size(); k++){
-                    gamma_full_tensor[i][j][k] = new std::complex<double>[N_tau];
-                }
-            }
-        }
-    }
+    // gamma_tensor = new std::complex<double>***[vecK.size()];
+    // for (size_t i=0; i<vecK.size(); i++){
+    //     gamma_tensor[i] = new std::complex<double>**[N_tau];
+    //     for (size_t j=0; j<N_tau; j++){
+    //         gamma_tensor[i][j] = new std::complex<double>*[vecK.size()];
+    //         for (size_t k=0; k<vecK.size(); k++){
+    //             gamma_tensor[i][j][k] = new std::complex<double>[N_tau];
+    //         }
+    //     } 
+    // }
+    // if (is_full){ // Constructing the array to store the lower-most level in the full susceptibility formula. (1D)
+    //     gamma_full_tensor = new std::complex<double>***[vecK.size()];
+    //     for (size_t i=0; i<vecK.size(); i++){
+    //         gamma_full_tensor[i] = new std::complex<double>**[N_tau];
+    //         for (size_t j=0; j<N_tau; j++){
+    //             gamma_full_tensor[i][j] = new std::complex<double>*[vecK.size()];
+    //             for (size_t k=0; k<vecK.size(); k++){
+    //                 gamma_full_tensor[i][j][k] = new std::complex<double>[N_tau];
+    //             }
+    //         }
+    //     }
+    // }
     // To be able to initialize the static variables important to IPT (GreenStuff), one has to instantiate a GreenStuff object.
     arma::Cube<double> initiate_double_slots; arma::Cube< std::complex<double> > initiate_cplx_double_slot;
     #else // Saving on memory doing so. For DMFT loop, no parallelization is needed.
@@ -180,25 +180,25 @@ int main(int argc, char** argv){
 
                     /* Calculation Susceptibilities. The second template argument specifies the type of the SplineInline object. */
                     #ifdef PARALLEL
-                    MPI_Barrier(MPI_COMM_WORLD);
-                    calculateSusceptibilitiesParallel<IPT2::DMFTproc>(splInlineObj,pathToDir,customDirName,is_full,is_jj,ThreadFunctor::solver_prototype::IPT2_prot);
+                    // MPI_Barrier(MPI_COMM_WORLD);
+                    // calculateSusceptibilitiesParallel<IPT2::DMFTproc>(splInlineObj,pathToDir,customDirName,is_full,is_jj,ThreadFunctor::solver_prototype::IPT2_prot);
                     #else
                     calculateSusceptibilities<IPT2::DMFTproc>(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
                     #endif
                     /* Testing */
-                    // #ifdef PARALLEL
-                    // #if DIM == 1
-                    // std::ofstream test_bubble_output;
-                    // std::string test_bubble_str("test_bubble_1.dat");
-                    // q1D._qx=0.0;
-                    // for (size_t j=0; j<iqnArr_l.size();j++){
-                    //     q1D._iwn = iqnArr_l[j]; //
-                    //     ThreadFunctor::ThreadWrapper threadObjTest(q1D,splInlineObj); // Must be loaded after loadSpline called...some inner variables are then set
-                    //     std::complex<double> sus_non_interacting = threadObjTest.lindhard_functionIPT(is_jj,test_bubble_output,test_bubble_str,0);
-                    //     std::cout << "For iqn " << q1D._iwn << " the susceptibility is " << sus_non_interacting << std::endl;
-                    // }
-                    // #endif
-                    // #endif
+                    #ifdef PARALLEL
+                    #if DIM == 1
+                    std::ofstream test_bubble_output;
+                    std::string test_bubble_str("test_bubble_1.dat");
+                    q1D._qx=0.0;
+                    for (size_t j=0; j<iqnArr_l.size();j++){
+                        q1D._iwn = iqnArr_l[j]; //
+                        ThreadFunctor::ThreadWrapper threadObjTest(q1D,splInlineObj); // Must be loaded after loadSpline called...some inner variables are then set
+                        std::complex<double> sus_non_interacting = threadObjTest.lindhard_functionIPT(is_jj,test_bubble_output,test_bubble_str,0);
+                        std::cout << "For iqn " << q1D._iwn << " the susceptibility is " << sus_non_interacting << std::endl;
+                    }
+                    #endif
+                    #endif
                 } else{
                     std::cout << "To compute the susceptibilities, you must load a self-energy defined on a wider Matsubara frequency" << "\n";
                     std::cout << "range (MULT_N_TAU times larger) to be able to interpolate it using a linear spline." << std::endl;
@@ -238,29 +238,29 @@ int main(int argc, char** argv){
         }
     }
     // Deallocating
-    #ifdef PARALLEL
-    for (size_t i=0; i<vecK.size(); i++){
-        for (size_t j=0; j<N_tau; j++){
-            for (size_t k=0; k<vecK.size(); k++){
-                delete[] gamma_tensor[i][j][k];
-            }
-            delete[] gamma_tensor[i][j];
-        }
-        delete[] gamma_tensor[i];
-    }
-    delete[] gamma_tensor;
-    if (is_full){
-        for (size_t i=0; i<vecK.size(); i++){
-            for (size_t j=0; j<N_tau; j++){
-                for (size_t k=0; k<vecK.size(); k++){
-                    delete[] gamma_full_tensor[i][j][k];
-                }
-                delete[] gamma_full_tensor[i][j];
-            }
-            delete[] gamma_full_tensor[i];
-        }
-        delete[] gamma_full_tensor;
-    }
-    #endif
+    // #ifdef PARALLEL
+    // for (size_t i=0; i<vecK.size(); i++){
+    //     for (size_t j=0; j<N_tau; j++){
+    //         for (size_t k=0; k<vecK.size(); k++){
+    //             delete[] gamma_tensor[i][j][k];
+    //         }
+    //         delete[] gamma_tensor[i][j];
+    //     }
+    //     delete[] gamma_tensor[i];
+    // }
+    // delete[] gamma_tensor;
+    // if (is_full){
+    //     for (size_t i=0; i<vecK.size(); i++){
+    //         for (size_t j=0; j<N_tau; j++){
+    //             for (size_t k=0; k<vecK.size(); k++){
+    //                 delete[] gamma_full_tensor[i][j][k];
+    //             }
+    //             delete[] gamma_full_tensor[i][j];
+    //         }
+    //         delete[] gamma_full_tensor[i];
+    //     }
+    //     delete[] gamma_full_tensor;
+    // }
+    // #endif
     return 0;
 }

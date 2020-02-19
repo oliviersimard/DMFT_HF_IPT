@@ -92,10 +92,10 @@ std::complex<double> Integrals::integrate_simps(std::function< std::complex<doub
 
 std::complex<double> Integrals::I2D(std::function<std::complex<double>(double,double,std::complex<double>)> funct,double x0,double xf,double y0,double yf,std::complex<double> iwn,const double tol,unsigned int maxVal,bool is_converged) const{
     double dx=(xf-x0)/(double)maxVal, dy=(yf-y0)/(double)maxVal;
-    std::complex<double> result, prevResult(0.0), resultSumNyorNx, resultSumNxNy;
+    std::complex<double> result, prevResult(0.0,0.0), resultSumNyorNx, resultSumNxNy;
     unsigned int iter=1;
-    while (!is_converged && iter<20){
-        resultSumNyorNx=0.0, resultSumNxNy=0.0;
+    while (!is_converged && iter<MAX_ITER_INTEGRAL){
+        resultSumNyorNx=std::complex<double>(0.0,0.0), resultSumNxNy=std::complex<double>(0.0,0.0);
         dx=(xf-x0)/(double)maxVal;
         dy=(yf-y0)/(double)maxVal;
         prevResult=result;
@@ -112,7 +112,7 @@ std::complex<double> Integrals::I2D(std::function<std::complex<double>(double,do
 
         is_converged = ( ( (std::abs(prevResult-result))>tol ) ) ? false : true;
 
-        if (iter>MAX_ITER_INTEGRAL || is_converged){
+        if (is_converged){
             break;
         }
         maxVal*=2;
@@ -184,6 +184,33 @@ double Integrals::falsePosMethod(std::function<double(double)> funct, double a, 
         throw std::runtime_error("Exceeded the amount of loops allowed for root finding. Current value is: "+std::to_string(MAX_ITER_ROOT));
     }
     return c;
+}
+
+std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,double tol,unsigned int maxDelta) const{
+    double dk=(kf-k0)/(double)maxDelta;
+    std::complex<double> result(0.0,0.0), prevResult(0.0,0.0), resultSumNk;
+    unsigned int iter=1;
+    bool is_converged=false;
+    while(!is_converged && iter<MAX_ITER_INTEGRAL){
+        resultSumNk = std::complex<double>(0.0,0.0);
+        prevResult = result;
+        dk=(kf-k0)/(double)maxDelta;
+        for (unsigned int i=1; i<maxDelta; i++){
+            resultSumNk+=funct(k0+i*dk,iwn);
+        }
+
+        result = 0.5*dk*funct(k0,iwn)+0.5*dk*funct(kf,iwn)+dk*resultSumNk;
+
+        is_converged = (std::abs(prevResult-result)>tol) ? false : true;
+
+        if (is_converged)
+            break;
+
+        maxDelta*=2;
+        iter++;
+    }
+    
+    return result;
 }
 
 // double Integrals::I2DRec(std::function<double(double,double)> funct,double x0,double xf,double y0,double yf,unsigned int currLevel,double tol,unsigned int maxVal,bool is_converged,double prevResult) const{
