@@ -212,7 +212,7 @@ std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_
         tau_final_G[i] = ( ( 1.0/beta*std::exp( -im*(double)i*M_PI*(1.0/MM - 1.0) ) )*output[i] ).real();
     }
     for (int i=0; i<MM; i++){
-        tau_final_G[MM] += ( 1.0/beta*std::exp(-im*M_PI*(1.0-MM))*output[i] ).real();
+        tau_final_G[MM] += ( 1.0/beta*std::exp(-im*M_PI*(1.0-MM))*F_iwn[i] ).real();
     }
     delete[] output;
     delete[] input;

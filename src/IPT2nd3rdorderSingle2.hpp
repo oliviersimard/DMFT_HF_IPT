@@ -31,7 +31,6 @@ class FFTtools{
     public:
         enum Spec { plain_positive, plain_negative, dG_dtau_positive, dG_dtau_negative };
 
-        void fft_t2w(arma::Cube<double>& data1, arma::Cube< std::complex<double> >& data2);
         void fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<double>& data2);
         void fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>&, arma::Cube<double>&, Spec);
         
@@ -57,6 +56,7 @@ class DMFTproc{
         double density_mu0(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu0(const arma::Cube< std::complex<double> >&) const;
         double double_occupancy() const;
+        double dbl_occupancy(unsigned int iter) const;
     private:
         GreenStuff& WeissGreen;
         GreenStuff& Hyb;

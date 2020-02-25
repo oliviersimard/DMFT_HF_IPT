@@ -132,7 +132,7 @@ class Cubic_spline(object):
 
     @staticmethod
     def get_derivative(x_arr, y_arr):
-        """Returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
+        """Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
         made to treat the boudary points (the ones relevant in fact for the spline). The ideal is to use a dense beta array.
         """
         assert len(x_arr)==len(y_arr), "The lengths of x_arr and y_arr have to be the same."
@@ -151,9 +151,73 @@ class Cubic_spline(object):
         # print("left_der ", left_most_val)
         # print("right_der ", right_most_val)
         
-        assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
+        #assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
         
         der_f = np.insert(der_f,0,left_most_val)
+        der_f = np.append(der_f,right_most_val)
+
+        return der_f
+
+    @staticmethod
+    def get_derivative_4th_order(x_arr, y_arr):
+        """Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
+        made to treat the boudary points (the ones relevant in fact for the spline). The ideal is to use a dense beta array.
+        """
+        assert len(x_arr)==len(y_arr), "The lengths of x_arr and y_arr have to be the same."
+        der_f = np.empty((len(x_arr)-4,),dtype=float)
+        right_most_val = 0.0
+        left_most_val = 0.0
+        h = x_arr[1] - x_arr[0] # ordered array
+        for i in range(2,len(x_arr)-2):
+            der_f[i-2] = ( 1.0/12.0*y_arr[i-2] - 2.0/3.0*y_arr[i-1] + 2.0/3.0*y_arr[i+1] - 1.0/12.0*y_arr[i+2] ) / h
+
+        left_most_val = ( -25.0/12.0*y_arr[0] + 4.0*y_arr[1] - 3.0*y_arr[2] + 4.0/3.0*y_arr[3] - 1.0/4.0*y_arr[4] ) / h ## Assuming x_arr is ordered and evenly spaced...
+        second_left_most_val = ( -25.0/12.0*y_arr[1] + 4.0*y_arr[2] - 3.0*y_arr[3] + 4.0/3.0*y_arr[4] - 1.0/4.0*y_arr[5] ) / h
+        right_most_val = ( 25.0/12.0*y_arr[-1] - 4.0*y_arr[-2] + 3.0*y_arr[-3] - 4.0/3.0*y_arr[-4] + 1.0/4.0*y_arr[-5] ) / h
+        second_right_most_val = ( 25.0/12.0*y_arr[-2] - 4.0*y_arr[-3] + 3.0*y_arr[-4] - 4.0/3.0*y_arr[-5] + 1.0/4.0*y_arr[-6] ) / h
+
+        print("left_der ", left_most_val)
+        print("right_der ", right_most_val)
+        
+        #assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
+        
+        der_f = np.insert(der_f,0,second_left_most_val)
+        der_f = np.insert(der_f,0,left_most_val)
+        der_f = np.append(der_f,second_right_most_val)
+        der_f = np.append(der_f,right_most_val)
+
+        return der_f
+
+    @staticmethod
+    def get_derivative_6th_order(x_arr, y_arr):
+        """Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
+        made to treat the boudary points (the ones relevant in fact for the spline). The ideal is to use a dense beta array.
+        """
+        assert len(x_arr)==len(y_arr), "The lengths of x_arr and y_arr have to be the same."
+        der_f = np.empty((len(x_arr)-6,),dtype=float)
+        right_most_val = 0.0
+        left_most_val = 0.0
+        h = x_arr[1] - x_arr[0] # ordered array
+        for i in range(3,len(x_arr)-3):
+            der_f[i-3] = ( -1.0/60.0*y_arr[i-3] + 3.0/20.0*y_arr[i-2] - 3.0/4.0*y_arr[i-1] + 3.0/4.0*y_arr[i+1] - 3.0/20.0*y_arr[i+2] + 1.0/60.0*y_arr[i+3] ) / h
+
+        left_most_val = ( -49.0/20.0*y_arr[0] + 6.0*y_arr[1] - 15.0/2.0*y_arr[2] + 20.0/3.0*y_arr[3] - 15.0/4.0*y_arr[4] + 6.0/5.0*y_arr[5] - 1.0/6.0*y_arr[6] ) / h ## Assuming x_arr is ordered and evenly spaced...
+        second_left_most_val = ( -49.0/20.0*y_arr[1] + 6.0*y_arr[2] - 15.0/2.0*y_arr[3] + 20.0/3.0*y_arr[4] - 15.0/4.0*y_arr[5] + 6.0/5.0*y_arr[6] - 1.0/6.0*y_arr[7] ) / h
+        third_left_most_val = ( -49.0/20.0*y_arr[2] + 6.0*y_arr[3] - 15.0/2.0*y_arr[4] + 20.0/3.0*y_arr[5] - 15.0/4.0*y_arr[6] + 6.0/5.0*y_arr[7] - 1.0/6.0*y_arr[8] ) / h
+        right_most_val = ( 49.0/20.0*y_arr[-1] - 6.0*y_arr[-2] + 15.0/2.0*y_arr[-3] - 20.0/3.0*y_arr[-4] + 15.0/4.0*y_arr[-5] - 6.0/5.0*y_arr[-6] + 1.0/6.0*y_arr[-7] ) / h
+        second_right_most_val = ( 49.0/20.0*y_arr[-2] - 6.0*y_arr[-3] + 15.0/2.0*y_arr[-4] - 20.0/3.0*y_arr[-5] + 15.0/4.0*y_arr[-6] - 6.0/5.0*y_arr[-7] + 1.0/6.0*y_arr[-8] ) / h
+        third_right_most_val = ( 49.0/20.0*y_arr[-3] - 6.0*y_arr[-4] + 15.0/2.0*y_arr[-5] - 20.0/3.0*y_arr[-6] + 15.0/4.0*y_arr[-7] - 6.0/5.0*y_arr[-8] + 1.0/6.0*y_arr[-9] ) / h
+
+        print("left_der ", left_most_val)
+        print("right_der ", right_most_val)
+        
+        #assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
+        
+        der_f = np.insert(der_f,0,third_left_most_val)
+        der_f = np.insert(der_f,0,second_left_most_val)
+        der_f = np.insert(der_f,0,left_most_val)
+        der_f = np.append(der_f,third_right_most_val)
+        der_f = np.append(der_f,second_right_most_val)
         der_f = np.append(der_f,right_most_val)
 
         return der_f
@@ -177,7 +241,7 @@ class FermionsvsBosons(Cubic_spline):
             FermionsvsBosons._iwn_array = np.array([1.0j*(2.0*n+1.0)*np.pi/beta for n in range(cubic_spline_funct_size-1)],dtype=complex)
             FermionsvsBosons._x_array = np.asarray(x_array)
             FermionsvsBosons._cubic_spline = np.zeros((cubic_spline_funct_size-1,),dtype=complex)
-        print("size: ", cubic_spline_funct_size)
+        #print("size: ", cubic_spline_funct_size)
         assert len(Cubic_spline._funct)==len(FermionsvsBosons._x_array), "Check the lengths of the arrays in FermionsvsBosons class constructor."
         assert np.mod(cubic_spline_funct_size,2)==1, "The imaginary-time length has got to be odd. (iwn has to be even for mirroring reasons.)"
     
@@ -197,8 +261,8 @@ class FermionsvsBosons(Cubic_spline):
         Sp_0 = Cubic_spline._mc[0]; Sp_beta = 3.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta**2 + 2.0*Cubic_spline._mb[-2]*Cubic_spline._delta_beta + Cubic_spline._mc[-2]
         Spp_0 = 2.0*Cubic_spline._mb[0]; Spp_beta = 6.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta + 2.0*Cubic_spline._mb[-2]
         
-        print("S_beta: ", S_beta, " S_0 ", S_0)
-        # print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
+        # print("S_beta: ", S_beta, " S_0 ", S_0)
+        print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
         # print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
         
         # print("S_beta: ", S_beta, " S_0 ", S_0)

@@ -105,7 +105,7 @@ for name in filenames:
 	assert len(omega_n)==len(Rf_n)==len(If_n), "The lengths of Matsubara array, Re F(iwn) and Im F(iwn) have to be equal."
 
 	f_n = Rf_n + 1j*If_n
-	N = len(omega_n)-0 # Substracting the last Matsubara frequencies
+	N = len(omega_n)-7 # Substracting the last Matsubara frequencies
 	g = np.zeros((N, N), dtype = np.clongdouble)
 	omega_n = omega_n[0:N]
 
@@ -121,8 +121,8 @@ for name in filenames:
 	B = np.zeros((N, ), dtype = np.clongdouble)
 	P = np.zeros((N, ), dtype = np.clongdouble)
 	fw = []
-	kern_ikn_w = [] ; kern_tau_pos_w = []
-	kern_ikn = [] ; kern_tau_pos = []
+	# kern_ikn_w = [] ; kern_tau_pos_w = []
+	# kern_ikn = [] ; kern_tau_pos = []
 
 	for k in range(len(omega)):
 		z = omega[k] + 1j*eta

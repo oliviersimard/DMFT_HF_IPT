@@ -199,13 +199,14 @@ if __name__ == "__main__":
         f2.close()
     else:
         # file containing the data to be inputted as Sigma_iwn
-        wn, sigma_iwn_re, sigma_iwn_im = np.genfromtxt("Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_4096_Nit_32.dat",dtype=float,skip_header=1,usecols=(0,1,2),unpack=True)
+        wn, sigma_iwn_re, sigma_iwn_im = np.genfromtxt("./data/Self_energy_1D_U_7.000000_beta_40.000000_n_0.500000_N_tau_1024_Nit_13.dat",dtype=float,skip_header=1,usecols=(0,1,2),unpack=True)
         sigma_iwn = sigma_iwn_re + 1.j*sigma_iwn_im
         iwn_array = 1.j*wn
-        beta = 50.0 # Change this according to the parameters loaded
-        U = 10.0 # Change this according to the parameters loaded
+        beta = 40.0 # Change this according to the parameters loaded
+        U = 7.0 # Change this according to the parameters loaded
         mu = U/2.0
         N_k = 500
+        N_tau = len(iwn_array)+1
         beta_array_self, delta_beta = np.linspace(0.0,beta,len(iwn_array)+1,retstep=True)
         k_array, k_step = np.linspace(0.0,2*np.pi,N_k,retstep=True)
         k_array += k_step
@@ -234,7 +235,7 @@ if __name__ == "__main__":
         # Transforming the iwn Green's functions into tau Green's functions
         G_tau_for_k = np.empty((N_k,len(beta_array_self)),dtype=float)
         plt.figure(4)
-        plt.yscale('log')
+        #plt.yscale('log')
         for i,k in enumerate(k_array):
             G_tau_for_k[i,:] = get_iwn_to_tau(G_k_iwn[i,:],beta) - 0.5 #+ ( 2.0 + (U**2)/4.0 )*beta_array_self[i]*(beta-beta_array_self[i])/4.0
             sum_rule_val_iqn_0_vs_q.append(4.0*np.cos(k)*(-G_tau_for_k[i,-1]))
@@ -300,6 +301,7 @@ if __name__ == "__main__":
                 f1.write("%f\t\t%f\t\t%f\n" % (iqn_array[i].imag,bubble_GG_iqn[i].real,bubble_GG_iqn[i].imag))
         
         f1.close()
+
         with open("test_bb_cubic_self.dat", "w") as f2:
             for i in range(len(bubble_GG_iqn_cubic)):
                 if i==0:
@@ -307,3 +309,8 @@ if __name__ == "__main__":
                 f2.write("%f\t\t%f\t\t%f\n" % (iqn_array[i].imag,bubble_GG_iqn_cubic[i].real,bubble_GG_iqn_cubic[i].imag))
 
         f2.close()
+
+        with open("test_bb_self_convergence.dat", "a+") as f3:
+            f3.write("%d\t\t%f\t\t%f\t\t%f\n" % (N_tau,bubble_GG_iqn_cubic[0].real,bubble_GG_iqn[0],sum_rule_val_iqn_0))
+
+        f3.close()

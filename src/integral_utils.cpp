@@ -213,37 +213,40 @@ std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,st
     return result;
 }
 
-// double Integrals::I2DRec(std::function<double(double,double)> funct,double x0,double xf,double y0,double yf,unsigned int currLevel,double tol,unsigned int maxVal,bool is_converged,double prevResult) const{
-//     // same spacing along both axes. No discrimination.
-//     double dx=(xf-x0)/(double)maxVal, dy=(yf-y0)/(double)maxVal;
-//     double resultSumNyorNx=0.0, resultSumNxNy=0.0, result;
+double Integrals::I1D(std::function<double(double)> funct,double k0,double kf,double tol,unsigned int maxDelta) const{
+    double dk=(kf-k0)/(double)maxDelta;
+    double result = 0.0, prevResult = 0.0, resultSumNk;
+    unsigned int iter=1;
+    bool is_converged=false;
+    while(!is_converged && iter<MAX_ITER_INTEGRAL){
+        resultSumNk = 0.0;
+        prevResult = result;
+        dk=(kf-k0)/(double)maxDelta;
+        for (unsigned int i=1; i<maxDelta; i++){
+            resultSumNk+=funct(k0+i*dk);
+        }
 
-//     for (unsigned int i=1; i<maxVal; i++){
-//         resultSumNyorNx+=funct(x0+i*dx,y0)+funct(x0+i*dx,yf)+funct(x0,y0+i*dy)+funct(xf,y0+i*dy);
-//     }
-//     for (unsigned int i=1; i<maxVal; i++){
-//         for (unsigned int j=1; j<maxVal; j++){
-//             resultSumNxNy+=funct(x0+i*dx,y0+j*dy);
-//         }
-//     }
-//     std::cout << "xf: " << xf << "x0: " <<  x0 << "yf: " << yf  << "y0: " << y0 << std::endl;
-//     result=0.25*dx*dy*(funct(x0,y0)+funct(xf,y0)+funct(x0,yf)+funct(xf,yf))+0.5*dx*dy*resultSumNyorNx+dx*dy*resultSumNxNy;
+        result = 0.5*dk*funct(k0)+0.5*dk*funct(kf)+dk*resultSumNk;
 
-//     if ( (currLevel!=1) && ((prevResult-2.0*result)<=tol) ){ // because the segment is always subdivided by half.
-//         is_converged=true;
-//     }
+        is_converged = (std::abs(prevResult-result)>tol) ? false : true;
 
-//     if (_maxLevel>=currLevel && is_converged){
-//         return result;
-//     }
-//     else if (_maxLevel<currLevel){
-//         std::cout << "Integral has not converged!" << "\n";
-//         std::cout << "Finished with value: " << result << std::endl;
-//         return result;
-//     }
-//     else{
-//         std::cout << currLevel << std::endl;
-//         currLevel++;
-//         return I2DRec(funct,x0,(xf-x0)/2.0,y0,yf,currLevel,tol,maxVal,is_converged,result)+I2DRec(funct,(xf-x0)/2.0,xf,y0,yf,currLevel,tol,maxVal,is_converged,result)+I2DRec(funct,x0,xf,y0,(yf-y0)/2.0,currLevel,tol,maxVal,is_converged,result)+I2DRec(funct,x0,xf,(yf-y0)/2.0,yf,currLevel,tol,maxVal,is_converged,result);
-//     }
-// }
+        if (is_converged)
+            break;
+
+        maxDelta*=2;
+        iter++;
+    }
+    
+    return result;
+}
+
+double Integrals::I1D(std::vector<double>& vecfunct,double delta_tau) const{
+    double result, resultSumNk = 0.0;
+
+    for (unsigned int i=1; i<vecfunct.size()-1; i++){
+        resultSumNk+=vecfunct[i];
+    }
+    result = 0.5*delta_tau*vecfunct[0]+0.5*delta_tau*vecfunct.back()+delta_tau*resultSumNk;
+    
+    return result;
+}

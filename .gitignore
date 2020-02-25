@@ -16,3 +16,4 @@ mea/Figs
 __pycache__
 data
 mea/test_bb_splines
+mea/bb*

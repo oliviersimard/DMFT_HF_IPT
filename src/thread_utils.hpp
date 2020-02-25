@@ -69,6 +69,7 @@ namespace ThreadFunctor{
             std::tuple< std::complex<double>,std::complex<double> > gamma_twoD_spsp_IPT(double kbarx_m_tildex,double kbary_m_tildey,std::complex<double> wtilde,std::complex<double> wbar) const;
             std::vector< std::complex<double> > buildGK1D(std::complex<double> ik, double k) const;
             std::vector< std::complex<double> > buildGK1D_IPT(std::complex<double> ik, double k) const;
+            std::complex<double> buildGk1D_IPT(std::complex<double> ik, double k) const;
             std::vector< std::complex<double> > buildGK2D(std::complex<double> ik, double kx, double ky) const;
             std::vector< std::complex<double> > buildGK2D_IPT(std::complex<double> ik, double kx, double ky) const;
             std::complex<double> gamma_oneD_spsp_full_lower(double kp,double kbar,std::complex<double> iknp,std::complex<double> wbar) const;
@@ -119,6 +120,9 @@ namespace ThreadFunctor{
     inline std::vector< std::complex<double> > ThreadWrapper::buildGK1D_IPT(std::complex<double> ik, double k) const{
         std::vector< std::complex<double> > GK = { 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ), 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) ) }; // UP, DOWN + GreenStuff::mu - GreenStuff::mu
         return GK;
+    }
+    inline std::complex<double> ThreadWrapper::buildGk1D_IPT(std::complex<double> ik, double k) const{
+        return 1.0/( ik + GreenStuff::mu - epsilonk(k) - _splInline.calculateSpline(ik.imag()) );
     }
     #elif DIM == 2
     inline std::vector< std::complex<double> > ThreadWrapper::buildGK2D_IPT(std::complex<double> ik, double kx, double ky) const{
