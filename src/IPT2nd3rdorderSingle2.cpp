@@ -205,7 +205,7 @@ void FFTtools::fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>
         data2.matsubara_t_pos.slice(timeGrid)(0,0)=-1.0-data2.matsubara_t_pos.slice(0)(0,0);
         break;
     case plain_negative:
-
+    
         for(size_t i=0; i<timeGrid; i++){
             F_decal[2*i]=substractG[i].real();
             F_decal[2*i+1]=-1.0*(substractG[i].imag()); // complex conjugate

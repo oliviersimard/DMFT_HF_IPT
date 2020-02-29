@@ -1,6 +1,29 @@
 import numpy as np
 from math import isclose
 import matplotlib.pyplot as plt
+from copy import deepcopy
+
+def get_iwn_to_tau(G_iwn, beta : float, type_of="Green"):
+    """This function computes transformation from iwn to tau for Green's function (type="Green") or
+    for it derivative (type=Derivative). *args represents the set of moments used to compute the extremal 
+    value of the derivative of G(tau) (sum rule). Usually only the first moment is included.
+    """
+    MM = len(G_iwn) # N = M/2
+    tau_final_G = np.zeros(MM+1,dtype=float)
+    # FFT
+    tau_resolved_G = np.fft.fft(G_iwn)
+    for i in range(MM):
+        tau_final_G[i] = ( np.exp( -1.j * np.pi * i * ( 1.0/(MM) - 1.0 ) )*tau_resolved_G[i] ).real
+
+    if type_of=="Green":
+        for i in range(MM):
+            tau_final_G[MM] += ( np.exp( -1.j * np.pi * (1.0-(MM)) )*G_iwn[i] ).real
+        tau_final_G *= (1./beta)
+
+    elif type_of=="Derivative":
+        tau_final_G *= (1./beta)
+
+    return tau_final_G
 
 class Cubic_spline(object):
     """Class for cubic spline.
@@ -58,7 +81,6 @@ class Cubic_spline(object):
         cls._rhs[size-1] = 3.0*( right_der - (cls._funct[size-1] - cls._funct[size-2])/cls._delta_beta )
         
         return None
-        #return cls._subdiagonal, cls._diagonal, cls._superdiagonal, cls._rhs 
         
     @classmethod
     def tridiagonal_LU_decomposition(cls) -> None:
@@ -75,7 +97,6 @@ class Cubic_spline(object):
             if cls._diagonal[size]==0.0:
                 raise Exception("Cannot have zeros along the diagonal...see last element.")
         return None
-        #return cls._subdiagonal, cls._diagonal, cls._superdiagonal
 
     @classmethod
     def tridiagonal_LU_solve(cls) -> None:
@@ -151,8 +172,6 @@ class Cubic_spline(object):
         # print("left_der ", left_most_val)
         # print("right_der ", right_most_val)
         
-        #assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
-        
         der_f = np.insert(der_f,0,left_most_val)
         der_f = np.append(der_f,right_most_val)
 
@@ -176,10 +195,8 @@ class Cubic_spline(object):
         right_most_val = ( 25.0/12.0*y_arr[-1] - 4.0*y_arr[-2] + 3.0*y_arr[-3] - 4.0/3.0*y_arr[-4] + 1.0/4.0*y_arr[-5] ) / h
         second_right_most_val = ( 25.0/12.0*y_arr[-2] - 4.0*y_arr[-3] + 3.0*y_arr[-4] - 4.0/3.0*y_arr[-5] + 1.0/4.0*y_arr[-6] ) / h
 
-        print("left_der ", left_most_val)
-        print("right_der ", right_most_val)
-        
-        #assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
+        # print("left_der ", left_most_val)
+        # print("right_der ", right_most_val)
         
         der_f = np.insert(der_f,0,second_left_most_val)
         der_f = np.insert(der_f,0,left_most_val)
@@ -208,10 +225,8 @@ class Cubic_spline(object):
         second_right_most_val = ( 49.0/20.0*y_arr[-2] - 6.0*y_arr[-3] + 15.0/2.0*y_arr[-4] - 20.0/3.0*y_arr[-5] + 15.0/4.0*y_arr[-6] - 6.0/5.0*y_arr[-7] + 1.0/6.0*y_arr[-8] ) / h
         third_right_most_val = ( 49.0/20.0*y_arr[-3] - 6.0*y_arr[-4] + 15.0/2.0*y_arr[-5] - 20.0/3.0*y_arr[-6] + 15.0/4.0*y_arr[-7] - 6.0/5.0*y_arr[-8] + 1.0/6.0*y_arr[-9] ) / h
 
-        print("left_der ", left_most_val)
-        print("right_der ", right_most_val)
-        
-        #assert isclose(np.abs(right_most_val),np.abs(left_most_val),abs_tol=1e-5), "The derivative end points have to be similar, otherwise the method lacks precision."
+        # print("left_der ", left_most_val)
+        # print("right_der ", right_most_val)
         
         der_f = np.insert(der_f,0,third_left_most_val)
         der_f = np.insert(der_f,0,second_left_most_val)
@@ -221,6 +236,52 @@ class Cubic_spline(object):
         der_f = np.append(der_f,right_most_val)
 
         return der_f
+
+    @staticmethod
+    def get_derivative_FFT(G_k_iwn, funct_dispersion, iwn_arr, k_arr, U : float, beta : float, mu : float, q=0.0, opt="positive"):
+        """This method computes the derivatives of G(tau) at boundaries for the cubic spline. Recall that only positive imaginary time
+        is used, i.e 0 < tau < beta. It takes care of subtracting the leading moments for smoother results.
+        
+        Parameters:
+            G_k_iwn (complex np.ndarray): Green's function mesh over (k,iwn)-space.
+            funct_dispersion (function): dispersion relation of the tight-binding model.
+            iwn_arr (complex np.array): Fermionic Matsubara frequencies.
+            k_arr (float np.array): k-space array.
+            U (float): Hubbard local interaction.
+            beta (float): Inverse temperature.
+            mu (float): chemical potential.
+            q (float): incoming momentum. Defaults q=0.0.
+            opt (str): positive or negative imaginary-time Green's function derivated. Takes in "positive" of "negative". 
+            Defaults opt="postitive".
+        
+        Returns:
+            dG_tau_for_k (float np.ndarray): imaginary-time Green's function derivative mesh over (k,iwn)-space.
+
+        """
+        dG_tau_for_k = np.empty((len(k_arr),len(iwn_arr)+1),dtype=float)
+        beta_arr = np.linspace(0.0,beta,len(iwn_arr)+1)
+        # Subtracting the leading moments of the Green's function
+        for j,iwn in enumerate(iwn_arr):
+            for l,k in enumerate(k_arr):
+                moments = 1.0/(iwn) + funct_dispersion(k+q)/(iwn*iwn) + (U**2/4.0 + funct_dispersion(k+q)**2)/(iwn**3)
+                # G
+                G_k_iwn[l,j] -= moments
+                if opt=="negative":
+                    G_k_iwn[l,j] = np.conj(G_k_iwn[l,j]) # because G(-tau)
+            G_k_iwn[:,j] *= -1.0*iwn
+        
+        # Calculating the dG/dtau objects
+        for l,k in enumerate(k_arr):
+            dG_tau_for_k[l,:] = get_iwn_to_tau(G_k_iwn[l,:],beta,type_of="Derivative")
+            for j,tau in enumerate(beta_arr):
+                if opt=="positive":
+                    dG_tau_for_k[l,j] += 0.5*funct_dispersion(k+q) + 0.5*( beta/2.0 - tau )*( U**2/4.0 + funct_dispersion(k+q)**2 )
+                elif opt=="negative":
+                    dG_tau_for_k[l,j] += 0.5*funct_dispersion(k+q) + 0.5*( tau - beta/2.0 )*( U**2/4.0 + funct_dispersion(k+q)**2 )
+            
+            dG_tau_for_k[l,-1] = funct_dispersion(k+q)-mu+U*0.5 - 1.0*dG_tau_for_k[l,0] # Assuming half-filling
+        
+        return dG_tau_for_k
 
 class FermionsvsBosons(Cubic_spline):
 
@@ -262,10 +323,9 @@ class FermionsvsBosons(Cubic_spline):
         Spp_0 = 2.0*Cubic_spline._mb[0]; Spp_beta = 6.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta + 2.0*Cubic_spline._mb[-2]
         
         # print("S_beta: ", S_beta, " S_0 ", S_0)
-        print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
+        # print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
         # print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
         
-        # print("S_beta: ", S_beta, " S_0 ", S_0)
         Sppp = np.empty((size_iqn,),dtype=complex)
         
         for i in range(size_iqn):
@@ -294,7 +354,7 @@ class FermionsvsBosons(Cubic_spline):
         S_0 = Cubic_spline._funct[0]; S_beta = Cubic_spline._ma[-2]*Cubic_spline._delta_beta**3 + Cubic_spline._mb[-2]*Cubic_spline._delta_beta**2 + Cubic_spline._mc[-2]*Cubic_spline._delta_beta + Cubic_spline._funct[-2] # Minus 2 here 
         Sp_0 = Cubic_spline._mc[0]; Sp_beta = 3.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta**2 + 2.0*Cubic_spline._mb[-2]*Cubic_spline._delta_beta + Cubic_spline._mc[-2]
         Spp_0 = 2.0*Cubic_spline._mb[0]; Spp_beta = 6.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta + 2.0*Cubic_spline._mb[-2]
-        print("S_beta: ", S_beta, " S_0 ", S_0)
+        # print("S_beta: ", S_beta, " S_0 ", S_0)
         # print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
         # print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
         Sppp = np.zeros((size_iwn,),dtype=complex)
