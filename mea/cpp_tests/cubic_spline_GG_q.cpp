@@ -11,13 +11,12 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 
 struct FileData;
 
-std::vector<double> get_derivative(std::vector<double> x_arr, std::vector<double> y_arr);
 FileData get_data(const std::string& strName, const unsigned int& Ntau);
 std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj="Green");
 template<typename T> std::vector< T > generate_random_numbers(size_t arr_size, T min, T max);
 arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector<double>& beta_arr, double U, double mu, double q=0.0, std::string opt="positive");
-double velocity(double k);
-std::complex<double> I1D_CPLX(std::vector< std::complex<double> >& vecfunct,double delta);
+inline double velocity(double k);
+void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false);
 
 struct FileData{
     std::vector<double> iwn;
@@ -32,13 +31,13 @@ typedef struct cplx_t{ // Custom data holder for the HDF5 handling
 
 int main(void){
 
-    std::string inputFilename("../data/Self_energy_1D_U_2.000000_beta_80.000000_n_0.500000_N_tau_4096_Nit_5.dat");
+    std::string inputFilename("../data/Self_energy_1D_U_2.000000_beta_20.000000_n_0.500000_N_tau_4096_Nit_5.dat");
     // Choose whether current-current or spin-spin correlation function is computed.
-    const bool is_jj = true; 
+    const bool is_jj = false; 
     const unsigned int Ntau = 2*4096;
     const unsigned int N_k = 600;
     const unsigned int N_q = 51;
-    const double beta = 80.0;
+    const double beta = 20.0;
     const double U = 2.0;
     const double mu = U/2.0; // Half-filling
     spline<double> splObj;
@@ -61,7 +60,7 @@ int main(void){
         q_array.push_back(q_tmp);
     }
     // HDF5 business
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_k)+std::string(".hdf5"));
+    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_k)+std::string("_isjj_")+std::to_string(is_jj)+std::string(".hdf5"));
     const H5std_string FILE_NAME( filename );
     const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;
@@ -182,86 +181,117 @@ int main(void){
             GG_iqn_q[j] = 1.0/(2.0*M_PI)*integralsObj.I1D_CPLX(GG_iqn_k_tmp,delta);
         }
 
-        try{
+        std::string DATASET_NAME("q_"+std::to_string(q_array[em]));
+        writeInHDF5File(GG_iqn_q, file, DATA_SET_DIM, RANK, MEMBER1, MEMBER2, DATASET_NAME);
 
-            H5::Exception::dontPrint();
-            // Casting all the real values into the following array to get around the custom type design. Also easier to read out using Python.
-            std::vector<cplx_t> custom_cplx_GG_iqn_q(DATA_SET_DIM);
-            std::transform(GG_iqn_q.begin(),GG_iqn_q.end(),custom_cplx_GG_iqn_q.begin(),[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
-
-            hsize_t dimsf[1];
-            dimsf[0] = DATA_SET_DIM;
-            H5::DataSpace dataspace( RANK, dimsf );
-
-            // H5::CompType std_cmplx_type( sizeof(std::complex<double>) );
-            // H5::FloatType datatype( H5::PredType::NATIVE_DOUBLE );
-            // datatype.setOrder( H5T_ORDER_LE );
-            // size_t size_real_cmplx = sizeof(((std::complex<double> *)0)->real());
-            // size_t size_imag_cmplx = sizeof(((std::complex<double> *)0)->imag());
-            // std_cmplx_type.insertMember( MEMBER1, size_real_cmplx, H5::PredType::NATIVE_DOUBLE);
-            // std_cmplx_type.insertMember( MEMBER2, size_imag_cmplx, H5::PredType::NATIVE_DOUBLE);
-
-            H5::CompType mCmplx_type( sizeof(cplx_t) );
-            mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
-            mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
-
-            // Create the dataset.
-            std::string DATASET_NAME("q_"+std::to_string(q_array[em]));
-            H5::DataSet* dataset;
-            // dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, std_cmplx_type, dataspace));
-            dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, mCmplx_type, dataspace));
-            // Write data to dataset
-            dataset->write( custom_cplx_GG_iqn_q.data(), mCmplx_type );
-
-            delete dataset;
-
-        } catch( H5::FileIException err ){
-            err.printErrorStack();
-            return -1;
-        }
-        // catch failure caused by the DataSet operations
-        catch( H5::DataSetIException error ){
-            error.printErrorStack();
-            return -1;
-        }
-        // catch failure caused by the DataSpace operations
-        catch( H5::DataSpaceIException error ){
-            error.printErrorStack();
-            return -1;
-        }
-        // catch failure caused by the DataSpace operations
-        catch( H5::DataTypeIException error ){
-            error.printErrorStack();
-            return -1;
-        }
     }
 
     delete file;
 
 }
 
+void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false){
+    /*  This method writes in an HDF5 file the data passed in the first entry "GG_iqn_q". The data has to be complex-typed. This function hinges on the
+    the existence of a custom complex structure "cplx_t" to parse in the data:
+    
+        typedef struct cplx_t{ // Custom data holder for the HDF5 handling
+            double re;
+            double im;
+        } cplx_t;
+        
+        Parameters:
+            GG_iqn_q (std::vector< std::complex<double> >&): function mesh over (iqn,q)-space.
+            file (H5::H5File*): pointer to file object.
+            DATA_SET_DIM (const unsigned int&): corresponds to the number of bosonic Matsubara frequencies and therefore to the length of columns in HDF5 file.
+            RANK (const int&): rank of the object to be saved. Should be 1.
+            MEMBER1 (const H5std_string&): name designating the internal metadata to label the first member variable of cplx_t structure.
+            MEMBER2 (const H5std_string&): name designating the internal metadata to label the second member variable of cplx_t structure.
+            DATASET_NAME (const std::string&): name of the dataset to be saved.
+        
+        Returns:
+            (void)
+    */
+    try{
+        H5::Exception::dontPrint();
+        // Casting all the real values into the following array to get around the custom type design. Also easier to read out using Python.
+        std::vector<cplx_t> custom_cplx_GG_iqn_q(DATA_SET_DIM);
+        std::transform(GG_iqn_q.begin(),GG_iqn_q.end(),custom_cplx_GG_iqn_q.begin(),[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
+
+        hsize_t dimsf[1];
+        dimsf[0] = DATA_SET_DIM;
+        H5::DataSpace dataspace( RANK, dimsf );
+
+        // H5::CompType std_cmplx_type( sizeof(std::complex<double>) );
+        // H5::FloatType datatype( H5::PredType::NATIVE_DOUBLE );
+        // datatype.setOrder( H5T_ORDER_LE );
+        // size_t size_real_cmplx = sizeof(((std::complex<double> *)0)->real());
+        // size_t size_imag_cmplx = sizeof(((std::complex<double> *)0)->imag());
+        // std_cmplx_type.insertMember( MEMBER1, size_real_cmplx, H5::PredType::NATIVE_DOUBLE);
+        // std_cmplx_type.insertMember( MEMBER2, size_imag_cmplx, H5::PredType::NATIVE_DOUBLE);
+
+        H5::CompType mCmplx_type( sizeof(cplx_t) );
+        mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
+        mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
+
+        // Create the dataset.
+        H5::DataSet* dataset;
+        // dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, std_cmplx_type, dataspace));
+        dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, mCmplx_type, dataspace));
+        // Write data to dataset
+        dataset->write( custom_cplx_GG_iqn_q.data(), mCmplx_type );
+
+        delete dataset;
+
+    } catch( H5::FileIException err ){
+        err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown!");
+    }
+    // catch failure caused by the DataSet operations
+    catch( H5::DataSetIException error ){
+        error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataSpaceIException error ){
+        error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataTypeIException error ){
+        error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException!");
+    }
+
+}
+
 inline double velocity(double k){
+    /* This method computes the current vertex in the case of a 1D nearest-neighbour dispersion relation.
+
+    Parameters:
+        k (double): k-point.
+
+    Returns:
+        (double): current vertex.
+    */
     return 2.0*std::sin(k);
 }
 
 arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector<double>& beta_arr, double U, double mu, double q, std::string opt){
-    /*  This method computes the derivatives of G(tau) at boundaries for the cubic spline. Recall that only positive imaginary time
+    /*  This method computes the derivatives of G(tau) (or G(-tau)) at boundaries for the cubic spline. Recall that only positive imaginary time
         is used, i.e 0 < tau < beta. It takes care of subtracting the leading moments for smoother results.
         
         Parameters:
-            G_k_iwn (complex np.ndarray): Green's function mesh over (k,iwn)-space.
-            funct_dispersion (function): dispersion relation of the tight-binding model.
-            iwn_arr (complex np.array): Fermionic Matsubara frequencies.
-            k_arr (float np.array): k-space array.
-            U (float): Hubbard local interaction.
-            beta (float): Inverse temperature.
-            mu (float): chemical potential.
-            q (float): incoming momentum. Defaults q=0.0.
-            opt (str): positive or negative imaginary-time Green's function derivated. Takes in "positive" of "negative". 
-            Defaults opt="postitive".
+            G_k_iwn (arma::Mat< std::complex<double> >): Green's function mesh over (k,iwn)-space.
+            iwn (const std::vector< std::complex<double> >&): Fermionic Matsubara frequencies.
+            k_arr (const std::vector<double>&): k-space vector.
+            beta_arr (const std::vector<double>&): imaginary-time vector.
+            U (double): Hubbard local interaction.
+            mu (double): chemical potential.
+            q (double): incoming momentum. Defaults q=0.0.
+            opt (std::string): positive or negative imaginary-time Green's function derivated. Takes in "positive" of "negative". Defaults opt="postitive".
         
         Returns:
-            dG_tau_for_k (float np.ndarray): imaginary-time Green's function derivative mesh over (k,iwn)-space.
+            dG_tau_for_k (arma::Mat<double>): imaginary-time Green's function derivative mesh over (k,tau)-space.
     */
     
     arma::Mat<double> dG_tau_for_k(k_arr.size(),beta_arr.size());
@@ -298,6 +328,19 @@ arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, 
 
 
 FileData get_data(const std::string& strName, const unsigned int& Ntau){
+    /*  This method fetches the data (self-energy) contained inside a file named "strName". The data has to be laid out 
+    the following way: 
+        1. 1st column are the fermionic Matsubara frequencies.
+        2. 2nd column are the real parts of the self-energy.
+        3. 3rd column are the imaginary parts of the self-energy. 
+        
+        Parameters:
+            strName (const std::string&): Filename containeing the self-energy.
+            Ntau (const unsigned int&): Number of fermionic Matsubara frequencies (length of the columns).
+        
+        Returns:
+            fileDataObj (struct FileData): struct containing a vector of data for each column in the data file.
+    */
 
     std::vector<double> iwn(Ntau,0.0);
     std::vector<double> re(Ntau,0.0);
@@ -340,6 +383,19 @@ FileData get_data(const std::string& strName, const unsigned int& Ntau){
 }
 
 std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj){
+    /*  This method computes the imaginary-time object related to "F_iwn". Prior to calling in this method, one needs
+    to subtract the leading moments of the object, be it the self-energy or the Green's function. 
+        
+        Parameters:
+            F_iwn (const std::vector< std::complex<double> >&): Object defined in fermionic Matsubara frequencies to translate to imaginary time.
+            beta (double): Inverse temperature.
+            obj (std::string): string specifying the nature of the object to be transformed. Defaults to "Green". Anything else chosen,
+            i.e "Derivative", means that the last component to the imaginary-time object (tau=beta) is left for later. This is particularly important for the derivative.
+        
+        Returns:
+            tau_final_G (std::vector<double>): vector containing the imaginary-time definition of the inputted object "F_iwn".
+    */
+
     size_t MM = F_iwn.size();
     //std::cout << "size: " << MM << std::endl;
     const std::complex<double> im(0.0,1.0);
@@ -370,6 +426,17 @@ std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_
 
 template<typename T>
 std::vector< T > generate_random_numbers(size_t arr_size, T min, T max){
+    /*  This template (T) method generates an array of random numbers. 
+        
+        Parameters:
+            arr_size (size_t): size of the vector to be generated randomly.
+            min (T): minimum value of the randomly generated vector.
+            max (T): maximum value of the randomly generated vector.
+        
+        Returns:
+            rand_num_container (std::vector< T >): vector containing the numbers generated randomly.
+    */
+
     srand(time(0));
     std::vector< T > rand_num_container(arr_size);
     T random_number;
@@ -378,15 +445,4 @@ std::vector< T > generate_random_numbers(size_t arr_size, T min, T max){
         rand_num_container[i] = random_number;
     }
     return rand_num_container;
-}
-
-std::complex<double> I1D_CPLX(std::vector< std::complex<double> >& vecfunct,double delta){
-    std::complex<double> result, resultSumNk(0.0,0.0);
-
-    for (unsigned int i=1; i<vecfunct.size()-1; i++){
-        resultSumNk+=vecfunct[i];
-    }
-    result = 0.5*delta*vecfunct[0]+0.5*delta*vecfunct.back()+delta*resultSumNk;
-    
-    return result;
 }

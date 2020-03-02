@@ -6,11 +6,11 @@ from re import findall
 from sys import exit
 from math import isclose
 
-def get_derivative(p1 : float, p2 : float, delta_x : float) -> float:
-    """p1 and p2 are the neighbouring points to the target points at which the derivative is looked for. delta_x is supposed to
+def get_derivative(p1 : float, p2 : float, p3 : float, p4 : float, delta_x : float) -> float:
+    """p1, p2, p3 and p4 are the neighbouring points to the target points at which the derivative is looked for. delta_x is supposed to
     be constant and represents the step between two images of the function.
     """
-    der = (p2 - p1) / (2.0*delta_x)
+    der = ( 1.0/12.0*p1 - 2.0/3.0*p2 + 2.0/3.0*p3 - 1.0/12.0*p4 ) / delta_x
     return der
 
 def pade(omega_n, f_n, omega):
@@ -154,7 +154,7 @@ if __name__=="__main__":
             q_tmp_val_im = np.array(list(map(lambda x: x.imag,q_tmp_val)))
             for j,om in enumerate(omega):
                 if om==0.0:
-                    re_sigma_jj[j] = get_derivative(q_tmp_val_im[j-1],q_tmp_val_im[j+1],2.0*(wmax)/(N_omega-1.)) 
+                    re_sigma_jj[j] = get_derivative(q_tmp_val_im[j-2],q_tmp_val_im[j-1],q_tmp_val_im[j+1],q_tmp_val_im[j+2],2.0*(wmax)/(N_omega-1.)) 
                 else:
                     re_sigma_jj[j] = q_tmp_val_im[j] / om  
             mesh_Omega_Q[i,:] = re_sigma_jj

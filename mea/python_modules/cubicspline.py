@@ -255,7 +255,7 @@ class Cubic_spline(object):
             Defaults opt="postitive".
         
         Returns:
-            dG_tau_for_k (float np.ndarray): imaginary-time Green's function derivative mesh over (k,iwn)-space.
+            dG_tau_for_k (float np.ndarray): imaginary-time Green's function derivative mesh over (k,tau)-space.
 
         """
         dG_tau_for_k = np.empty((len(k_arr),len(iwn_arr)+1),dtype=float)
