@@ -64,6 +64,7 @@ class Integrals{
         std::complex<double> I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,double tol=0.00001,unsigned int maxDelta=10) const;
         double I1D(std::function<double(double)> funct,double k0,double kf,double tol=0.00001,unsigned int maxDelta=10) const;
         double I1D(std::vector<double>& vecfunct,double delta_tau) const;
+        std::complex<double> I1D_CPLX(std::vector< std::complex<double> >& vecfunct,double delta) const;
 
         // False position method to find roots
         double falsePosMethod(std::function<double(double)>,double,double,const double tol=ROOT_FINDING_TOL) const noexcept(false);

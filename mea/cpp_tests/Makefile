@@ -2,23 +2,26 @@ SRC=$(PWD)/../../src
 OBJ=$(PWD)/obj
 
 CXX=g++ -std=c++11 -Wall -g
-INC=${HOME}/gsl/include
-LIB=${HOME}/gsl/lib
+INC=${HOME}/gsl/include -I${HOME}/install/HDF5/1.10.6/include
+LIB=${HOME}/gsl/lib -L${HOME}/install/HDF5/1.10.6/lib
 
-CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 #-lgtest -lgmock -lpthread
+CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -lhdf5 -lhdf5_hl -lhdf5_cpp #-lgtest -lgmock -lpthread
 
 PROG=CPP-TESTS
 
 all: $(PROG)
 
-$(PROG): $(OBJ)/green_utils.o $(OBJ)/cubic_spline.o
-	$(CXX) $(OBJ)/green_utils.o $(OBJ)/cubic_spline.o $(CXXFLAGS) -o spl.out
+$(PROG): $(OBJ)/green_utils.o $(OBJ)/cubic_spline.o $(OBJ)/integral_utils.o
+	$(CXX) $(OBJ)/green_utils.o $(OBJ)/cubic_spline.o $(OBJ)/integral_utils.o $(CXXFLAGS) -o spl.out
 
 $(OBJ)/green_utils.o: $(SRC)/green_utils.cpp
 	$(CXX) -c -I$(INC) $(SRC)/green_utils.cpp -o $(OBJ)/green_utils.o
 
-$(OBJ)/cubic_spline.o: $(PWD)/spline_cpp_tests.cpp
-	$(CXX) -c -I$(INC) $(PWD)/spline_cpp_tests.cpp -o $(OBJ)/cubic_spline.o
+$(OBJ)/cubic_spline.o: $(PWD)/cubic_spline_GG_q.cpp
+	$(CXX) -c -I$(INC) $(PWD)/cubic_spline_GG_q.cpp -o $(OBJ)/cubic_spline.o
+
+$(OBJ)/integral_utils.o: $(SRC)/integral_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/integral_utils.cpp -o $(OBJ)/integral_utils.o
 
 clean:
 	rm -f $(OBJ)/* $(PWD)/spl.out

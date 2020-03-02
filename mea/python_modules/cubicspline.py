@@ -259,20 +259,21 @@ class Cubic_spline(object):
 
         """
         dG_tau_for_k = np.empty((len(k_arr),len(iwn_arr)+1),dtype=float)
+        G_k_iwn_tmp = deepcopy(G_k_iwn)
         beta_arr = np.linspace(0.0,beta,len(iwn_arr)+1)
         # Subtracting the leading moments of the Green's function
         for j,iwn in enumerate(iwn_arr):
             for l,k in enumerate(k_arr):
                 moments = 1.0/(iwn) + funct_dispersion(k+q)/(iwn*iwn) + (U**2/4.0 + funct_dispersion(k+q)**2)/(iwn**3)
                 # G
-                G_k_iwn[l,j] -= moments
+                G_k_iwn_tmp[l,j] -= moments
                 if opt=="negative":
-                    G_k_iwn[l,j] = np.conj(G_k_iwn[l,j]) # because G(-tau)
-            G_k_iwn[:,j] *= -1.0*iwn
+                    G_k_iwn_tmp[l,j] = np.conj(G_k_iwn_tmp[l,j]) # because G(-tau)
+            G_k_iwn_tmp[:,j] *= -1.0*iwn
         
         # Calculating the dG/dtau objects
         for l,k in enumerate(k_arr):
-            dG_tau_for_k[l,:] = get_iwn_to_tau(G_k_iwn[l,:],beta,type_of="Derivative")
+            dG_tau_for_k[l,:] = get_iwn_to_tau(G_k_iwn_tmp[l,:],beta,type_of="Derivative")
             for j,tau in enumerate(beta_arr):
                 if opt=="positive":
                     dG_tau_for_k[l,j] += 0.5*funct_dispersion(k+q) + 0.5*( beta/2.0 - tau )*( U**2/4.0 + funct_dispersion(k+q)**2 )

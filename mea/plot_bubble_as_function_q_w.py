@@ -127,6 +127,7 @@ if __name__=="__main__":
 
         wmax = float(findall(r"(?<=wmax_)(\d*\.\d+|\d+)",options.data)[0])
         U = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",options.data)[0])
+        beta = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",options.data)[0])
 
         hf = h5py.File(options.data,"r")
         N_q = len(hf.keys())
@@ -177,7 +178,8 @@ if __name__=="__main__":
             
             plt.ylabel(r"$\omega$")
             plt.xlabel(r"$\mathbf{q}/\pi$")
-            plt.title(r"$\operatorname{Re}\sigma_{jj}(\omega,\mathbf{q})$")
+            plt.title(r"$\operatorname{Re}\sigma_{jj}(\omega,\mathbf{q})$ without velocities at "+r"$U={0}t$ and $\beta={1}/t$".format(U,beta))
+            #plt.title(r"$\operatorname{Re}\sigma_{jj}(\omega,\mathbf{q})$ at "+r"$U={0}t$ and $\beta={1}/t$".format(U,beta))
             plt.xticks(np.arange(min(q_arr),max(q_arr)+0.25,0.25))
             plt.yticks(np.arange(-wmax,wmax+2.0,2.0))
             im = plt.imshow(mesh_Omega_Q.transpose(), cmap=plt.cm.Blues, extent=(min(q_arr), max(q_arr), -wmax, wmax), vmax=6, vmin=0, aspect='auto', interpolation='bilinear')  

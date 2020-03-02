@@ -17,3 +17,4 @@ __pycache__
 data
 mea/test_bb_splines
 mea/bb*
+mea/cpp_tests/bb*

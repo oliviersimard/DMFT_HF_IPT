@@ -452,9 +452,9 @@ std::vector< std::complex<T> > spline<T>::bosonic_corr(const std::vector< std::c
     _Sp_N_beta=3.0*m_a[size-1]*h_last*h_last+2.0*m_b[size-1]*h_last+m_c[size-1];
     _Spp_N_beta=6.0*m_a[size-1]*h_last+2.0*m_b[size-1];
 
-    std::cout << "S_beta: " << _S_N_beta << " S_0 " << _S_1_0 << "\n";
-    std::cout << "Sp_beta: " << _Sp_N_beta << " Sp_0 " << _Sp_1_0 << "\n";
-    std::cout << "Spp_beta: " << _Spp_N_beta << " Spp_0 " << _Spp_1_0 << "\n";
+    // std::cout << "S_beta: " << _S_N_beta << " S_0 " << _S_1_0 << "\n";
+    // std::cout << "Sp_beta: " << _Sp_N_beta << " Sp_0 " << _Sp_1_0 << "\n";
+    // std::cout << "Spp_beta: " << _Spp_N_beta << " Spp_0 " << _Spp_1_0 << "\n";
 
     // This will be used later for FFT.
     for (size_t n=0; n<size; n++){

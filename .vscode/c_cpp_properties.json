@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${env:HOME}/gsl/include/**",
-                "${env:HOME}/install/alglib/src/**"
+                "${env:HOME}/install/alglib/src/**",
+                "${env:HOME}/install/HDF5/1.10.6/include/**"
             ],
             "defines": [],
             "macFrameworkPath": [

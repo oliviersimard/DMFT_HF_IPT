@@ -100,8 +100,7 @@ if __name__=="__main__":
     
     sum_rule_val_iqn_0 = 1.0/N_k*sum(sum_rule_val_iqn_0_vs_q)
     print("Sum rule: ", sum_rule_val_iqn_0)
-    plt.show()
-    exit(0)
+    
     # plt.figure(1)
     # for n in range(0,N_k,N_k//10):
     #     #der_G_vs_k_6 = cs.Cubic_spline.get_derivative_6th_order(beta_array_self,G_tau_for_k_2[n,:])

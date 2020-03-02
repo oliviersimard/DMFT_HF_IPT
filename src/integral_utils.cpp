@@ -250,3 +250,14 @@ double Integrals::I1D(std::vector<double>& vecfunct,double delta_tau) const{
     
     return result;
 }
+
+std::complex<double> Integrals::I1D_CPLX(std::vector< std::complex<double> >& vecfunct,double delta) const{
+    std::complex<double> result, resultSumNk(0.0,0.0);
+
+    for (unsigned int i=1; i<vecfunct.size()-1; i++){
+        resultSumNk+=vecfunct[i];
+    }
+    result = 0.5*delta*vecfunct[0]+0.5*delta*vecfunct.back()+delta*resultSumNk;
+    
+    return result;
+}
