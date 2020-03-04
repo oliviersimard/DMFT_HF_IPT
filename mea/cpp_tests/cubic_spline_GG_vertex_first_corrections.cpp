@@ -1,5 +1,6 @@
-#include "../../src/tridiagonal.hpp"
-#include "../../src/integral_utils.hpp"
+//#include "../../src/tridiagonal.hpp"
+//#include "../../src/integral_utils.hpp"
+#include "../../src/IPT2nd3rdorderSingle2.hpp"
 #include <fftw3.h>
 #include <fstream>
 #include "H5Cpp.h" 
@@ -17,7 +18,8 @@ template<typename T> std::vector< T > generate_random_numbers(size_t arr_size, T
 arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector<double>& beta_arr, double U, double mu, double q=0.0, std::string opt="positive");
 inline double velocity(double k) noexcept;
 void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false);
-inline void sum_rule_iqn_0(double n_k, double k, double& sum_rule_total, unsigned int N_k) noexcept;
+inline void sum_rule_iqn_0(double n_k, double k, double& sum_rule_total, unsigned int N_q) noexcept;
+std::complex<double> getGreen(double k, double mu, std::complex<double> iwn, IPT2::SplineInline< std::complex<double> >& splInlineobj);
 
 struct FileData{
     std::vector<double> iwn;
@@ -32,41 +34,40 @@ typedef struct cplx_t{ // Custom data holder for the HDF5 handling
 
 int main(void){
     
-    std::string inputFilename("../data/Self_energy_1D_U_14.000000_beta_30.000000_n_0.500000_N_tau_8192_Nit_12.dat");
+    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_1024_Nit_32.dat");
+    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_2048");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true; 
-    const unsigned int Ntau = 2*8192;
-    const unsigned int N_k = 800;
-    const unsigned int N_q = 31;
-    const double beta = 30.0;
-    const double U = 14.0;
+    const unsigned int Ntau = 2*1024;
+    const unsigned int N_q = 500;
+    const double beta = 50.0;
+    const double U = 10.0;
     const double mu = U/2.0; // Half-filling
-    spline<double> splObj;
+    // k_tilde and k_bar momenta
+    const double k_tilde = M_PI;
+    const double k_bar = M_PI;
+    const double qq = 0.0;
+
     // beta array constructed
     std::vector<double> beta_array;
     for (size_t j=0; j<=Ntau; j++){
         double beta_tmp = j*beta/(Ntau);
         beta_array.push_back(beta_tmp);
     }
-    // k_array constructed
-    std::vector<double> k_array;
-    for (size_t l=0; l<N_k; l++){
-        double k_tmp = l*2.0*M_PI/(double)(N_k-1);
-        k_array.push_back(k_tmp);
-    }
-    // q_array constructed
-    std::vector<double> q_array;
+    // q_tilde_array constructed
+    std::vector<double> q_tilde_array;
     for (size_t l=0; l<N_q; l++){
-        double q_tmp = l*2.0*M_PI/(double)(N_q-1);
-        q_array.push_back(q_tmp);
+        double q_tilde_tmp = l*2.0*M_PI/(double)(N_q-1);
+        q_tilde_array.push_back(q_tilde_tmp);
     }
     // HDF5 business
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_k)+std::string("_isjj_")+std::to_string(is_jj)+std::string(".hdf5"));
+    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string(".hdf5"));
     const H5std_string FILE_NAME( filename );
     const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;
     const H5std_string MEMBER1( "RE" );
     const H5std_string MEMBER2( "IM" );
+    
     H5::H5File* file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     // Getting the data
     FileData dataFromFile = get_data(inputFilename,Ntau);
@@ -87,143 +88,150 @@ int main(void){
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
     }
 
-    // Building the lattice Green's function from the local DMFT self-energy
-    arma::Mat< std::complex<double> > G_k_iwn(k_array.size(),iwn.size());
-    for (size_t l=0; l<k_array.size(); l++){
-        for (size_t j=0; j<iwn.size(); j++){
-            G_k_iwn(l,j) = 1.0/( iwn[j] + mu - epsilonk(k_array[l]) - sigma_iwn[j] );
+    spline<double> splObj;
+    std::vector<double> initVec(2*Ntau,0.0); // This data contains twice as much data to perform the interpolation
+    IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn,iqn);
+    splInlineObj.loadFileSpline(inputFilenameLoad,IPT2::spline_type::linear);
+
+    
+    // Should be a loop over the external momentum from this point on...
+    arma::Mat< std::complex<double> > G_k_bar_q_tilde_iwn(q_tilde_array.size(),iwn.size());
+    arma::Mat< std::complex<double> > G_k_tilde_q_tilde_iwn(q_tilde_array.size(),iwn.size());
+    arma::Mat<double> G_k_bar_q_tilde_tau(q_tilde_array.size(),Ntau+1);
+    arma::Mat<double> G_k_tilde_q_tilde_tau(q_tilde_array.size(),Ntau+1);
+    std::vector<double> FFT_k_bar_q_tilde_tau;
+    std::vector<double> FFT_k_tilde_q_tilde_tau;
+    arma::Mat<double> dGG_tau_for_k(q_tilde_array.size(),beta_array.size());
+    std::vector< std::complex<double> > cubic_spline_GG_iqn(iqn.size());
+
+    // Computing the derivatives for given (k_tilde,k_bar) tuple. Used inside the cubic spline algorithm...
+    for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
+        // Building the lattice Green's function from the local DMFT self-energy
+        for (size_t l=0; l<q_tilde_array.size(); l++){
+            G_k_bar_q_tilde_iwn(l,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(k_bar-q_tilde_array[l]) - sigma_iwn[n_bar] );
+        }
+    }
+    arma::Mat<double> dG_dtau_m_FFT_k_bar = get_derivative_FFT(G_k_bar_q_tilde_iwn,iwn,q_tilde_array,beta_array,U,mu,k_bar,std::string("negative"));
+
+    for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
+        for (size_t l=0; l<q_tilde_array.size(); l++){
+            // Substracting the tail of the Green's function
+            G_k_bar_q_tilde_iwn(l,n_bar) -= 1.0/(iwn[n_bar]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
 
-    arma::Mat<double> dG_dtau_m_FFT = get_derivative_FFT(G_k_iwn,iwn,k_array,beta_array,U,mu,0.0,std::string("negative"));
+    for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
+        // Building the lattice Green's function from the local DMFT self-energy
+        for (size_t l=0; l<q_tilde_array.size(); l++){
+            G_k_tilde_q_tilde_iwn(l,n_tilde) = 1.0/( ( iwn[n_tilde] ) + mu - epsilonk(k_tilde-q_tilde_array[l]) - sigma_iwn[n_tilde] );
+            // Substracting the tail of the Green's function
+            G_k_tilde_q_tilde_iwn(l,n_tilde) -= 1.0/(iwn[n_tilde]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+        }
+    }
+    arma::Mat<double> dG_dtau_FFT_k_tilde = get_derivative_FFT(G_k_tilde_q_tilde_iwn,iwn,q_tilde_array,beta_array,U,mu,k_tilde);
+
+    for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
+        for (size_t l=0; l<q_tilde_array.size(); l++){
+            // Substracting the tail of the Green's function
+            G_k_tilde_q_tilde_iwn(l,n_tilde) -= 1.0/(iwn[n_tilde]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+        }
+    }
 
     /* TEST dG(-tau)/dtau */
-    std::ofstream test1("test_1.dat", std::ios::out);
+    std::ofstream test1("test_1_corr.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test1 << beta_array[j] << "  " << dG_dtau_m_FFT(12,j) << "\n";
+        test1 << beta_array[j] << "  " << dG_dtau_m_FFT_k_bar(52,j) << "\n";
     }
     test1.close();
-    
-    // Substracting the tail of the Green's function
-    for (size_t l=0; l<k_array.size(); l++){
-        for (size_t j=0; j<iwn.size(); j++){
-            G_k_iwn(l,j) -= 1.0/(iwn[j]) + epsilonk(k_array[l])/iwn[j]/iwn[j] + ( U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]) )/iwn[j]/iwn[j]/iwn[j];
-        }
-    }
+
     // FFT of G(iwn) --> G(tau)
-    arma::Mat<double> G_k_tau(k_array.size(),Ntau+1);
-    std::vector<double> FFT_k_tau;
-    double sum_rule_val = 0.0;
-    for (size_t l=0; l<k_array.size(); l++){
-        std::vector< std::complex<double> > G_iwn_k_slice(G_k_iwn(l,arma::span::all).begin(),G_k_iwn(l,arma::span::all).end());
-        FFT_k_tau = get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
+    for (size_t l=0; l<q_tilde_array.size(); l++){
+        std::vector< std::complex<double> > G_iwn_k_slice(G_k_bar_q_tilde_iwn(l,arma::span::all).begin(),G_k_bar_q_tilde_iwn(l,arma::span::all).end());
+        FFT_k_bar_q_tilde_tau = get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
         for (size_t i=0; i<beta_array.size(); i++){
-            G_k_tau(l,i) = FFT_k_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]) + 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]));
+            G_k_bar_q_tilde_tau(l,i) = FFT_k_bar_q_tilde_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
         }
-        sum_rule_iqn_0(-1.0*G_k_tau(l,Ntau),k_array[l],sum_rule_val,N_k);
     }
-    std::cout << "The sum rule gives: " << sum_rule_val << "\n";
+
+    // FFT of G(iwn) --> G(tau)
+    for (size_t l=0; l<q_tilde_array.size(); l++){
+        std::vector< std::complex<double> > G_iwn_k_slice(G_k_tilde_q_tilde_iwn(l,arma::span::all).begin(),G_k_tilde_q_tilde_iwn(l,arma::span::all).end());
+        FFT_k_tilde_q_tilde_tau = get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
+        for (size_t i=0; i<beta_array.size(); i++){
+            G_k_tilde_q_tilde_tau(l,i) = FFT_k_tilde_q_tilde_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
+        }
+    }
 
     /* TEST G(-tau) */
-    std::ofstream test2("test_2.dat", std::ios::out);
+    std::ofstream test2("test_2_corr.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test2 << beta_array[j] << "  " << -1.0*G_k_tau(12,Ntau-j) << "\n";
+        test2 << beta_array[j] << "  " << -1.0*G_k_bar_q_tilde_tau(52,Ntau-j) << "\n";
     }
     test2.close();
+
+    arma::Cube< std::complex<double> > cub_spl_GG_n_bar_vs_n_tilde(iwn.size(),iwn.size(),q_tilde_array.size());
+    for (size_t l=0; l<q_tilde_array.size(); l++){
+        spline<double> splObj_GG;
+        arma::Cube<double> GG_tau_for_k(2,2,beta_array.size());
+
+        for (size_t i=0; i<beta_array.size(); i++){
+            dGG_tau_for_k(l,i) = (-2.0)*( G_k_tilde_q_tilde_tau(l,i)*dG_dtau_m_FFT_k_bar(l,i) - dG_dtau_FFT_k_tilde(l,i)*G_k_bar_q_tilde_tau(l,Ntau-i) );
+            GG_tau_for_k.slice(i)(0,0) = (-2.0)*(-1.0)*( G_k_tilde_q_tilde_tau(l,i)*G_k_bar_q_tilde_tau(l,Ntau-i) );
+        }
+
+        // Taking the derivative for boundary conditions
+        double left_der_GG = dGG_tau_for_k(l,0);
+        double right_der_GG = dGG_tau_for_k(l,Ntau);
+
+        splObj_GG.set_boundary(spline<double>::bd_type::first_deriv,left_der_GG,spline<double>::bd_type::first_deriv,right_der_GG);
+        splObj_GG.set_points(beta_array,GG_tau_for_k);
+
+        for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
+            std::vector< std::complex<double> > cub_spl_GG = splObj_GG.bosonic_corr_single_ladder(iwn,beta,n_bar);
+            cub_spl_GG_n_bar_vs_n_tilde.slice(l)(n_bar,arma::span::all) = arma::Row< std::complex<double> >(cub_spl_GG);
+        }
+    }
+    for (auto el : cub_spl_GG_n_bar_vs_n_tilde.slice(0)(0,arma::span::all)){
+        std::cout << el << std::endl;
+    }
     exit(0);
 
-    // Should be a loop over the external momentum from this point on...
-    arma::Mat< std::complex<double> > G_k_q_iwn(k_array.size(),iwn.size());
-    arma::Mat<double> G_k_q_tau(k_array.size(),Ntau+1);
-    std::vector<double> FFT_k_q_tau;
-    arma::Mat<double> dGG_tau_for_k(k_array.size(),beta_array.size());
-    arma::Mat< std::complex<double> > cubic_spline_GG_iqn_k(iqn.size(),k_array.size());
-    arma::Cube<double> GG_tau_for_k(2,2,beta_array.size());
-    for (size_t em=0; em<q_array.size(); em++){
-        std::cout << "q: " << q_array[em] << "\n";
-        // Building the lattice Green's function from the local DMFT self-energy
-        for (size_t l=0; l<k_array.size(); l++){
-            for (size_t j=0; j<iwn.size(); j++){
-                G_k_q_iwn(l,j) = 1.0/( iwn[j] + mu - epsilonk(k_array[l]+q_array[em]) - sigma_iwn[j] );
+    const Integrals integralsObj;
+    arma::Mat< std::complex<double> > GG_n_bar_n_tilde(iwn.size(),iwn.size());
+    constexpr double delta = 2.0*M_PI/(double)(N_q-1);
+    for (size_t em=0; em<iqn.size(); em++){
+        for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
+            for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
+                std::vector< std::complex<double> > GG_n_bar_n_tilde_k_tmp(cub_spl_GG_n_bar_vs_n_tilde(arma::span(n_bar,n_bar),arma::span(n_tilde,n_tilde),arma::span::all).begin(),cub_spl_GG_n_bar_vs_n_tilde(arma::span(n_bar,n_bar),arma::span(n_tilde,n_tilde),arma::span::all).end());
+                // This part remains to be done....
+                GG_n_bar_n_tilde(n_bar,n_tilde) = getGreen(k_tilde,mu,iwn[n_tilde],splInlineObj)*getGreen(k_tilde+qq,mu,iwn[n_tilde]+iqn[em],splInlineObj)*( 1.0 / ( 1.0 + U/(2.0*M_PI)*integralsObj.I1D_CPLX(GG_n_bar_n_tilde_k_tmp,delta) ) )*getGreen(k_bar,mu,iwn[n_bar],splInlineObj)*getGreen(k_bar+qq,mu,iwn[n_bar]+iqn[em],splInlineObj);
             }
         }
-
-        arma::Mat<double> dG_dtau_FFT_q = get_derivative_FFT(G_k_q_iwn,iwn,k_array,beta_array,U,mu,q_array[em]);
-
-        // Substracting the tail of the Green's function
-        for (size_t l=0; l<k_array.size(); l++){
-            for (size_t j=0; j<iwn.size(); j++){
-                G_k_q_iwn(l,j) -= 1.0/(iwn[j]) + epsilonk(k_array[l]+q_array[em])/iwn[j]/iwn[j] + ( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) )/iwn[j]/iwn[j]/iwn[j];
-            }
-        }
-        // FFT of G(iwn) --> G(tau)
-        for (size_t l=0; l<k_array.size(); l++){
-            std::vector< std::complex<double> > G_iwn_k_q_slice(G_k_q_iwn(l,arma::span::all).begin(),G_k_q_iwn(l,arma::span::all).end());
-            FFT_k_q_tau = get_iwn_to_tau(G_iwn_k_q_slice,beta); // beta_arr.back() is beta
-            for (size_t i=0; i<beta_array.size(); i++){
-                G_k_q_tau(l,i) = FFT_k_q_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]+q_array[em]) + 0.25*beta_array[i]*(beta-beta_array[i])*( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) );
-            }
-        }
-
-        for (size_t l=0; l<k_array.size(); l++){
-            spline<double> splObj_GG;
-            if (is_jj){
-                for (size_t i=0; i<beta_array.size(); i++){
-                    dGG_tau_for_k(l,i) = velocity(k_array[l])*velocity(k_array[l])*(-2.0)*( dG_dtau_m_FFT(l,i)*G_k_q_tau(l,i) - G_k_tau(l,Ntau-i)*dG_dtau_FFT_q(l,i) );
-                    GG_tau_for_k.slice(i)(0,0) = velocity(k_array[l])*velocity(k_array[l])*(-2.0)*(-1.0)*( G_k_q_tau(l,i)*G_k_tau(l,Ntau-i) );
-                }
-            }else{
-                for (size_t i=0; i<beta_array.size(); i++){
-                    dGG_tau_for_k(l,i) = (-2.0)*( dG_dtau_m_FFT(l,i)*G_k_q_tau(l,i) - G_k_tau(l,Ntau-i)*dG_dtau_FFT_q(l,i) );
-                    GG_tau_for_k.slice(i)(0,0) = (-2.0)*(-1.0)*( G_k_q_tau(l,i)*G_k_tau(l,Ntau-i) );
-                }
-            }
-
-            // Taking the derivative for boundary conditions
-            double left_der_GG = dGG_tau_for_k(l,0);
-            double right_der_GG = dGG_tau_for_k(l,Ntau);
-
-            splObj_GG.set_boundary(spline<double>::bd_type::first_deriv,left_der_GG,spline<double>::bd_type::first_deriv,right_der_GG);
-            splObj_GG.set_points(beta_array,GG_tau_for_k);
-
-            std::vector< std::complex<double> > cub_spl_GG = splObj_GG.bosonic_corr(iqn,beta);
-            for (size_t i=0; i<cub_spl_GG.size(); i++){
-                cubic_spline_GG_iqn_k(i,l) = cub_spl_GG[i];
-            }
-        }
-
-        const Integrals integralsObj;
-        std::vector< std::complex<double> > GG_iqn_q(iqn.size());
-        const double delta = 2.0*M_PI/(double)(N_k-1);
-        for (size_t j=0; j<iqn.size(); j++){
-            std::vector< std::complex<double> > GG_iqn_k_tmp(cubic_spline_GG_iqn_k(j,arma::span::all).begin(),cubic_spline_GG_iqn_k(j,arma::span::all).end());
-            GG_iqn_q[j] = 1.0/(2.0*M_PI)*integralsObj.I1D_CPLX(GG_iqn_k_tmp,delta);
-        }
-
-        std::string DATASET_NAME("q_"+std::to_string(q_array[em]));
-        writeInHDF5File(GG_iqn_q, file, DATA_SET_DIM, RANK, MEMBER1, MEMBER2, DATASET_NAME);
-
+        cubic_spline_GG_iqn[em] = (U/beta/beta)*arma::accu(GG_n_bar_n_tilde); // summing over the internal ikn_tilde and ikn_bar
     }
+
+    std::string DATASET_NAME("q_"+std::to_string(qq));
+    writeInHDF5File(cubic_spline_GG_iqn, file, DATA_SET_DIM, RANK, MEMBER1, MEMBER2, DATASET_NAME);
 
     delete file;
 
 }
 
-inline void sum_rule_iqn_0(double n_k, double k, double& sum_rule_total, unsigned int N_k) noexcept{
+inline void sum_rule_iqn_0(double n_k, double k, double& sum_rule_total, unsigned int N_q) noexcept{
     /*  This method computes the sum rule that determines the value of the optical conductivity at iqn=0. This sum rule reads:
 
-        sum_rule = 1/N_k*sum_{k,sigma} d^2\epsilon_k/dk^2 <n_{k,sigma}>.
+        sum_rule = 1/N_q*sum_{k,sigma} d^2\epsilon_k/dk^2 <n_{k,sigma}>.
         
         Parameters:
             n_k (double): electron density at a given k-point.
             k (double): k-point.
             sum_rule_total (double&): total of sum rule, that is the expression above as final result after whole k-summation.
-            N_k (unsigned int): Number of k-points spanning the original Brillouin zone.
+            N_q (unsigned int): Number of k-points spanning the original Brillouin zone.
         
         Returns:
             (void).
     */
-    sum_rule_total += 1.0/N_k*4.0*std::cos(k)*n_k;
+    sum_rule_total += 1.0/N_q*4.0*std::cos(k)*n_k;
 }
 
 void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false){
@@ -300,6 +308,10 @@ void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* 
 
 }
 
+inline std::complex<double> getGreen(double k, double mu, std::complex<double> iwn, IPT2::SplineInline< std::complex<double> >& splInlineobj){
+    return 1.0 / ( iwn + mu - epsilonk(k) - splInlineobj.calculateSpline( iwn.imag() ) );
+}
+
 inline double velocity(double k) noexcept{
     /* This method computes the current vertex in the case of a 1D nearest-neighbour dispersion relation.
 
@@ -312,51 +324,37 @@ inline double velocity(double k) noexcept{
     return 2.0*std::sin(k);
 }
 
-arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector<double>& beta_arr, double U, double mu, double q, std::string opt){
-    /*  This method computes the derivatives of G(tau) (or G(-tau)) at boundaries for the cubic spline. Recall that only positive imaginary time
-        is used, i.e 0 < tau < beta. It takes care of subtracting the leading moments for smoother results.
-        
-        Parameters:
-            G_k_iwn (arma::Mat< std::complex<double> >): Green's function mesh over (k,iwn)-space.
-            iwn (const std::vector< std::complex<double> >&): Fermionic Matsubara frequencies.
-            k_arr (const std::vector<double>&): k-space vector.
-            beta_arr (const std::vector<double>&): imaginary-time vector.
-            U (double): Hubbard local interaction.
-            mu (double): chemical potential.
-            q (double): incoming momentum. Defaults q=0.0.
-            opt (std::string): positive or negative imaginary-time Green's function derivated. Takes in "positive" of "negative". Defaults opt="postitive".
-        
-        Returns:
-            dG_tau_for_k (arma::Mat<double>): imaginary-time Green's function derivative mesh over (k,tau)-space.
+arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& q_arr, const std::vector<double>& beta_arr, double U, double mu, double k, std::string opt){
+    /*  The main difference here from the previous method is that the k momenta are switched, i.e. the k-vector summed over is subtracted now.
     */
     
-    arma::Mat<double> dG_tau_for_k(k_arr.size(),beta_arr.size());
+    arma::Mat<double> dG_tau_for_k(q_arr.size(),beta_arr.size());
     const double beta = beta_arr.back();
     // Subtracting the leading moments of the Green's function...
     std::complex<double> moments;
-    for (size_t j=0; j<iwn.size(); j++){
-        for (size_t l=0; l<k_arr.size(); l++){
-            moments = 1.0/iwn[j] + epsilonk(k_arr[l]+q)/iwn[j]/iwn[j] + ( U*U/4.0 + epsilonk(k_arr[l]+q)*epsilonk(k_arr[l]+q) )/iwn[j]/iwn[j]/iwn[j];
-            G_k_iwn(l,j) -= moments;
+    for (size_t n_k=0; n_k<iwn.size(); n_k++){
+        for (size_t l=0; l<q_arr.size(); l++){
+            moments = 1.0/( iwn[n_k] ) + epsilonk(k-q_arr[l])/( iwn[n_k] )/( iwn[n_k] ) + ( U*U/4.0 + epsilonk(k-q_arr[l])*epsilonk(k-q_arr[l]) )/( iwn[n_k] )/( iwn[n_k] )/( iwn[n_k] );
+            G_k_iwn(l,n_k) -= moments;
             if (opt.compare("negative")==0){
-                G_k_iwn(l,j) = std::conj(G_k_iwn(l,j));
+                G_k_iwn(l,n_k) = std::conj(G_k_iwn(l,n_k));
             }
-            G_k_iwn(l,j) *= -1.0*iwn[j];
+            G_k_iwn(l,n_k) *= -1.0*iwn[n_k];
         }
     }
     // Calculating the imaginary-time derivative of the Green's function.
     std::vector<double> FFT_iwn_tau;
-    for (size_t l=0; l<k_arr.size(); l++){
+    for (size_t l=0; l<q_arr.size(); l++){
         std::vector< std::complex<double> > G_iwn_k_slice(G_k_iwn(l,arma::span::all).begin(),G_k_iwn(l,arma::span::all).end());
         FFT_iwn_tau = get_iwn_to_tau(G_iwn_k_slice,beta,std::string("Derivative")); // beta_arr.back() is beta
         for (size_t i=0; i<beta_arr.size()-1; i++){
             if (opt.compare("negative")==0){
-                dG_tau_for_k(l,i) = FFT_iwn_tau[i] + 0.5*epsilonk(k_arr[l]+q) + 0.5*( beta_arr[i] - beta/2.0 )*( U*U/4.0 + epsilonk(k_arr[l]+q)*epsilonk(k_arr[l]+q) );
+                dG_tau_for_k(l,i) = FFT_iwn_tau[i] + 0.5*epsilonk(k-q_arr[l]) + 0.5*( beta_arr[i] - beta/2.0 )*( U*U/4.0 + epsilonk(k-q_arr[l])*epsilonk(k-q_arr[l]) );
             } else if (opt.compare("positive")==0){
-                dG_tau_for_k(l,i) = FFT_iwn_tau[i] + 0.5*epsilonk(k_arr[l]+q) + 0.5*( beta/2.0 - beta_arr[i] )*( U*U/4.0 + epsilonk(k_arr[l]+q)*epsilonk(k_arr[l]+q) );
+                dG_tau_for_k(l,i) = FFT_iwn_tau[i] + 0.5*epsilonk(k-q_arr[l]) + 0.5*( beta/2.0 - beta_arr[i] )*( U*U/4.0 + epsilonk(k-q_arr[l])*epsilonk(k-q_arr[l]) );
             }
         }
-        dG_tau_for_k(l,arma::span::all)(beta_arr.size()-1) = epsilonk(k_arr[l]+q)-mu+U*0.5 - 1.0*dG_tau_for_k(l,0); // Assumed half-filling
+        dG_tau_for_k(l,arma::span::all)(beta_arr.size()-1) = epsilonk(k-q_arr[l])-mu+U*0.5 - 1.0*dG_tau_for_k(l,0); // Assumed half-filling
     }
 
     return dG_tau_for_k;

@@ -36,8 +36,8 @@ int main(void){
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true; 
     const unsigned int Ntau = 2*8192;
-    const unsigned int N_k = 800;
-    const unsigned int N_q = 31;
+    const unsigned int N_k = 1000;
+    const unsigned int N_q = 3;
     const double beta = 30.0;
     const double U = 14.0;
     const double mu = U/2.0; // Half-filling
@@ -98,16 +98,16 @@ int main(void){
     arma::Mat<double> dG_dtau_m_FFT = get_derivative_FFT(G_k_iwn,iwn,k_array,beta_array,U,mu,0.0,std::string("negative"));
 
     /* TEST dG(-tau)/dtau */
-    std::ofstream test1("test_1.dat", std::ios::out);
+    std::ofstream test1("test_1_fewer_moments.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test1 << beta_array[j] << "  " << dG_dtau_m_FFT(12,j) << "\n";
+        test1 << beta_array[j] << "  " << dG_dtau_m_FFT(52,j) << "\n";
     }
     test1.close();
     
     // Substracting the tail of the Green's function
     for (size_t l=0; l<k_array.size(); l++){
         for (size_t j=0; j<iwn.size(); j++){
-            G_k_iwn(l,j) -= 1.0/(iwn[j]) + epsilonk(k_array[l])/iwn[j]/iwn[j] + ( U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+            G_k_iwn(l,j) -= 1.0/(iwn[j]); //+ epsilonk(k_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
     // FFT of G(iwn) --> G(tau)
@@ -118,20 +118,19 @@ int main(void){
         std::vector< std::complex<double> > G_iwn_k_slice(G_k_iwn(l,arma::span::all).begin(),G_k_iwn(l,arma::span::all).end());
         FFT_k_tau = get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
         for (size_t i=0; i<beta_array.size(); i++){
-            G_k_tau(l,i) = FFT_k_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]) + 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]));
+            G_k_tau(l,i) = FFT_k_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]));
         }
         sum_rule_iqn_0(-1.0*G_k_tau(l,Ntau),k_array[l],sum_rule_val,N_k);
     }
     std::cout << "The sum rule gives: " << sum_rule_val << "\n";
 
     /* TEST G(-tau) */
-    std::ofstream test2("test_2.dat", std::ios::out);
+    std::ofstream test2("test_2_fewer_moments.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test2 << beta_array[j] << "  " << -1.0*G_k_tau(12,Ntau-j) << "\n";
+        test2 << beta_array[j] << "  " << -1.0*G_k_tau(52,Ntau-j) << "\n";
     }
     test2.close();
-    exit(0);
-
+    
     // Should be a loop over the external momentum from this point on...
     arma::Mat< std::complex<double> > G_k_q_iwn(k_array.size(),iwn.size());
     arma::Mat<double> G_k_q_tau(k_array.size(),Ntau+1);
@@ -153,7 +152,7 @@ int main(void){
         // Substracting the tail of the Green's function
         for (size_t l=0; l<k_array.size(); l++){
             for (size_t j=0; j<iwn.size(); j++){
-                G_k_q_iwn(l,j) -= 1.0/(iwn[j]) + epsilonk(k_array[l]+q_array[em])/iwn[j]/iwn[j] + ( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) )/iwn[j]/iwn[j]/iwn[j];
+                G_k_q_iwn(l,j) -= 1.0/(iwn[j]); //+ epsilonk(k_array[l]+q_array[em])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) )/iwn[j]/iwn[j]/iwn[j];
             }
         }
         // FFT of G(iwn) --> G(tau)
@@ -161,7 +160,7 @@ int main(void){
             std::vector< std::complex<double> > G_iwn_k_q_slice(G_k_q_iwn(l,arma::span::all).begin(),G_k_q_iwn(l,arma::span::all).end());
             FFT_k_q_tau = get_iwn_to_tau(G_iwn_k_q_slice,beta); // beta_arr.back() is beta
             for (size_t i=0; i<beta_array.size(); i++){
-                G_k_q_tau(l,i) = FFT_k_q_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]+q_array[em]) + 0.25*beta_array[i]*(beta-beta_array[i])*( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) );
+                G_k_q_tau(l,i) = FFT_k_q_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]+q_array[em]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) );
             }
         }
 

@@ -13,8 +13,8 @@ def get_derivative(p1 : float, p2 : float, p3 : float, p4 : float, delta_x : flo
 
 if __name__=="__main__":
 
-    range_plot = 1.0 # Range of q values to be plotted
-    center_plot = np.pi/2.0 # Center around which the q values are plotted
+    range_plot = 0.4 # Range of q values to be plotted
+    center_plot = np.pi # Center around which the q values are plotted
 
     filename = "cpp_tests/bb_1D_U_2.000000_beta_50.000000_Ntau_8192_Nk_500_isjj_1.hdf5.pade_wmax_10.0"
 
