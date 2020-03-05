@@ -16,10 +16,10 @@ struct FileData;
 FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
 std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj="Green");
 template<typename T> std::vector< T > generate_random_numbers(size_t arr_size, T min, T max) noexcept;
-arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector<double>& beta_arr, double U, double mu, double q=0.0, std::string opt="positive");
 inline double velocity(double k) noexcept;
 void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false);
 std::complex<double> getGreen(double k, double mu, std::complex<double> iwn, IPT2::SplineInline< std::complex<double> >& splInlineobj);
+std::complex<double> Gamma(double k_bar, double k_tilde, std::complex<double> ikn_bar, std::complex<double> ikn_tilde, std::vector< std::complex<double> >& iqn, std::vector<double>& q_arr, double U, double beta, double mu, IPT2::SplineInline< std::complex<double> >& splInlineobj);
 
 struct FileData{
     std::vector<double> iwn;
@@ -38,7 +38,7 @@ int main(void){
     std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true; 
-    const unsigned int Ntau = 2*256;
+    const unsigned int Ntau = 2*128;
     const unsigned int N_q = 50;
     const double beta = 50.0;
     const double U = 10.0;
@@ -61,7 +61,7 @@ int main(void){
         q_tilde_array.push_back(q_tilde_tmp);
     }
     // HDF5 business
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string(".hdf5"));
+    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_sum.hdf5"));
     const H5std_string FILE_NAME( filename );
     const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;
@@ -96,22 +96,17 @@ int main(void){
     
     // Should be a loop over the external momentum from this point on...
     arma::Mat< std::complex<double> > G_k_bar_q_tilde_iwn(q_tilde_array.size(),iwn.size());
-    arma::Mat< std::complex<double> > G_k_tilde_q_tilde_iwn(q_tilde_array.size(),iwn.size());
     arma::Mat<double> G_k_bar_q_tilde_tau(q_tilde_array.size(),Ntau+1);
-    arma::Mat<double> G_k_tilde_q_tilde_tau(q_tilde_array.size(),Ntau+1);
     std::vector<double> FFT_k_bar_q_tilde_tau;
-    std::vector<double> FFT_k_tilde_q_tilde_tau;
-    arma::Mat<double> dGG_tau_for_k(q_tilde_array.size(),beta_array.size());
     std::vector< std::complex<double> > cubic_spline_GG_iqn(iqn.size());
 
     // Computing the derivatives for given (k_tilde,k_bar) tuple. Used inside the cubic spline algorithm...
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         // Building the lattice Green's function from the local DMFT self-energy
         for (size_t l=0; l<q_tilde_array.size(); l++){
-            G_k_bar_q_tilde_iwn(l,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(k_bar-q_tilde_array[l]) - sigma_iwn[n_bar] );
+            G_k_bar_q_tilde_iwn(l,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(k_bar-q_tilde_array[l]) - splInlineObj.calculateSpline(iwn[n_bar].imag()) );
         }
     }
-    arma::Mat<double> dG_dtau_m_FFT_k_bar = get_derivative_FFT(G_k_bar_q_tilde_iwn,iwn,q_tilde_array,beta_array,U,mu,k_bar,std::string("negative"));
 
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         for (size_t l=0; l<q_tilde_array.size(); l++){
@@ -119,30 +114,6 @@ int main(void){
             G_k_bar_q_tilde_iwn(l,n_bar) -= 1.0/(iwn[n_bar]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
-
-    for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
-        // Building the lattice Green's function from the local DMFT self-energy
-        for (size_t l=0; l<q_tilde_array.size(); l++){
-            G_k_tilde_q_tilde_iwn(l,n_tilde) = 1.0/( ( iwn[n_tilde] ) + mu - epsilonk(k_tilde-q_tilde_array[l]) - sigma_iwn[n_tilde] );
-            // Substracting the tail of the Green's function
-            G_k_tilde_q_tilde_iwn(l,n_tilde) -= 1.0/(iwn[n_tilde]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
-        }
-    }
-    arma::Mat<double> dG_dtau_FFT_k_tilde = get_derivative_FFT(G_k_tilde_q_tilde_iwn,iwn,q_tilde_array,beta_array,U,mu,k_tilde);
-
-    for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
-        for (size_t l=0; l<q_tilde_array.size(); l++){
-            // Substracting the tail of the Green's function
-            G_k_tilde_q_tilde_iwn(l,n_tilde) -= 1.0/(iwn[n_tilde]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
-        }
-    }
-
-    /* TEST dG(-tau)/dtau */
-    std::ofstream test1("test_1_corr.dat", std::ios::out);
-    for (size_t j=0; j<beta_array.size(); j++){
-        test1 << beta_array[j] << "  " << dG_dtau_m_FFT_k_bar(2,j) << "\n";
-    }
-    test1.close();
 
     // FFT of G(iwn) --> G(tau)
     for (size_t l=0; l<q_tilde_array.size(); l++){
@@ -153,59 +124,25 @@ int main(void){
         }
     }
 
-    // FFT of G(iwn) --> G(tau)
-    for (size_t l=0; l<q_tilde_array.size(); l++){
-        std::vector< std::complex<double> > G_iwn_k_slice(G_k_tilde_q_tilde_iwn(l,arma::span::all).begin(),G_k_tilde_q_tilde_iwn(l,arma::span::all).end());
-        FFT_k_tilde_q_tilde_tau = get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
-        for (size_t i=0; i<beta_array.size(); i++){
-            G_k_tilde_q_tilde_tau(l,i) = FFT_k_tilde_q_tilde_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
-        }
-    }
-
     /* TEST G(-tau) */
-    std::ofstream test2("test_2_corr.dat", std::ios::out);
+    std::ofstream test2("test_1_corr_no_cubic_spline.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
         test2 << beta_array[j] << "  " << -1.0*G_k_bar_q_tilde_tau(2,Ntau-j) << "\n";
     }
     test2.close();
 
-    arma::Cube< std::complex<double> > cub_spl_GG_n_bar_vs_n_tilde(iwn.size(),iwn.size(),q_tilde_array.size());
-    for (size_t l=0; l<q_tilde_array.size(); l++){
-        std::cout << "q_tilde: " << l << "\n";
-        spline<double> splObj_GG;
-        arma::Cube<double> GG_tau_for_k(2,2,beta_array.size());
-
-        for (size_t i=0; i<beta_array.size(); i++){
-            dGG_tau_for_k(l,i) = (-2.0)*( G_k_tilde_q_tilde_tau(l,i)*dG_dtau_m_FFT_k_bar(l,i) - dG_dtau_FFT_k_tilde(l,i)*G_k_bar_q_tilde_tau(l,Ntau-i) );
-            GG_tau_for_k.slice(i)(0,0) = (-2.0)*(-1.0)*( G_k_tilde_q_tilde_tau(l,i)*G_k_bar_q_tilde_tau(l,Ntau-i) );
-        }
-
-        // Taking the derivative for boundary conditions
-        double left_der_GG = dGG_tau_for_k(l,0);
-        double right_der_GG = dGG_tau_for_k(l,Ntau);
-
-        splObj_GG.set_boundary(spline<double>::bd_type::first_deriv,left_der_GG,spline<double>::bd_type::first_deriv,right_der_GG);
-        splObj_GG.set_points(beta_array,GG_tau_for_k);
-
-        for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
-            std::vector< std::complex<double> > cub_spl_GG = splObj_GG.bosonic_corr_single_ladder(iwn,beta,n_bar);
-            cub_spl_GG_n_bar_vs_n_tilde.slice(l)(n_bar,arma::span::all) = arma::Row< std::complex<double> >(cub_spl_GG);
-        }
-    }
-    // for (auto el : cub_spl_GG_n_bar_vs_n_tilde.slice(0)(0,arma::span::all)){
-    //     std::cout << el << std::endl;
-    // }
-
     // Computing Gamma
-    const Integrals integralsObj;
+    // const Integrals integralsObj;
     constexpr double delta = 2.0*M_PI/(double)(N_q-1);
     arma::Mat< std::complex<double> > Gamma_n_bar_n_tilde(iwn.size(),iwn.size()); // Doesn't depend on iq_n
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
+        clock_t begin = clock();
         for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
-            std::vector< std::complex<double> > GG_n_bar_n_tilde_k_tmp(cub_spl_GG_n_bar_vs_n_tilde(arma::span(n_bar,n_bar),arma::span(n_tilde,n_tilde),arma::span::all).begin(),cub_spl_GG_n_bar_vs_n_tilde(arma::span(n_bar,n_bar),arma::span(n_tilde,n_tilde),arma::span::all).end());
-            // This part remains to be done....
-            Gamma_n_bar_n_tilde(n_bar,n_tilde) = ( 1.0 / ( 1.0 + U/(2.0*M_PI)*integralsObj.I1D_CPLX(GG_n_bar_n_tilde_k_tmp,delta) ) );
+            Gamma_n_bar_n_tilde(n_bar,n_tilde) = Gamma(k_bar,k_tilde,iwn[n_bar],iwn[n_tilde],iqn,q_tilde_array,U,beta,mu,splInlineObj);
         }
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "outer loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
     }
 
     arma::Mat< std::complex<double> > GG_n_bar_n_tilde(iwn.size(),iwn.size());
@@ -220,7 +157,7 @@ int main(void){
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         std::cout << "outer loop em: " << em << " done in " << elapsed_secs << " secs.." << "\n";
-        cubic_spline_GG_iqn[em] = (U/beta/beta)*arma::accu(GG_n_bar_n_tilde); // summing over the internal ikn_tilde and ikn_bar
+        cubic_spline_GG_iqn[em] = (1.0/beta/beta)*arma::accu(GG_n_bar_n_tilde); // summing over the internal ikn_tilde and ikn_bar
     }
     std::cout << "After the loop.." << std::endl;
 
@@ -322,43 +259,6 @@ inline double velocity(double k) noexcept{
     */
     return 2.0*std::sin(k);
 }
-
-arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& q_arr, const std::vector<double>& beta_arr, double U, double mu, double k, std::string opt){
-    /*  The main difference here from the previous method is that the k momenta are switched, i.e. the k-vector summed over is subtracted now.
-    */
-    
-    arma::Mat<double> dG_tau_for_k(q_arr.size(),beta_arr.size());
-    const double beta = beta_arr.back();
-    // Subtracting the leading moments of the Green's function...
-    std::complex<double> moments;
-    for (size_t n_k=0; n_k<iwn.size(); n_k++){
-        for (size_t l=0; l<q_arr.size(); l++){
-            moments = 1.0/( iwn[n_k] ) + epsilonk(k-q_arr[l])/( iwn[n_k] )/( iwn[n_k] ) + ( U*U/4.0 + epsilonk(k-q_arr[l])*epsilonk(k-q_arr[l]) )/( iwn[n_k] )/( iwn[n_k] )/( iwn[n_k] );
-            G_k_iwn(l,n_k) -= moments;
-            if (opt.compare("negative")==0){
-                G_k_iwn(l,n_k) = std::conj(G_k_iwn(l,n_k));
-            }
-            G_k_iwn(l,n_k) *= -1.0*iwn[n_k];
-        }
-    }
-    // Calculating the imaginary-time derivative of the Green's function.
-    std::vector<double> FFT_iwn_tau;
-    for (size_t l=0; l<q_arr.size(); l++){
-        std::vector< std::complex<double> > G_iwn_k_slice(G_k_iwn(l,arma::span::all).begin(),G_k_iwn(l,arma::span::all).end());
-        FFT_iwn_tau = get_iwn_to_tau(G_iwn_k_slice,beta,std::string("Derivative")); // beta_arr.back() is beta
-        for (size_t i=0; i<beta_arr.size()-1; i++){
-            if (opt.compare("negative")==0){
-                dG_tau_for_k(l,i) = FFT_iwn_tau[i] + 0.5*epsilonk(k-q_arr[l]) + 0.5*( beta_arr[i] - beta/2.0 )*( U*U/4.0 + epsilonk(k-q_arr[l])*epsilonk(k-q_arr[l]) );
-            } else if (opt.compare("positive")==0){
-                dG_tau_for_k(l,i) = FFT_iwn_tau[i] + 0.5*epsilonk(k-q_arr[l]) + 0.5*( beta/2.0 - beta_arr[i] )*( U*U/4.0 + epsilonk(k-q_arr[l])*epsilonk(k-q_arr[l]) );
-            }
-        }
-        dG_tau_for_k(l,arma::span::all)(beta_arr.size()-1) = epsilonk(k-q_arr[l])-mu+U*0.5 - 1.0*dG_tau_for_k(l,0); // Assumed half-filling
-    }
-
-    return dG_tau_for_k;
-}
-
 
 FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false){
     /*  This method fetches the data (self-energy) contained inside a file named "strName". The data has to be laid out 
@@ -478,4 +378,25 @@ std::vector< T > generate_random_numbers(size_t arr_size, T min, T max) noexcept
         rand_num_container[i] = random_number;
     }
     return rand_num_container;
+}
+
+std::complex<double> Gamma(double k_bar, double k_tilde, std::complex<double> ikn_bar, std::complex<double> ikn_tilde, std::vector< std::complex<double> >& iqn, std::vector<double>& q_arr, double U, double beta, double mu, IPT2::SplineInline< std::complex<double> >& splInlineobj){
+    
+    std::complex<double> lower_val(0.0,0.0);
+    for (size_t l=0; l<q_arr.size(); l++){
+        if ( (l==0) || (l==(q_arr.size()-1)) ){
+            for (size_t j=0; j<iqn.size(); j++){
+                lower_val += 0.5*getGreen(k_bar-q_arr[l],mu,ikn_bar-iqn[j],splInlineobj)*getGreen(k_tilde-q_arr[l],mu,ikn_tilde-iqn[j],splInlineobj);
+            }
+        } else{
+            for (size_t j=0; j<iqn.size(); j++){
+                lower_val += getGreen(k_bar-q_arr[l],mu,ikn_bar-iqn[j],splInlineobj)*getGreen(k_tilde-q_arr[l],mu,ikn_tilde-iqn[j],splInlineobj);
+            }
+        }
+    }
+    lower_val*=U/beta/q_arr.size();
+    lower_val+=1.0;
+    lower_val = U/lower_val;
+
+    return lower_val;
 }

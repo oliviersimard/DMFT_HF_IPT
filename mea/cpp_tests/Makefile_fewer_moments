@@ -1,7 +1,7 @@
 SRC=$(PWD)/../../src
 OBJ=$(PWD)/obj
 
-CXX=g++ -std=c++11 -Wall -g -O2
+CXX=g++ -std=c++11 -Wall -g -O3
 INC=${HOME}/gsl/include -I${HOME}/install/HDF5/1.10.6/include
 LIB=${HOME}/gsl/lib -L${HOME}/install/HDF5/1.10.6/lib
 

@@ -37,7 +37,7 @@ int main(void){
     const bool is_jj = true; 
     const unsigned int Ntau = 2*8192;
     const unsigned int N_k = 1000;
-    const unsigned int N_q = 3;
+    const unsigned int N_q = 31;
     const double beta = 30.0;
     const double U = 14.0;
     const double mu = U/2.0; // Half-filling
