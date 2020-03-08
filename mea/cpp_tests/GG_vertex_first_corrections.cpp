@@ -38,14 +38,14 @@ int main(void){
     std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true; 
-    const unsigned int Ntau = 2*128;
-    const unsigned int N_q = 50;
+    const unsigned int Ntau = 2*256;
+    const unsigned int N_q = 400;
     const double beta = 50.0;
     const double U = 10.0;
     const double mu = U/2.0; // Half-filling
     // k_tilde and k_bar momenta
-    const double k_tilde = 0.0;
-    const double k_bar = M_PI;
+    const double k_tilde = -M_PI/2.0;
+    const double k_bar = M_PI/2.0;
     const double qq = 0.0;
 
     // beta array constructed
@@ -61,7 +61,7 @@ int main(void){
         q_tilde_array.push_back(q_tilde_tmp);
     }
     // HDF5 business
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_sum.hdf5"));
+    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_kbar_")+std::to_string(k_bar)+std::string("_ktilde_")+std::to_string(k_tilde)+std::string("_sum.hdf5"));
     const H5std_string FILE_NAME( filename );
     const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;
@@ -83,14 +83,19 @@ int main(void){
     std::vector< std::complex<double> > iwn(wn.size());
     std::transform(wn.begin(),wn.end(),iwn.begin(),[](double d){ return std::complex<double>(0.0,d); }); // casting into array of double for cubic spline.
     // Bosonic Matsubara array
-    std::vector< std::complex<double> > iqn;
+    std::vector< std::complex<double> > iqn; // for the total susceptibility
+    std::vector< std::complex<double> > iqn_tilde; // for the inner loop inside Gamma.
     for (size_t j=0; j<iwn.size(); j++){
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
+    }
+    for (signed int j=(-static_cast<int>(iwn.size()/2))+1; j<(signed int)static_cast<int>(iwn.size()/2); j++){ // Bosonic frequencies.
+        std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
+        iqn_tilde.push_back( matFreq );
     }
 
     spline<double> splObj;
     std::vector<double> initVec(2*Ntau,0.0); // This data contains twice as much data to perform the interpolation
-    IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn,iqn);
+    IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn);
     splInlineObj.loadFileSpline(inputFilenameLoad,IPT2::spline_type::linear);
 
     
@@ -111,7 +116,7 @@ int main(void){
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         for (size_t l=0; l<q_tilde_array.size(); l++){
             // Substracting the tail of the Green's function
-            G_k_bar_q_tilde_iwn(l,n_bar) -= 1.0/(iwn[n_bar]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+            G_k_bar_q_tilde_iwn(l,n_bar) -= 1.0/(iwn[n_bar]) + epsilonk(q_tilde_array[l])/iwn[n_bar]/iwn[n_bar]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
 
@@ -120,7 +125,7 @@ int main(void){
         std::vector< std::complex<double> > G_iwn_k_slice(G_k_bar_q_tilde_iwn(l,arma::span::all).begin(),G_k_bar_q_tilde_iwn(l,arma::span::all).end());
         FFT_k_bar_q_tilde_tau = get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
         for (size_t i=0; i<beta_array.size(); i++){
-            G_k_bar_q_tilde_tau(l,i) = FFT_k_bar_q_tilde_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
+            G_k_bar_q_tilde_tau(l,i) = FFT_k_bar_q_tilde_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
         }
     }
 
@@ -132,13 +137,11 @@ int main(void){
     test2.close();
 
     // Computing Gamma
-    // const Integrals integralsObj;
-    constexpr double delta = 2.0*M_PI/(double)(N_q-1);
     arma::Mat< std::complex<double> > Gamma_n_bar_n_tilde(iwn.size(),iwn.size()); // Doesn't depend on iq_n
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         clock_t begin = clock();
         for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
-            Gamma_n_bar_n_tilde(n_bar,n_tilde) = Gamma(k_bar,k_tilde,iwn[n_bar],iwn[n_tilde],iqn,q_tilde_array,U,beta,mu,splInlineObj);
+            Gamma_n_bar_n_tilde(n_bar,n_tilde) = Gamma(k_bar,k_tilde,iwn[n_bar],iwn[n_tilde],iqn_tilde,q_tilde_array,U,beta,mu,splInlineObj);
         }
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -380,17 +383,17 @@ std::vector< T > generate_random_numbers(size_t arr_size, T min, T max) noexcept
     return rand_num_container;
 }
 
-std::complex<double> Gamma(double k_bar, double k_tilde, std::complex<double> ikn_bar, std::complex<double> ikn_tilde, std::vector< std::complex<double> >& iqn, std::vector<double>& q_arr, double U, double beta, double mu, IPT2::SplineInline< std::complex<double> >& splInlineobj){
+std::complex<double> Gamma(double k_bar, double k_tilde, std::complex<double> ikn_bar, std::complex<double> ikn_tilde, std::vector< std::complex<double> >& iqn_tilde, std::vector<double>& q_arr, double U, double beta, double mu, IPT2::SplineInline< std::complex<double> >& splInlineobj){
     
     std::complex<double> lower_val(0.0,0.0);
     for (size_t l=0; l<q_arr.size(); l++){
         if ( (l==0) || (l==(q_arr.size()-1)) ){
-            for (size_t j=0; j<iqn.size(); j++){
-                lower_val += 0.5*getGreen(k_bar-q_arr[l],mu,ikn_bar-iqn[j],splInlineobj)*getGreen(k_tilde-q_arr[l],mu,ikn_tilde-iqn[j],splInlineobj);
+            for (size_t j=0; j<iqn_tilde.size(); j++){
+                lower_val += 0.5*getGreen(k_bar-q_arr[l],mu,ikn_bar-iqn_tilde[j],splInlineobj)*getGreen(k_tilde-q_arr[l],mu,ikn_tilde-iqn_tilde[j],splInlineobj);
             }
         } else{
-            for (size_t j=0; j<iqn.size(); j++){
-                lower_val += getGreen(k_bar-q_arr[l],mu,ikn_bar-iqn[j],splInlineobj)*getGreen(k_tilde-q_arr[l],mu,ikn_tilde-iqn[j],splInlineobj);
+            for (size_t j=0; j<iqn_tilde.size(); j++){
+                lower_val += getGreen(k_bar-q_arr[l],mu,ikn_bar-iqn_tilde[j],splInlineobj)*getGreen(k_tilde-q_arr[l],mu,ikn_tilde-iqn_tilde[j],splInlineobj);
             }
         }
     }

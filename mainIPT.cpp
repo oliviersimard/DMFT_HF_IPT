@@ -166,7 +166,7 @@ int main(int argc, char** argv){
                 #endif /* PARALLEL */
                 if (load_self){ // The file containing wider Matsubara frequency domain is loaded for spline.
                     std::vector<double> initVec(2*MULT_N_TAU*N_tau,0.0); // Important that it is 2*MULT_N_TAU
-                    IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec,vecK,iwnArr_l,iqnArr_l);
+                    IPT2::SplineInline< std::complex<double> > splInlineObj(MULT_N_TAU*N_tau,initVec,vecK,iwnArr_l);
                     HF::K_1D q1D; //
                     try{
                         splInlineObj.loadFileSpline(filenameToLoad,IPT2::spline_type::linear); // Spline is ready for use by calling function calculateSpline()-

@@ -80,16 +80,16 @@ class SplineInline{
             return _iwn_cplx;
         }
         //SplineInline(const size_t,const std::vector<double>&);
-        SplineInline(const size_t,std::vector<double>,std::vector<double>,std::vector< std::complex<double> >,std::vector< std::complex<double> >);
+        SplineInline(const size_t,std::vector<double>,std::vector<double>,std::vector< std::complex<double> >);
         SplineInline()=default;
         SplineInline<T>& operator=(const SplineInline<T>& obj);
     private:
         const size_t _N_tau_size {0};
         std::vector<double> _iwn={}, _iwn_re={}, _iwn_im={}, _k_array={};
-        std::vector< T > _iwn_array={}, _iqn_array={}, _iwn_cplx={};
+        std::vector< T > _iwn_array={}, _iwn_cplx={};
         spline_type _spline_choice=cubic;
         static spline<T> _spl;
-        T compute_linear_spline(double reIwn, std::vector< T > y) const;
+        T compute_linear_spline(double reIwn) const;
 };
 
 template<class T> spline<T> SplineInline<T>::_spl=spline<T>();
@@ -101,8 +101,8 @@ template<class T> spline<T> SplineInline<T>::_spl=spline<T>();
 //                                             iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
 
 template<typename T>
-IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec,std::vector<double> k_arr,std::vector< std::complex<double> > iwn_arr,std::vector< std::complex<double> > iqn_arr) : _N_tau_size(sizeArr),
-                                                                _iwn(initVec),_iwn_re(initVec),_iwn_im(initVec),_k_array(k_arr),_iwn_array(iwn_arr),_iqn_array(iqn_arr){
+IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec,std::vector<double> k_arr,std::vector< std::complex<double> > iwn_arr) : _N_tau_size(sizeArr),
+                                                                _iwn(initVec),_iwn_re(initVec),_iwn_im(initVec),_k_array(k_arr),_iwn_array(iwn_arr){
 
                                                                 }
 
@@ -116,15 +116,14 @@ IPT2::SplineInline<T>& IPT2::SplineInline<T>::operator=(const IPT2::SplineInline
         this->_iwn_cplx=obj._iwn_cplx;
         this->_k_array=obj._k_array;
         this->_iwn_array=obj._iwn_array;
-        this->_iqn_array=obj._iqn_array;
         this->_spline_choice=obj._spline_choice;
     }
     return *this;
 }
 
 template<typename T>
-T IPT2::SplineInline<T>::compute_linear_spline(double reIwn, std::vector< T > y) const {
-    assert(_iwn.size()==y.size());
+T IPT2::SplineInline<T>::compute_linear_spline(double reIwn) const {
+    assert(_iwn.size()==_iwn_cplx.size());
     assert(_iwn.size()>2);
     size_t n = _iwn.size();
     std::vector<double>::const_iterator it;
@@ -149,7 +148,7 @@ T IPT2::SplineInline<T>::compute_linear_spline(double reIwn, std::vector< T > y)
     double h = reIwn-_iwn[idx];
     T interpol;
     // interpol = y_i + (y_{i+1}-y_i) / (x_{i+1}-x_i) * (x - x_i). h and x_i would be purely imaginary, so no need to transform back to imaginary data, because it cancels out due to division.
-    interpol = y[idx] + ( (y[idx+1]-y[idx]) / (_iwn[idx+1]-_iwn[idx]) ) * h;
+    interpol = _iwn_cplx[idx] + ( (_iwn_cplx[idx+1]-_iwn_cplx[idx]) / (_iwn[idx+1]-_iwn[idx]) ) * h;
 
     return interpol;
 }
@@ -214,7 +213,7 @@ template<>
 inline std::complex<double> IPT2::SplineInline< std::complex<double> >::calculateSpline(double reIwn) const{
     switch (_spline_choice){
     case IPT2::spline_type::linear:
-        return compute_linear_spline(reIwn,_iwn_cplx);
+        return compute_linear_spline(reIwn);
         break;
     default:
         return _spl(reIwn);

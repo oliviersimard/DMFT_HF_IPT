@@ -13,10 +13,10 @@ def get_derivative(p1 : float, p2 : float, p3 : float, p4 : float, delta_x : flo
 
 if __name__=="__main__":
 
-    range_plot = 0.4 # Range of q values to be plotted
-    center_plot = np.pi # Center around which the q values are plotted
+    range_plot = 0.5 # Range of q values to be plotted
+    center_plot = 0.0 # Center around which the q values are plotted
 
-    filename = "cpp_tests/bb_1D_U_10.000000_beta_50.000000_Ntau_256_Nk_50_isjj_1_sum.hdf5.pade_wmax_25.0"
+    filename = "cpp_tests/bb_1D_U_10.000000_beta_50.000000_Ntau_16384_Nk_1000_isjj_1_2_moments.hdf5.pade_wmax_20.0"
 
     wmax = float(findall(r"(?<=wmax_)(\d*\.\d+|\d+)",filename)[0])
     Ntau = int(findall(r"(?<=Ntau_)(\d+)",filename)[0])
@@ -26,7 +26,7 @@ if __name__=="__main__":
     tmp_q_omega_re_sigma = np.empty((len(omega),),dtype=float)
 
     plt.figure(0)
-    colors = iter(plt.cm.rainbow(np.linspace(0,1,25)))
+    colors = iter(plt.cm.rainbow(np.linspace(0,1,30)))
     hf = h5py.File(filename,"r")
     for i,q_val in enumerate(hf.keys()):
         q = float(str(q_val).split("_")[-1])

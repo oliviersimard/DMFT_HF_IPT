@@ -496,7 +496,7 @@ template<class T>
 std::vector< std::complex< T > > spline<T>::bosonic_corr_single_ladder(const std::vector< std::complex< T > >& ikn_tilde_arr,double beta,size_t n_bar){
     size_t size = ikn_tilde_arr.size();
     const double delta_tau = beta/(double)size;
-    const std::complex< T > ikn_bar = std::complex< T >((T)0.0,(T)((2.0*n_bar+1.0)*M_PI/beta));
+    const std::complex< T > ikn_bar = ikn_tilde_arr[n_bar];
 
     _S_1_0=m_y.slice(0)(0,0); // f_0(x_0) = a_0(x_0-x_0)^3 + b_0(x_0-x_0)^2 + c_0(x_0-x_0) + y_0
     _Sp_1_0=m_c0; // f'_0(x_0) = 3a_0(x_0-x_0)^2 + 2b_0(x_0-x_0)^1 + c_0 
@@ -515,7 +515,7 @@ std::vector< std::complex< T > > spline<T>::bosonic_corr_single_ladder(const std
     // This will be used later for FFT.
     std::complex< T > n_bar_weight;
     for (size_t n=0; n<size; n++){
-        n_bar_weight = std::exp(std::complex< T >((T)0.0,(T)(-2.0*M_PI*n_bar*n/size)));
+        n_bar_weight = std::exp(-1.0*ikn_tilde_arr[n_bar]*beta*(double)n/(double)size);
         _Sppp.push_back(6.0*n_bar_weight*m_a[n]);
     }
 
@@ -531,7 +531,7 @@ std::vector< std::complex< T > > spline<T>::bosonic_corr_single_ladder(const std
     
     std::vector< std::complex< T > > cubic_spline(size,0.0);
     for(size_t i=0; i<size; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
-        if (ikn_tilde_arr[i]!=std::complex< T >(0.0,0.0)){
+        if (std::abs(ikn_tilde_arr[i]-ikn_bar)!=0.0){
             cubic_spline[i] = ( (_S_N_beta-_S_1_0)/( ikn_tilde_arr[i]-ikn_bar ) - (_Sp_N_beta-_Sp_1_0)/( ikn_tilde_arr[i]-ikn_bar )/( ikn_tilde_arr[i]-ikn_bar ) + (_Spp_N_beta-_Spp_1_0)/( ikn_tilde_arr[i]-ikn_bar )/( ikn_tilde_arr[i]-ikn_bar )/( ikn_tilde_arr[i]-ikn_bar ) + (1.0-std::exp((ikn_tilde_arr[i]-ikn_bar)*delta_tau))*(output[i])/( ikn_tilde_arr[i]-ikn_bar )/( ikn_tilde_arr[i]-ikn_bar )/( ikn_tilde_arr[i]-ikn_bar )/( ikn_tilde_arr[i]-ikn_bar ) );
         } else{
             for (size_t j=1; j<m_x.size(); j++){ // Dealing with the 0th bosonic Matsubara frequency...

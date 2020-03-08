@@ -20,6 +20,7 @@ arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, 
 inline double velocity(double k) noexcept;
 void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false);
 std::complex<double> getGreen(double k, double mu, std::complex<double> iwn, IPT2::SplineInline< std::complex<double> >& splInlineobj);
+template<typename T> T summ(std::vector< T >) noexcept;
 
 struct FileData{
     std::vector<double> iwn;
@@ -34,18 +35,18 @@ typedef struct cplx_t{ // Custom data holder for the HDF5 handling
 
 int main(void){
     
-    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256_Nit_32.dat");
-    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512");
+    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512_Nit_32.dat");
+    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_1024");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true; 
-    const unsigned int Ntau = 2*256;
-    const unsigned int N_q = 50;
+    const unsigned int Ntau = 2*512;
+    const unsigned int N_q = 500;
     const double beta = 50.0;
     const double U = 10.0;
     const double mu = U/2.0; // Half-filling
     // k_tilde and k_bar momenta
-    const double k_tilde = 0.0;
-    const double k_bar = M_PI;
+    const double k_tilde = -M_PI/2.0;
+    const double k_bar = M_PI/2.0;
     const double qq = 0.0;
 
     // beta array constructed
@@ -61,7 +62,7 @@ int main(void){
         q_tilde_array.push_back(q_tilde_tmp);
     }
     // HDF5 business
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string(".hdf5"));
+    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_kbar_")+std::to_string(k_bar)+std::string("_ktilde_")+std::to_string(k_tilde)+std::string("_1_moment.hdf5"));
     const H5std_string FILE_NAME( filename );
     const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;
@@ -116,7 +117,7 @@ int main(void){
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         for (size_t l=0; l<q_tilde_array.size(); l++){
             // Substracting the tail of the Green's function
-            G_k_bar_q_tilde_iwn(l,n_bar) -= 1.0/(iwn[n_bar]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+            G_k_bar_q_tilde_iwn(l,n_bar) -= 1.0/(iwn[n_bar]); //+ epsilonk(q_tilde_array[l])/iwn[n_bar]/iwn[n_bar]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
 
@@ -124,8 +125,6 @@ int main(void){
         // Building the lattice Green's function from the local DMFT self-energy
         for (size_t l=0; l<q_tilde_array.size(); l++){
             G_k_tilde_q_tilde_iwn(l,n_tilde) = 1.0/( ( iwn[n_tilde] ) + mu - epsilonk(k_tilde-q_tilde_array[l]) - sigma_iwn[n_tilde] );
-            // Substracting the tail of the Green's function
-            G_k_tilde_q_tilde_iwn(l,n_tilde) -= 1.0/(iwn[n_tilde]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
     arma::Mat<double> dG_dtau_FFT_k_tilde = get_derivative_FFT(G_k_tilde_q_tilde_iwn,iwn,q_tilde_array,beta_array,U,mu,k_tilde);
@@ -133,14 +132,14 @@ int main(void){
     for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
         for (size_t l=0; l<q_tilde_array.size(); l++){
             // Substracting the tail of the Green's function
-            G_k_tilde_q_tilde_iwn(l,n_tilde) -= 1.0/(iwn[n_tilde]); //+ epsilonk(q_tilde_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+            G_k_tilde_q_tilde_iwn(l,n_tilde) -= 1.0/(iwn[n_tilde]); //+ epsilonk(q_tilde_array[l])/iwn[n_tilde]/iwn[n_tilde]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
 
     /* TEST dG(-tau)/dtau */
     std::ofstream test1("test_1_corr.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test1 << beta_array[j] << "  " << dG_dtau_m_FFT_k_bar(2,j) << "\n";
+        test1 << beta_array[j] << "  " << dG_dtau_m_FFT_k_bar(0,j) << "\n";
     }
     test1.close();
 
@@ -165,7 +164,7 @@ int main(void){
     /* TEST G(-tau) */
     std::ofstream test2("test_2_corr.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test2 << beta_array[j] << "  " << -1.0*G_k_bar_q_tilde_tau(2,Ntau-j) << "\n";
+        test2 << beta_array[j] << "  " << -1.0*G_k_bar_q_tilde_tau(0,Ntau-j) << "\n";
     }
     test2.close();
 
@@ -192,9 +191,6 @@ int main(void){
             cub_spl_GG_n_bar_vs_n_tilde.slice(l)(n_bar,arma::span::all) = arma::Row< std::complex<double> >(cub_spl_GG);
         }
     }
-    // for (auto el : cub_spl_GG_n_bar_vs_n_tilde.slice(0)(0,arma::span::all)){
-    //     std::cout << el << std::endl;
-    // }
 
     // Computing Gamma
     const Integrals integralsObj;
@@ -204,7 +200,8 @@ int main(void){
         for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
             std::vector< std::complex<double> > GG_n_bar_n_tilde_k_tmp(cub_spl_GG_n_bar_vs_n_tilde(arma::span(n_bar,n_bar),arma::span(n_tilde,n_tilde),arma::span::all).begin(),cub_spl_GG_n_bar_vs_n_tilde(arma::span(n_bar,n_bar),arma::span(n_tilde,n_tilde),arma::span::all).end());
             // This part remains to be done....
-            Gamma_n_bar_n_tilde(n_bar,n_tilde) = ( 1.0 / ( 1.0 + U/(2.0*M_PI)*integralsObj.I1D_CPLX(GG_n_bar_n_tilde_k_tmp,delta) ) );
+            Gamma_n_bar_n_tilde(n_bar,n_tilde) = ( U / ( 1.0 + U/(2.0*M_PI)*integralsObj.I1D_CPLX(GG_n_bar_n_tilde_k_tmp,delta) ) );
+            //Gamma_n_bar_n_tilde(n_bar,n_tilde) = ( U / ( 1.0 + U/(N_q)*summ(GG_n_bar_n_tilde_k_tmp) ) );
         }
     }
 
@@ -220,7 +217,7 @@ int main(void){
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         std::cout << "outer loop em: " << em << " done in " << elapsed_secs << " secs.." << "\n";
-        cubic_spline_GG_iqn[em] = (U/beta/beta)*arma::accu(GG_n_bar_n_tilde); // summing over the internal ikn_tilde and ikn_bar
+        cubic_spline_GG_iqn[em] = (1.0/beta/beta)*arma::accu(GG_n_bar_n_tilde); // summing over the internal ikn_tilde and ikn_bar
     }
     std::cout << "After the loop.." << std::endl;
 
@@ -478,4 +475,18 @@ std::vector< T > generate_random_numbers(size_t arr_size, T min, T max) noexcept
         rand_num_container[i] = random_number;
     }
     return rand_num_container;
+}
+
+template<typename T> 
+T summ(std::vector< T > vec) noexcept{
+    T tot {0.0};
+    for (size_t l=0; l<vec.size(); l++){
+        if ( (l==0) || (l==(vec.size()-1)) ){
+            tot+=0.5*vec[l];
+        } else{
+            tot+=vec[l];
+        }
+    }
+
+    return tot;
 }
