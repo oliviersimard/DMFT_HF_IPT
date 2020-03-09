@@ -4,7 +4,8 @@
 #include <fftw3.h>
 #include <fstream>
 #include <ctime>
-#include "H5Cpp.h" 
+#include "H5Cpp.h"
+#include <mpi.h> 
 /*
 Info HDF5:
 https://support.hdfgroup.org/HDF5/doc/cpplus_RM/compound_8cpp-example.html
@@ -39,12 +40,12 @@ int main(void){
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true; 
     const unsigned int Ntau = 2*256;
-    const unsigned int N_q = 400;
+    const unsigned int N_q = 200;
     const double beta = 50.0;
     const double U = 10.0;
     const double mu = U/2.0; // Half-filling
     // k_tilde and k_bar momenta
-    const double k_tilde = -M_PI/2.0;
+    const double k_tilde = 0.0;
     const double k_bar = M_PI/2.0;
     const double qq = 0.0;
 

@@ -16,7 +16,7 @@ if __name__=="__main__":
     range_plot = 0.5 # Range of q values to be plotted
     center_plot = 0.0 # Center around which the q values are plotted
 
-    filename = "cpp_tests/bb_1D_U_10.000000_beta_50.000000_Ntau_16384_Nk_1000_isjj_1_2_moments.hdf5.pade_wmax_20.0"
+    filename = "cpp_tests/bb_1D_U_10.000000_beta_50.000000_Ntau_512_Nk_100_isjj_1.hdf5.pade_wmax_25.0"
 
     wmax = float(findall(r"(?<=wmax_)(\d*\.\d+|\d+)",filename)[0])
     Ntau = int(findall(r"(?<=Ntau_)(\d+)",filename)[0])
