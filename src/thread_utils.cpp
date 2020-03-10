@@ -138,12 +138,12 @@ std::tuple< std::complex<double>,std::complex<double> > ThreadWrapper::gamma_one
     std::complex<double> lower_level(0.0,0.0), bubble(0.0,0.0);
     for (size_t qttilde=0; qttilde<_splInline._k_array.size(); qttilde++){
         if ( (qttilde==0) || (qttilde==_splInline._k_array.size()-1) ){
-            for (size_t wttilde=0; wttilde<_splInline._iqn_array.size(); wttilde++){
-                lower_level += 0.5*buildGk1D_IPT(wtilde-_splInline._iqn_array[wttilde],ktilde-_splInline._k_array[qttilde])*buildGk1D_IPT(wbar-_splInline._iqn_array[wttilde],kbar-_splInline._k_array[qttilde]);
+            for (size_t wttilde=0; wttilde<iqnArr_l.size(); wttilde++){
+                lower_level += 0.5*buildGk1D_IPT(wtilde-iqnArr_l[wttilde],ktilde-_splInline._k_array[qttilde])*buildGk1D_IPT(wbar-iqnArr_l[wttilde],kbar-_splInline._k_array[qttilde]);
             }
         }else{
-            for (size_t wttilde=0; wttilde<_splInline._iqn_array.size(); wttilde++){
-                lower_level += buildGk1D_IPT(wtilde-_splInline._iqn_array[wttilde],ktilde-_splInline._k_array[qttilde])*buildGk1D_IPT(wbar-_splInline._iqn_array[wttilde],kbar-_splInline._k_array[qttilde]);
+            for (size_t wttilde=0; wttilde<iqnArr_l.size(); wttilde++){
+                lower_level += buildGk1D_IPT(wtilde-iqnArr_l[wttilde],ktilde-_splInline._k_array[qttilde])*buildGk1D_IPT(wbar-iqnArr_l[wttilde],kbar-_splInline._k_array[qttilde]);
             }
         }
     }

@@ -5,7 +5,6 @@
 #include<cmath> // double abs(double)
 #include<stdexcept>
 //#include<algorithm> // copy() and assign()
-#include<armadillo>
 //#include<limits> // numeric_limits
 #include<iomanip> // set_precision
 #include "tridiagonal.hpp"
@@ -16,6 +15,7 @@
 
 //namespace IPT2{ class DMFTproc; };
 struct GreenStuff;
+namespace IPT2{ template<class T> class OneLadder; };
 
 // Prototypes
 void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&);
@@ -73,6 +73,7 @@ class DMFTproc{
 template<class T>
 class SplineInline{
     friend class ::ThreadFunctor::ThreadWrapper;
+    friend class OneLadder< T >;
     public:
         void loadFileSpline(const std::string&, const spline_type&) noexcept(false);
         T calculateSpline(double) const;
@@ -80,7 +81,7 @@ class SplineInline{
             return _iwn_cplx;
         }
         //SplineInline(const size_t,const std::vector<double>&);
-        SplineInline(const size_t,std::vector<double>,std::vector<double>,std::vector< std::complex<double> >);
+        SplineInline(const size_t,std::vector<double>,std::vector<double>,std::vector< T >);
         SplineInline()=default;
         SplineInline<T>& operator=(const SplineInline<T>& obj);
     private:
@@ -88,7 +89,7 @@ class SplineInline{
         std::vector<double> _iwn={}, _iwn_re={}, _iwn_im={}, _k_array={};
         std::vector< T > _iwn_array={}, _iwn_cplx={};
         spline_type _spline_choice=cubic;
-        static spline<T> _spl;
+        static spline< T > _spl;
         T compute_linear_spline(double reIwn) const;
 };
 
@@ -101,13 +102,13 @@ template<class T> spline<T> SplineInline<T>::_spl=spline<T>();
 //                                             iwn(initVec),iwn_re(initVec),iwn_im(initVec){}
 
 template<typename T>
-IPT2::SplineInline<T>::SplineInline(const size_t sizeArr,std::vector<double> initVec,std::vector<double> k_arr,std::vector< std::complex<double> > iwn_arr) : _N_tau_size(sizeArr),
+IPT2::SplineInline< T >::SplineInline(const size_t sizeArr,std::vector<double> initVec,std::vector<double> k_arr,std::vector< T > iwn_arr) : _N_tau_size(sizeArr),
                                                                 _iwn(initVec),_iwn_re(initVec),_iwn_im(initVec),_k_array(k_arr),_iwn_array(iwn_arr){
 
                                                                 }
 
 template<typename T>
-IPT2::SplineInline<T>& IPT2::SplineInline<T>::operator=(const IPT2::SplineInline<T>& obj){
+IPT2::SplineInline< T >& IPT2::SplineInline< T >::operator=(const IPT2::SplineInline< T >& obj){
     if (this!=&obj){
         *(const_cast<size_t*>(&this->_N_tau_size)) = obj._N_tau_size;
         this->_iwn=obj._iwn;
