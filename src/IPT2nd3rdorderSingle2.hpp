@@ -15,7 +15,7 @@
 
 //namespace IPT2{ class DMFTproc; };
 struct GreenStuff;
-namespace IPT2{ template<class T> class OneLadder; };
+namespace IPT2{ template< class T > class OneLadder; template< class T > class InfiniteLadders; };
 
 // Prototypes
 void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&);
@@ -74,6 +74,7 @@ template<class T>
 class SplineInline{
     friend class ::ThreadFunctor::ThreadWrapper;
     friend class OneLadder< T >;
+    friend class InfiniteLadders< T >;
     public:
         void loadFileSpline(const std::string&, const spline_type&) noexcept(false);
         T calculateSpline(double) const;

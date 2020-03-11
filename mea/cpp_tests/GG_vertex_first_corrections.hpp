@@ -38,34 +38,43 @@ namespace IPT2{
             OneLadder(const OneLadder&) = delete;
             std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, double qq=0.0) const noexcept;
             OneLadder()=default;
-            explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn_tilde, const std::vector< T >& iqn, const std::vector<double>& k_arr, double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn_tilde(iqn_tilde), _iqn(iqn), _k_t_b(k_arr){
+            explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn(iqn), _k_t_b(k_arr), _iqn_tilde(iqn_tilde){
                 this->_mu = mu;
                 this->_U = U;
                 this->_beta = beta;
             };
 
-            inline T getGreen(double k, T iwn) const noexcept;
-            T Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_tilde) const noexcept;
-        
-        private:
-            // using SplineInline< T >::_k_array; // if inheriting public SplineInline< T >
-            // using SplineInline< T >::_iwn_array;
+        protected:
             const SplineInline< T >& _splInlineobj;
-            const std::vector< T >& _iqn_tilde;
             const std::vector< T >& _iqn;
             const std::vector<double>& _k_t_b;
             double _mu {0.0}, _U {0.0}, _beta {0.0};
+            inline T getGreen(double k, T iwn) const noexcept;
+            T Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_tilde) const noexcept;
+
+        private:
+            const std::vector< T >& _iqn_tilde;
 
     };
 
     template< class T >
-    class InfiniteLadders : OneLadder< T > {
+    class InfiniteLadders : public OneLadder< T > {
         public:
-            explicit InfiniteLadders(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn_tilde, const std::vector< T >& iqn, double mu, double U, double beta) : OneLadder< T >(splInlineobj,iqn_tilde,iqn,mu,U,beta){};
+            InfiniteLadders& operator=(const InfiniteLadders&) = delete;
+            InfiniteLadders(const InfiniteLadders&) = delete;
+            explicit InfiniteLadders(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : OneLadder< T >(splInlineobj,iqn,k_arr,iqn_tilde,mu,U,beta){
+                std::cout << "InfiniteLadder U: " << OneLadder< T >::_U << " and InfiniteLadder beta: " << OneLadder< T >::_beta << std::endl;
+            }
+            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, double qq=0.0, bool is_simple_ladder_precomputed=false) const noexcept;
 
         private:
             using OneLadder< T >::getGreen;
             using OneLadder< T >::Gamma;
+            T Gamma_correction_denominator(double k_bar, double kpp, T ikn_bar, T ikppn) const noexcept;
+            arma::Mat< T > Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq) const noexcept;
+            T Gamma_merged_corr(arma::Mat< T >& denom_corr, T iqn, double qq) const noexcept;
+            
+
     };
 
 }
@@ -77,7 +86,7 @@ inline T IPT2::OneLadder< T >::getGreen(double k, T iwn) const noexcept{
 
 template< class T >
 T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_tilde) const noexcept{
-    T lower_val(0.0,0.0);
+    T lower_val{0.0};
     for (size_t l=0; l<_splInlineobj._k_array.size(); l++){
         if ( (l==0) || (l==(_splInlineobj._k_array.size()-1)) ){
             for (size_t j=0; j<_iqn_tilde.size(); j++){
@@ -89,8 +98,8 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_til
             }
         }
     }
-    lower_val*=_U/_beta/_splInlineobj._k_array.size();
-    lower_val+=1.0;
+    lower_val *= _U/_beta/_splInlineobj._k_array.size();
+    lower_val += 1.0;
     lower_val = _U/lower_val;
 
     return lower_val;
@@ -125,6 +134,111 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
     std::cout << "After the loop.." << std::endl;
     
     return cubic_spline_GG_iqn;
+}
+
+template< class T >
+T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double kpp, T ikn_bar, T ikppn) const noexcept{
+    T denom_val{0.0};
+    for (size_t n_k_ppp=0; n_k_ppp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_ppp++){
+        if ( (n_k_ppp==0) || (n_k_ppp==(OneLadder< T >::_splInlineobj._k_array.size()-1)) ){
+            for (size_t n_ppp=0; n_ppp<OneLadder< T >::_splInlineobj._iwn_array.size(); n_ppp++){
+                denom_val += 0.5*getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_ppp]+kpp-k_bar,OneLadder< T >::_splInlineobj._iwn_array[n_ppp]+ikppn-ikn_bar)*getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_ppp],OneLadder< T >::_splInlineobj._iwn_array[n_ppp]);
+            }
+        } else{
+            for (size_t n_ppp=0; n_ppp<OneLadder< T >::_splInlineobj._iwn_array.size(); n_ppp++){
+                denom_val += getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_ppp]+kpp-k_bar,OneLadder< T >::_splInlineobj._iwn_array[n_ppp]+ikppn-ikn_bar)*getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_ppp],OneLadder< T >::_splInlineobj._iwn_array[n_ppp]);
+            }
+        }
+    }
+    denom_val *= OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_splInlineobj._k_array.size();
+    denom_val += 1.0;
+
+    return 1.0/denom_val;
+}
+
+template< class T >
+arma::Mat< T > IPT2::InfiniteLadders< T >::Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq) const noexcept{
+    // compute the denominator of correction term in bunch (doesn't depend on iqn)
+    arma::Mat< T > denom_corr(OneLadder< T >::_splInlineobj._k_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size());
+    for (size_t n_k_pp=0; n_k_pp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_pp++){
+        for (size_t n_pp=0; n_pp<OneLadder< T >::_splInlineobj._iwn_array.size(); n_pp++){
+            denom_corr(n_k_pp,n_pp) = Gamma_correction_denominator(k_bar,OneLadder< T >::_splInlineobj._k_array[n_k_pp],ikn_bar,OneLadder< T >::_splInlineobj._iwn_array[n_pp]);
+        }
+    }
+
+    return denom_corr;
+}
+
+template< class T >
+T IPT2::InfiniteLadders< T >::Gamma_merged_corr(arma::Mat< T >& denom_corr, T iqn, double qq) const noexcept{
+    // This function method is an implicit function of k_bar and ikn_bar
+    T tot_corr{0.0};
+    for (size_t n_k_pp=0; n_k_pp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_pp++){
+        if ( (n_k_pp==0) || (n_k_pp==(OneLadder< T >::_splInlineobj._k_array.size()-1)) ){
+            for (size_t n_pp=0; n_pp<OneLadder< T >::_splInlineobj._iwn_array.size(); n_pp++){
+                tot_corr += 0.5*getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_pp],OneLadder< T >::_splInlineobj._iwn_array[n_pp])*denom_corr(n_k_pp,n_pp)*getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_pp]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_pp]+iqn);
+            }
+        } else{
+            for (size_t n_pp=0; n_pp<OneLadder< T >::_splInlineobj._iwn_array.size(); n_pp++){
+                tot_corr += getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_pp],OneLadder< T >::_splInlineobj._iwn_array[n_pp])*denom_corr(n_k_pp,n_pp)*getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_pp]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_pp]+iqn);
+            }
+        }
+    }
+
+    tot_corr *= OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_splInlineobj._k_array.size();
+    
+    return tot_corr; 
+}
+
+template< class T >
+std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, double qq, bool is_simple_ladder_precomputed) const noexcept{
+    std::vector< MPIData > GG_iqn;
+    // Computing Gamma
+    // Here should have the choice the load the precomputed single ladder denominator or not to save time...
+    arma::Mat< T > Gamma_n_bar_n_tilde(OneLadder< T >::_splInlineobj._iwn_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size()); // Doesn't depend on iq_n
+    if (is_simple_ladder_precomputed){
+        // Should load the data saved previously saved in the simpler simgle ladder calculation..
+        std::cerr << "Not implemented yet..." << "\n";
+    } else{
+        for (size_t n_bar=0; n_bar<OneLadder< T >::_splInlineobj._iwn_array.size(); n_bar++){
+            clock_t begin = clock();
+            for (size_t n_tilde=0; n_tilde<OneLadder< T >::_splInlineobj._iwn_array.size(); n_tilde++){
+                Gamma_n_bar_n_tilde(n_bar,n_tilde) = OneLadder< T >::_U/Gamma(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_k_t_b[n_k_tilde],OneLadder< T >::_splInlineobj._iwn_array[n_bar],OneLadder< T >::_splInlineobj._iwn_array[n_tilde]);
+            }
+            clock_t end = clock();
+            double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+            std::cout << "outer single ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
+        }
+    }
+
+    // ikn_bar-diagonal summation over the correction term degrees of freedom
+    arma::Cube< T > denom_corr(OneLadder< T >::_splInlineobj._k_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size());  // layout as follows: kpp, ikppn, ikn_bar
+    for (size_t n_bar=0; n_bar<OneLadder< T >::_splInlineobj._iwn_array.size(); n_bar++){
+        denom_corr.slice(n_bar) = Gamma_to_merge_corr(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar],qq);
+    }
+    
+    arma::Mat< T > tmp_ikn_bar_corr;
+    for (size_t em=0; em<OneLadder< T >::_iqn.size(); em++){
+        // Now, for each ikn_bar value, one has to complete the summation over kpp and ikppn by calling Gamma_merged_corr
+        std::vector< T > ikn_bar_corr(OneLadder< T >::_splInlineobj._iwn_array.size());
+        for (size_t n_bar=0; n_bar<OneLadder< T >::_splInlineobj._iwn_array.size(); n_bar++){
+            tmp_ikn_bar_corr = denom_corr.slice(n_bar);
+            ikn_bar_corr[n_bar] = Gamma_merged_corr(tmp_ikn_bar_corr,OneLadder< T >::_iqn[em],qq);
+        }
+        // Now considering both the single ladder and its corrections
+        arma::Mat< T > GG_n_bar_n_tilde(OneLadder< T >::_splInlineobj._iwn_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size());
+        for (size_t n_bar=0; n_bar<OneLadder< T >::_splInlineobj._iwn_array.size(); n_bar++){
+            for (size_t n_tilde=0; n_tilde<OneLadder< T >::_splInlineobj._iwn_array.size(); n_tilde++){
+                GG_n_bar_n_tilde(n_bar,n_tilde) = getGreen(OneLadder< T >::_k_t_b[n_k_tilde],OneLadder< T >::_splInlineobj._iwn_array[n_tilde])*getGreen(OneLadder< T >::_k_t_b[n_k_tilde]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_tilde]+OneLadder< T >::_iqn[em]) * ( 
+                    1.0 / ( Gamma_n_bar_n_tilde(n_bar,n_tilde) - ikn_bar_corr[n_bar] ) 
+                    ) * getGreen(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar])*getGreen(OneLadder< T >::_k_t_b[n_k_bar]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_iqn[em]);
+            }
+        }
+        MPIData mpi_data_tmp { n_k_tilde, n_k_bar, (OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+        GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+    }
+
+    return GG_iqn;
 }
 
 namespace IPT2{

@@ -20,13 +20,11 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 101;
-    const unsigned int N_k = 2;
+    const unsigned int N_q = 51;
+    const unsigned int N_k = 5;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
-    // k_tilde and k_bar momenta
-    const double qq = 0.0;
 
     // beta array constructed
     std::vector<double> beta_array;
@@ -55,6 +53,7 @@ int main(int argc, char** argv){
     const unsigned int DATA_SET_DIM = Ntau;
     const H5std_string MEMBER1( "RE" );
     const H5std_string MEMBER2( "IM" );
+    // The different processes cannot create more than once the file to be written in.
     if (world_rank==root_process){
         file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     }
@@ -88,8 +87,9 @@ int main(int argc, char** argv){
     IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn);
     splInlineObj.loadFileSpline(inputFilenameLoad,IPT2::spline_type::linear);
     // One-ladder calculations
-    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn_tilde,iqn,k_t_b_array,mu,U,beta);
-
+    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    
     // Setting MPI stuff up
     constexpr size_t tot_k_size = N_k*N_k;
     const size_t num_elem_per_proc = (world_size != 1) ? static_cast<size_t>(tot_k_size/world_size) : tot_k_size-1;
@@ -157,10 +157,11 @@ int main(int argc, char** argv){
         }
         test1.close();
 
-        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5;
+        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5(Ntau);
         for (size_t l=0; l<gathered_MPI_data->size(); l++){
             std::vector<MPIData> mpi_data_hdf5_tmp = gathered_MPI_data->at(l);
-            std::string DATASET_NAME("kbar_"+std::to_string(mpi_data_hdf5_tmp[0].k_bar)+"ktilde_"+std::to_string(mpi_data_hdf5_tmp[0].k_tilde));
+            std::string DATASET_NAME("kbar_"+std::to_string(k_t_b_array[mpi_data_hdf5_tmp[0].k_bar])+"ktilde_"+std::to_string(k_t_b_array[mpi_data_hdf5_tmp[0].k_tilde]));
+            std::cout << "DATASET_NAME: " << DATASET_NAME << std::endl;
             // extracting the std::complex<double> data from the MPI struct
             std::transform(mpi_data_hdf5_tmp.begin(),mpi_data_hdf5_tmp.end(),mpi_data_to_transfer_hdf5.begin(),[](MPIData d){ return d.cplx_data; });
             writeInHDF5File(mpi_data_to_transfer_hdf5, file, DATA_SET_DIM, RANK, MEMBER1, MEMBER2, DATASET_NAME);
@@ -199,7 +200,6 @@ int main(int argc, char** argv){
     arma::Mat< std::complex<double> > G_k_bar_q_tilde_iwn(q_tilde_array.size(),iwn.size());
     arma::Mat<double> G_k_bar_q_tilde_tau(q_tilde_array.size(),Ntau+1);
     std::vector<double> FFT_k_bar_q_tilde_tau;
-    constexpr double k_tilde = -M_PI/2.0;
     constexpr double k_bar = M_PI/2.0;
 
     // Computing the derivatives for given (k_tilde,k_bar) tuple. Used inside the cubic spline algorithm...
