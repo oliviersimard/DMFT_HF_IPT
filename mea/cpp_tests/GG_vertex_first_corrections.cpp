@@ -20,8 +20,8 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 51;
-    const unsigned int N_k = 5;
+    const unsigned int N_q = 101;
+    const unsigned int N_k = 3;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
@@ -86,9 +86,13 @@ int main(int argc, char** argv){
     // Spline object used to interpolate the self-energy
     IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn);
     splInlineObj.loadFileSpline(inputFilenameLoad,IPT2::spline_type::linear);
+    
     // One-ladder calculations
+    #ifndef INFINITE
     IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    #else
     IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    #endif
     
     // Setting MPI stuff up
     constexpr size_t tot_k_size = N_k*N_k;
@@ -127,7 +131,11 @@ int main(int argc, char** argv){
         for (size_t i=0; i<=num_elem_per_proc; i++){
             auto mpidataObj = vec_to_processes[i];
             clock_t begin = clock();
-            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde);
+            #ifndef INFINITE
+            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            #else
+            GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            #endif
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
@@ -178,7 +186,11 @@ int main(int argc, char** argv){
         for(size_t i = 0; i < num_elem_to_receive; i++) {
             auto mpidataObj = vec_for_slaves[i];
             clock_t begin = clock();
-            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde);
+            #ifndef INFINITE
+            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            #else
+            GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            #endif
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
@@ -186,9 +198,6 @@ int main(int argc, char** argv){
             printf("(%li, %li) calculated by slave_process %d\n", mpidataObj.k_bar, mpidataObj.k_tilde, world_rank); //, (void*)&vec_for_slaves);
         }
         ierr = MPI_Barrier(MPI_COMM_WORLD);
-        // char chars_to_send[50];
-        // sprintf(chars_to_send,"vec_slave_process %d has completed", world_rank);
-        // ierr = MPI_Send( chars_to_send, 50, MPI_CHAR, root_process, RETURN_DATA_TAG, MPI_COMM_WORLD);
         ierr = MPI_Send( &num_elem_to_receive, 1 , MPI_INT, root_process, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD );
         for (int l=0; l<num_elem_to_receive; l++){
             ierr = MPI_Send( (void*)(gathered_MPI_data->at(l).data()), gathered_MPI_data->at(l).size(), MPI_Data_struct_t, root_process, l, MPI_COMM_WORLD);

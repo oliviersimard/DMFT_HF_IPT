@@ -12,6 +12,8 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 #define RETURN_DATA_TAG 3000
 #define RETURN_NUM_RECV_TO_ROOT 3001
 
+#define INFINITE
+
 typedef struct{
     size_t k_tilde;
     size_t k_bar;
@@ -36,7 +38,7 @@ namespace IPT2{
         public:
             OneLadder& operator=(const OneLadder&) = delete;
             OneLadder(const OneLadder&) = delete;
-            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, double qq=0.0) const noexcept;
+            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq=0.0) const noexcept;
             OneLadder()=default;
             explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn(iqn), _k_t_b(k_arr), _iqn_tilde(iqn_tilde){
                 this->_mu = mu;
@@ -65,7 +67,7 @@ namespace IPT2{
             explicit InfiniteLadders(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : OneLadder< T >(splInlineobj,iqn,k_arr,iqn_tilde,mu,U,beta){
                 std::cout << "InfiniteLadder U: " << OneLadder< T >::_U << " and InfiniteLadder beta: " << OneLadder< T >::_beta << std::endl;
             }
-            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, double qq=0.0, bool is_simple_ladder_precomputed=false) const noexcept;
+            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq=0.0, bool is_simple_ladder_precomputed=false) const noexcept;
 
         private:
             using OneLadder< T >::getGreen;
@@ -106,7 +108,7 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_til
 }
 
 template< class T >
-std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, double qq) const noexcept{
+std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq) const noexcept{
     std::vector< MPIData > cubic_spline_GG_iqn;
     // Computing Gamma
     arma::Mat< T > Gamma_n_bar_n_tilde(_splInlineobj._iwn_array.size(),_splInlineobj._iwn_array.size()); // Doesn't depend on iq_n
@@ -128,8 +130,13 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
                 GG_n_bar_n_tilde(n_bar,n_tilde) = getGreen(_k_t_b[n_k_tilde],_splInlineobj._iwn_array[n_tilde])*getGreen(_k_t_b[n_k_tilde]+qq,_splInlineobj._iwn_array[n_tilde]+_iqn[em])*Gamma_n_bar_n_tilde(n_bar,n_tilde)*getGreen(_k_t_b[n_k_bar],_splInlineobj._iwn_array[n_bar])*getGreen(_k_t_b[n_k_bar]+qq,_splInlineobj._iwn_array[n_bar]+_iqn[em]);
             }
         }
-        MPIData mpi_data_tmp { n_k_tilde, n_k_bar, velocity(_k_t_b[n_k_tilde])*velocity(_k_t_b[n_k_bar])*(1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
-        cubic_spline_GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+        if (is_jj){
+            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, -1.0*velocity(_k_t_b[n_k_tilde])*velocity(_k_t_b[n_k_bar])*(1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+            cubic_spline_GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+        } else{
+            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, (1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+            cubic_spline_GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+        }
     }
     std::cout << "After the loop.." << std::endl;
     
@@ -191,7 +198,7 @@ T IPT2::InfiniteLadders< T >::Gamma_merged_corr(arma::Mat< T >& denom_corr, T iq
 }
 
 template< class T >
-std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, double qq, bool is_simple_ladder_precomputed) const noexcept{
+std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq, bool is_simple_ladder_precomputed) const noexcept{
     std::vector< MPIData > GG_iqn;
     // Computing Gamma
     // Here should have the choice the load the precomputed single ladder denominator or not to save time...
@@ -234,8 +241,13 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
                     ) * getGreen(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar])*getGreen(OneLadder< T >::_k_t_b[n_k_bar]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_iqn[em]);
             }
         }
-        MPIData mpi_data_tmp { n_k_tilde, n_k_bar, velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
-        GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+        if (is_jj){
+            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, -1.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+            GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+        } else{
+            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, (OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+            GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+        }
     }
 
     return GG_iqn;
