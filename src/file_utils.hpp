@@ -42,7 +42,7 @@ void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* 
 
 inline bool file_exists(const std::string& name){
   struct stat buffer;   
-  return (stat(name.c_str(), &buffer) == 0); // string null terminateds
+  return (stat(name.c_str(), &buffer) == 0); // string null terminates
 }
 
 inline std::string eraseAllSubStr(std::string mainStr, const std::string& toErase){

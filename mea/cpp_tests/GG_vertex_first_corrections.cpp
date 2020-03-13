@@ -9,8 +9,8 @@ int main(int argc, char** argv){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     
-    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_128_Nit_32.dat");
-    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256");
+    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256_Nit_32.dat");
+    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true;
     // Fetching results from string
@@ -21,7 +21,7 @@ int main(int argc, char** argv){
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
     const unsigned int N_q = 101;
-    const unsigned int N_k = 3;
+    const unsigned int N_k = 5;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
@@ -47,7 +47,11 @@ int main(int argc, char** argv){
 
     // HDF5 business
     H5::H5File* file = nullptr;
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_sum.hdf5"));
+    #ifdef INFINITE
+    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_infinite_ladder_sum.hdf5"));
+    #else
+    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_single_ladder_sum.hdf5"));
+    #endif
     const H5std_string FILE_NAME( filename );
     const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;

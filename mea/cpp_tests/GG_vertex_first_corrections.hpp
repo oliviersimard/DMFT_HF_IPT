@@ -12,7 +12,7 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 #define RETURN_DATA_TAG 3000
 #define RETURN_NUM_RECV_TO_ROOT 3001
 
-#define INFINITE
+//#define INFINITE
 
 typedef struct{
     size_t k_tilde;
@@ -35,6 +35,8 @@ namespace IPT2{
 
     template< class T >
     class OneLadder{
+        /* Class to compute single ladder vertex corrections.
+        */
         public:
             OneLadder& operator=(const OneLadder&) = delete;
             OneLadder(const OneLadder&) = delete;
@@ -61,6 +63,8 @@ namespace IPT2{
 
     template< class T >
     class InfiniteLadders : public OneLadder< T > {
+        /*  Class to compute infinite ladder vertex correction diagram.
+        */
         public:
             InfiniteLadders& operator=(const InfiniteLadders&) = delete;
             InfiniteLadders(const InfiniteLadders&) = delete;
@@ -76,18 +80,40 @@ namespace IPT2{
             arma::Mat< T > Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq) const noexcept;
             T Gamma_merged_corr(arma::Mat< T >& denom_corr, T iqn, double qq) const noexcept;
             
-
     };
 
 }
 
 template< class T >
 inline T IPT2::OneLadder< T >::getGreen(double k, T iwn) const noexcept{
+    /*  This method computes the dressed Green's function of the one-band model. 
+        
+        Parameters:
+            k (double): object defined in fermionic Matsubara frequencies to translate to imaginary time.
+            iwn (T): fermionic Matsubara frequency.
+        
+        Returns:
+            (T): dressed Green's function.
+    */
     return 1.0 / ( iwn + _mu - epsilonk(k) - _splInlineobj.calculateSpline( iwn.imag() ) );
 }
 
 template< class T >
 T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_tilde) const noexcept{
+    /*  This method computes the current-vertex correction for the single ladder diagram. It uses the dressed Green's
+    functions computed in the paramagnetic state. 
+        
+        Parameters:
+            k_bar (double): right doublon momentum (Feynman diagram picture).
+            k_tilde (double): left doublon momentum (Feynman diagram picture).
+            ikn_bar (T): fermionic Matsubara frequency for the right doublon (Feynman diagram picture).
+            ikn_tilde (T): fermionic Matsubara frequency for the left doublon (Feynman diagram picture).
+        
+        Returns:
+            lower_val (T): the current-vertex function for the given doublon parameter set. Eventually, the elements are gathered
+            in a matrix (Fermionic Matsubara frequencies) before being squeezed in between the four outer Green's functions; this is done
+            in operator() public member function.
+    */
     T lower_val{0.0};
     for (size_t l=0; l<_splInlineobj._k_array.size(); l++){
         if ( (l==0) || (l==(_splInlineobj._k_array.size()-1)) ){
@@ -109,7 +135,21 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_til
 
 template< class T >
 std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq) const noexcept{
-    std::vector< MPIData > cubic_spline_GG_iqn;
+    /*  This method computes the susceptibility given the current-vertex correction for the single ladder diagram. It does so for a set
+    of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
+        
+        Parameters:
+            n_k_bar (size_t): right doublon momentum index (Feynman diagram picture).
+            n_k_tilde (size_t): left doublon momentum index (Feynman diagram picture).
+            is_jj (bool): boolean parameters that selects the nature of the susceptibility to be computed: spin-spin (false) or current-current (true).
+            qq (double): momentum injected in the system. Defaults to 0, because interested in the thermodynamic limit (infinite volume).
+        
+        Returns:
+            GG_iqn (std::vector< MPIData >): vector whose elements are MPIData structures containing footprint of n_k_bar, n_k_tilde and 
+            the susceptibility for each bosonic Matsubara frequency. Therefore, the length of the vector is same as that of the incoming
+            bosonic Matsubara frequencies.
+    */
+    std::vector< MPIData > GG_iqn;
     // Computing Gamma
     arma::Mat< T > Gamma_n_bar_n_tilde(_splInlineobj._iwn_array.size(),_splInlineobj._iwn_array.size()); // Doesn't depend on iq_n
     for (size_t n_bar=0; n_bar<_splInlineobj._iwn_array.size(); n_bar++){
@@ -132,19 +172,33 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
         }
         if (is_jj){
             MPIData mpi_data_tmp { n_k_tilde, n_k_bar, -1.0*velocity(_k_t_b[n_k_tilde])*velocity(_k_t_b[n_k_bar])*(1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
-            cubic_spline_GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+            GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
         } else{
             MPIData mpi_data_tmp { n_k_tilde, n_k_bar, (1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
-            cubic_spline_GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+            GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
         }
     }
     std::cout << "After the loop.." << std::endl;
     
-    return cubic_spline_GG_iqn;
+    return GG_iqn;
 }
 
 template< class T >
 T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double kpp, T ikn_bar, T ikppn) const noexcept{
+    /*  This method computes the (q,iqn)-independent part of the correction to the current-vertex for the single ladder diagram. 
+    It corresponds to the denominator of the correction term. This correction to the single ladder diagrams depends solely on the 
+    following incoming tuple (k_bar,ikn_bar). It uses the dressed Green's functions computed in the paramagnetic state. 
+        
+        Parameters:
+            k_bar (double): left doublon momentum (Feynman diagram picture).
+            k_pp (double): momentum local to the full correction term accountable for the infinite ladder summation (Feynman diagram picture).
+            ikn_bar (T): left doublon fermionic Matsubara frequency (Feynman diagram picture).
+            ikppn (T): fermionic Matsubara frequency local to the full correction term (pairing up with k_pp).
+        
+        Returns:
+            (T): denominator of the correction term accountable to the infinite ladder summation for the current-vertex corrections.
+            This value is independent of the tuple (q,iqn).
+    */
     T denom_val{0.0};
     for (size_t n_k_ppp=0; n_k_ppp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_ppp++){
         if ( (n_k_ppp==0) || (n_k_ppp==(OneLadder< T >::_splInlineobj._k_array.size()-1)) ){
@@ -165,6 +219,19 @@ T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double 
 
 template< class T >
 arma::Mat< T > IPT2::InfiniteLadders< T >::Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq) const noexcept{
+    /*  This method computes the matrix containing the correction term to the single ladder as a function of the local
+    momentum k_pp and the local fermionic Matsubara frequency ikn_bar. This method mainly produces data container fit to be used
+    to sum over the local overall variables (k_pp,ikppn) defining the correction to the single ladder contribution.
+        
+        Parameters:
+            k_bar (double): left doublon momentum (Feynman diagram picture).
+            ikn_bar (T): left doublon fermionic Matsubara frequency (Feynman diagram picture).
+            qq (double): momentum injected in the system. Defaults to 0, because interested in the thermodynamic limit (infinite volume).
+        
+        Returns:
+            deniom_corr (arma::Mat<T>): Matrix containing the correction term to the single ladder as a function of the local 4-vector
+            (k_pp,ikppn).
+    */
     // compute the denominator of correction term in bunch (doesn't depend on iqn)
     arma::Mat< T > denom_corr(OneLadder< T >::_splInlineobj._k_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size());
     for (size_t n_k_pp=0; n_k_pp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_pp++){
@@ -178,6 +245,18 @@ arma::Mat< T > IPT2::InfiniteLadders< T >::Gamma_to_merge_corr(double k_bar, T i
 
 template< class T >
 T IPT2::InfiniteLadders< T >::Gamma_merged_corr(arma::Mat< T >& denom_corr, T iqn, double qq) const noexcept{
+    /*  This method finishes off the computation of the correction term to the single ladder by looping over the local
+    momentum k_pp and the local fermionic Matsubara frequency ikn_bar and including the numerator, which depends on (iqn,qq).
+        
+        Parameters:
+            denom_corr (arma::Mat< T >&): matrix containing the correction term to the single ladder as a function of the local 4-vector
+            (k_pp,ikppn).
+            iqn (T): injected bosonic Matsubara frequency.
+            qq (double): momentum injected in the system. Defaults to 0, because interested in the thermodynamic limit (infinite volume).
+        
+        Returns:
+            tot_corr (T): total contribution comming from the infinite summation of the ladder diagrams as a function of iqn.
+    */
     // This function method is an implicit function of k_bar and ikn_bar
     T tot_corr{0.0};
     for (size_t n_k_pp=0; n_k_pp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_pp++){
@@ -198,12 +277,28 @@ T IPT2::InfiniteLadders< T >::Gamma_merged_corr(arma::Mat< T >& denom_corr, T iq
 }
 
 template< class T >
-std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq, bool is_simple_ladder_precomputed) const noexcept{
+std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq, bool is_single_ladder_precomputed) const noexcept{
+    /*  This method computes the susceptibility given the current-vertex correction for the infinite ladder diagram. It does so for a set
+    of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
+        
+        Parameters:
+            n_k_bar (size_t): right doublon momentum index (Feynman diagram picture).
+            n_k_tilde (size_t): left doublon momentum index (Feynman diagram picture).
+            is_jj (bool): boolean parameters that selects the nature of the susceptibility to be computed: spin-spin (false) or current-current (true).
+            qq (double): momentum injected in the system. Defaults to 0, because interested in the thermodynamic limit (infinite volume).
+            is_single_ladder_precomputed (bool): boolean used to choose whether the single ladder part is loaded from previous matching 
+            calculations (true), or if it is computed from the beginning (false).
+        
+        Returns:
+            GG_iqn (std::vector< MPIData >): vector whose elements are MPIData structures containing footprint of n_k_bar, n_k_tilde and 
+            the susceptibility for each bosonic Matsubara frequency. Therefore, the length of the vector is same as that of the incoming
+            bosonic Matsubara frequencies.
+    */
     std::vector< MPIData > GG_iqn;
     // Computing Gamma
     // Here should have the choice the load the precomputed single ladder denominator or not to save time...
     arma::Mat< T > Gamma_n_bar_n_tilde(OneLadder< T >::_splInlineobj._iwn_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size()); // Doesn't depend on iq_n
-    if (is_simple_ladder_precomputed){
+    if (is_single_ladder_precomputed){
         // Should load the data saved previously saved in the simpler simgle ladder calculation..
         std::cerr << "Not implemented yet..." << "\n";
     } else{
@@ -333,6 +428,16 @@ namespace IPT2{
     }
 
     void set_vector_processes(std::vector<MPIData>* vec_to_processes, unsigned int N_q) noexcept{
+        /* This function sets up the vector of MPIData structures to be dispatched to slave processes by
+        root process.
+
+            Parameters:
+                vec_to_processes (std::vector<MPIData>*): pointer to vector of MPIData instances.
+                N_q (unsigned int): number of k-points (1D) of the doublon momentum to be considered (k_bar or k_tilde).
+            
+            Returns:
+                (void): fills up vec_to_processes with the MPIData instances.
+        */
         for (size_t k_t=0; k_t<N_q; k_t++){
             for (size_t k_b=0; k_b<N_q; k_b++){
                 MPIData mpi_data{ k_t, k_b, std::complex<double>(0.0,0.0) };
@@ -342,6 +447,15 @@ namespace IPT2{
     }
 
     void create_mpi_data_struct(MPI_Datatype& custom_type){
+        /* This function build a new MPI datatype by reference to deal with the struct MPIData that is used to send across the different 
+        processes.
+
+            Parameters:
+                custom_type (MPI_Datatype&): MPI datatype to be created based upon MPIData struct.
+            
+            Returns:
+                (void): committed MPI datatype.
+        */
         int lengths[3]={ 1, 1, 1 };
         MPI_Aint offsets[3]={ offsetof(MPIData,k_tilde), offsetof(MPIData,k_bar), offsetof(MPIData,cplx_data) };
         MPI_Datatype types[3]={ MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX }, tmp_type;

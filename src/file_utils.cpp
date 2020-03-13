@@ -1,6 +1,15 @@
 #include "file_utils.hpp"
 
 std::vector<std::string> glob(const std::string& pattern) noexcept(false){
+    /* This function fetches all the files with a given pattern. This function returns a vector of strings containing 
+    the results of the query.
+        
+        Parameters:
+            pattern (const std::string&): pattern of the filenames that one seeks. Needs to terminate with the wild card symbol "*".
+        
+        Returns:
+            filenames (std::vector<std::string>): vector of strings representing the found results based on the pattern fed in.
+    */
     using namespace std;
 
     // glob struct resides on the stack
@@ -25,12 +34,11 @@ std::vector<std::string> glob(const std::string& pattern) noexcept(false){
     } else{
         throw std::runtime_error("Glob issued an error: "+std::to_string(return_value));
     }
-    // collect all the filenames into a std::list<std::string>
+    // collect all the filenames into a std::vector<std::string>
     vector<string> filenames;
     for(size_t i = 0; i < glob_result.gl_pathc; ++i) {
         filenames.push_back(string(glob_result.gl_pathv[i]));
     }
-
     // cleanup
     globfree(&glob_result);
 
@@ -89,14 +97,23 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
     }
 }
 
-int extractIntegerLastWords(std::string str){ 
+int extractIntegerLastWords(std::string str){
+    /* This function extracts the last integers of the filenames corresponding to the iteration number (N_it). It returns 
+    the largest number N_it corresponding to the converged solution. Assumes that the filename finishes with ".dat" extension.
+        
+        Parameters:
+            str (std::string): filename containing data of calculations carried out by the impurity solver (N_it).
+        
+        Returns:
+            integerStr (int): integers at the end of the string representing the filename.
+    */
     //std::regex r("[0-9]*\\.[0-9]+|[0-9]+");
     std::vector<double> intContainer;
     std::string toDel(".dat");
     str = eraseAllSubStr(str,toDel);
     size_t last_index = str.find_last_not_of("0123456789");
     std::string result = str.substr(last_index + 1);
-    double integerStr = static_cast<int>(atof(result.c_str()));
+    int integerStr = static_cast<int>(atof(result.c_str()));
     return integerStr;
 }
 
@@ -108,7 +125,7 @@ FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept
         3. 3rd column are the imaginary parts of the self-energy. 
         
         Parameters:
-            strName (const std::string&): Filename containeing the self-energy.
+            strName (const std::string&): Filename containing the self-energy.
             Ntau (const unsigned int&): Number of fermionic Matsubara frequencies (length of the columns).
         
         Returns:
