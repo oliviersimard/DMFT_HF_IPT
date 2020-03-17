@@ -17,6 +17,7 @@ extern "C" {
 #include <stdexcept>
 #include <regex>
 #include <complex>
+#include <armadillo>
 #include "H5Cpp.h"
 
 typedef struct cplx_t{ // Custom data holder for the HDF5 handling
@@ -37,7 +38,10 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
 int extractIntegerLastWords(std::string str);
 FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
 std::vector<std::string> get_info_from_filename(const std::string& strName,const std::vector<std::string>& fetches,const char* separation_char="_") noexcept(false);
-void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false);
+void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false);
+arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::string& DATASET_NAME) noexcept(false);
+void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, double k_bar, double k_tilde, H5::H5File* file) noexcept(false);
+void save_matrix_in_HDF5(std::complex<double>* mat_to_save, double k_bar, double k_tilde, H5::H5File* file, size_t NX, size_t NY) noexcept(false);
 //inline std::string eraseAllSubStr(std::string,const std::string&);
 
 inline bool file_exists(const std::string& name){

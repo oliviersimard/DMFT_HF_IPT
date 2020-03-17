@@ -1,7 +1,5 @@
 #include "GG_vertex_first_corrections.hpp"
 
-static int root_process = 0;
-
 int main(int argc, char** argv){
     MPI_Init(&argc,&argv);
     int world_size;
@@ -9,10 +7,11 @@ int main(int argc, char** argv){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     
-    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256_Nit_32.dat");
-    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512");
+    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_128_Nit_32.dat");
+    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true;
+    const bool is_single_ladder_precomputed = true;
     // Fetching results from string
     std::vector<std::string> results;
     std::vector<std::string> fetches = {"U", "beta", "N_tau"};
@@ -20,11 +19,12 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 101;
-    const unsigned int N_k = 5;
+    const unsigned int N_q = 201;
+    const unsigned int N_k = 9;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
+    const double n = 0.5;
 
     // beta array constructed
     std::vector<double> beta_array;
@@ -48,20 +48,44 @@ int main(int argc, char** argv){
     // HDF5 business
     H5::H5File* file = nullptr;
     #ifdef INFINITE
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_infinite_ladder_sum.hdf5"));
+    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_q)+"_isjj_"+std::to_string(is_jj)+"_infinite_ladder_sum.hdf5");
     #else
-    std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_single_ladder_sum.hdf5"));
+    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_q)+"_isjj_"+std::to_string(is_jj)+"_single_ladder_sum.hdf5");
     #endif
     const H5std_string FILE_NAME( filename );
-    const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;
-    const H5std_string MEMBER1( "RE" );
-    const H5std_string MEMBER2( "IM" );
     // The different processes cannot create more than once the file to be written in.
     if (world_rank==root_process){
         file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     }
-    
+    // Creating HDF5 file to contain the single ladder denominator
+    H5::H5File* file_sl = nullptr;
+    const std::string path_to_save_single_ladder_mat("./sl_data/");
+    const std::string intermediate_path = "single_ladder_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n);
+    const std::string filename_sl = intermediate_path+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_q);
+    const H5std_string FILE_NAME_SL( path_to_save_single_ladder_mat+intermediate_path+"/"+filename_sl+".hdf5" );
+    #ifndef INFINITE
+    if ( (world_rank==root_process) && is_single_ladder_precomputed ){
+        try{
+            // Making the directory tree 
+            mkdirTree(path_to_save_single_ladder_mat+intermediate_path,"");
+            std::string pattern_to_look = path_to_save_single_ladder_mat+intermediate_path+"/"+filename_sl+"*";
+            std::cout << pattern_to_look << std::endl;
+            std::vector<std::string> glob_files_found;
+            // Looking if the HDF5 file about to be created exists already
+            glob_files_found = glob(pattern_to_look);
+            char buf_chr[filename_sl.length()+30];
+            sprintf(buf_chr,"File %s exists already!!",filename_sl.c_str());
+            if (glob_files_found.size()>0){
+                throw std::runtime_error( buf_chr );
+            }
+            file_sl = new H5::H5File( FILE_NAME_SL, H5F_ACC_TRUNC );
+        } catch(std::runtime_error& err){
+            std::cerr << err.what() << "\n";
+            exit(0);
+        }
+    }
+    #endif
     // Getting the data
     FileData dataFromFile = get_data(inputFilename,Ntau);
     std::vector<double> wn = dataFromFile.iwn;
@@ -77,10 +101,10 @@ int main(int argc, char** argv){
     // Bosonic Matsubara array
     std::vector< std::complex<double> > iqn; // for the total susceptibility
     std::vector< std::complex<double> > iqn_tilde; // for the inner loop inside Gamma.
-    for (size_t j=0; j<iwn.size(); j++){
+    for (size_t j=0; j<Ntau; j++){
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
     }
-    for (signed int j=(-static_cast<int>(iwn.size()/2))+1; j<(signed int)static_cast<int>(iwn.size()/2); j++){ // Bosonic frequencies.
+    for (signed int j=(-static_cast<int>(Ntau/2))+1; j<(signed int)static_cast<int>(Ntau/2); j++){ // Bosonic frequencies.
         std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
         iqn_tilde.push_back( matFreq );
     }
@@ -96,6 +120,9 @@ int main(int argc, char** argv){
     IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
     #else
     IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    if (is_single_ladder_precomputed){
+        IPT2::InfiniteLadders< std::complex<double> >::_FILE_NAME = FILE_NAME_SL;
+    }
     #endif
     
     // Setting MPI stuff up
@@ -136,20 +163,30 @@ int main(int argc, char** argv){
             auto mpidataObj = vec_to_processes[i];
             clock_t begin = clock();
             #ifndef INFINITE
-            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
             #else
-            GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
             #endif
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
             gathered_MPI_data->push_back(GG_iqn);
             printf("(%li,%li) calculated by root process\n", mpidataObj.k_bar, mpidataObj.k_tilde);
+            #ifndef INFINITE
+            if (is_single_ladder_precomputed){ // maybe take this out of the loop
+                auto mat_pt = one_ladder_obj.sl_vec[i]; // equiv to back()
+                save_matrix_in_HDF5(mat_pt,k_t_b_array[mpidataObj.k_bar],k_t_b_array[mpidataObj.k_tilde],file_sl,Ntau,Ntau);
+            }
+            #endif
         }
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         // Fetch data from the slaves
         MPIDataReceive mpi_data_receive;
         int recv_root_num_elem;
+        #ifndef INFINITE
+        ArmaMPI< std::complex<double> > armaMatObj(Ntau,Ntau);
+        arma::Mat< std::complex<double> > single_ladders_to_save;
+        #endif
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
             ierr = MPI_Recv( &recv_root_num_elem, 1, MPI_INT, 
                 an_id, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD, &status);
@@ -161,6 +198,20 @@ int main(int argc, char** argv){
                 gathered_MPI_data->push_back( std::vector<MPIData>(mpi_data_receive.data_struct,mpi_data_receive.data_struct+mpi_data_receive.size) );
                 free(mpi_data_receive.data_struct);
             }
+            #ifndef INFINITE
+            // Precompute the single ladder denominator
+            if (is_single_ladder_precomputed){
+                // Gathering the tags from the slaves
+                std::vector<int> returned_tags_from_slaves(recv_root_num_elem);
+                MPI_Recv( (void*)(returned_tags_from_slaves.data()), recv_root_num_elem, MPI_INT, an_id, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+                for (auto tag : returned_tags_from_slaves){
+                    single_ladders_to_save = armaMatObj.recv_Arma_mat_MPI(tag,an_id);
+                    auto n_ks = inverse_Cantor_pairing(tag); // n_k_bar, n_k_tilde
+                    std::cout << "n_bar: " << std::get<0>(n_ks) << " and n_tilde: " << std::get<1>(n_ks) << std::endl;
+                    save_matrix_in_HDF5(single_ladders_to_save,k_t_b_array[std::get<0>(n_ks)],k_t_b_array[std::get<1>(n_ks)],file_sl);
+                }
+            }
+            #endif
         }
 
         std::ofstream test1("test_1.dat", std::ios::out);
@@ -176,7 +227,7 @@ int main(int argc, char** argv){
             std::cout << "DATASET_NAME: " << DATASET_NAME << std::endl;
             // extracting the std::complex<double> data from the MPI struct
             std::transform(mpi_data_hdf5_tmp.begin(),mpi_data_hdf5_tmp.end(),mpi_data_to_transfer_hdf5.begin(),[](MPIData d){ return d.cplx_data; });
-            writeInHDF5File(mpi_data_to_transfer_hdf5, file, DATA_SET_DIM, RANK, MEMBER1, MEMBER2, DATASET_NAME);
+            writeInHDF5File(mpi_data_to_transfer_hdf5, file, DATA_SET_DIM, DATASET_NAME);
         }
 
     } else{
@@ -191,9 +242,9 @@ int main(int argc, char** argv){
             auto mpidataObj = vec_for_slaves[i];
             clock_t begin = clock();
             #ifndef INFINITE
-            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
             #else
-            GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj);
+            GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
             #endif
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -206,6 +257,15 @@ int main(int argc, char** argv){
         for (int l=0; l<num_elem_to_receive; l++){
             ierr = MPI_Send( (void*)(gathered_MPI_data->at(l).data()), gathered_MPI_data->at(l).size(), MPI_Data_struct_t, root_process, l, MPI_COMM_WORLD);
         }
+        #ifndef INFINITE
+        if (is_single_ladder_precomputed){
+            // Sending tags to root.
+            ierr = MPI_Send( (void*)(one_ladder_obj.tag_vec.data()), num_elem_to_receive, MPI_INT, root_process, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD );
+            for (size_t t=0; t<one_ladder_obj.tag_vec.size(); t++){
+                MPI_Send(one_ladder_obj.sl_vec.at(t),Ntau*Ntau,MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
+            }
+        }
+        #endif
     }
 
     
@@ -246,12 +306,11 @@ int main(int argc, char** argv){
     }
     test2.close();
 
-    // IPT2::OneLadder< std::complex<double> > one_ladder_object(splInlineObj,iqn_tilde,iqn,mu,U,beta);
-
-    // std::vector< std::complex<double> > data_opt_cond = one_ladder_object(k_bar,k_tilde);
-
     if (world_rank==root_process){
         delete file;
+        if (is_single_ladder_precomputed){
+            delete file_sl;
+        }
     }
     delete gathered_MPI_data;
     MPI_Type_free(&MPI_Data_struct_t);

@@ -11,8 +11,12 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 #define SEND_NUM_TO_SLAVES 2001
 #define RETURN_DATA_TAG 3000
 #define RETURN_NUM_RECV_TO_ROOT 3001
+#define RETURN_TAGS_TO_ROOT 3002
 
-//#define INFINITE
+//static bool slaves_can_write_in_file = false; // This prevents that the slave processes
+static int root_process = 0;
+
+#define INFINITE
 
 typedef struct{
     size_t k_tilde;
@@ -25,6 +29,8 @@ struct MPIDataReceive{
     size_t size;
 };
 
+inline std::tuple<int,int> inverse_Cantor_pairing(int number);
+
 // Adding methods to IPT2 namespace for this particular translation unit
 namespace IPT2{
     std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj="Green") noexcept;
@@ -32,6 +38,7 @@ namespace IPT2{
     inline double velocity(double k) noexcept;
     void set_vector_processes(std::vector<MPIData>*,unsigned int N_q) noexcept;
     void create_mpi_data_struct(MPI_Datatype& custom_type);
+    void create_mpi_data_struct_cplx(MPI_Datatype& custom_type);
 
     template< class T >
     class OneLadder{
@@ -40,13 +47,16 @@ namespace IPT2{
         public:
             OneLadder& operator=(const OneLadder&) = delete;
             OneLadder(const OneLadder&) = delete;
-            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq=0.0) const noexcept;
+            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed=false, double qq=0.0) const noexcept;
             OneLadder()=default;
             explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn(iqn), _k_t_b(k_arr), _iqn_tilde(iqn_tilde){
                 this->_mu = mu;
                 this->_U = U;
                 this->_beta = beta;
             };
+            static std::vector<int> tag_vec;
+            static std::vector< T* > sl_vec;
+            //static std::vector< T** > mat_sl_vec; 
 
         protected:
             const SplineInline< T >& _splInlineobj;
@@ -60,6 +70,10 @@ namespace IPT2{
             const std::vector< T >& _iqn_tilde;
 
     };
+    // contains tags to dicriminate matrices contained in mat_sl_vec (ordered arrangement)
+    template< class T > std::vector<int> OneLadder< T >::tag_vec = {};
+    template< class T > std::vector< T* > OneLadder< T >::sl_vec = {};
+    //template< class T > std::vector< T** > OneLadder< T >::mat_sl_vec = {};
 
     template< class T >
     class InfiniteLadders : public OneLadder< T > {
@@ -71,7 +85,8 @@ namespace IPT2{
             explicit InfiniteLadders(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : OneLadder< T >(splInlineobj,iqn,k_arr,iqn_tilde,mu,U,beta){
                 std::cout << "InfiniteLadder U: " << OneLadder< T >::_U << " and InfiniteLadder beta: " << OneLadder< T >::_beta << std::endl;
             }
-            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq=0.0, bool is_simple_ladder_precomputed=false) const noexcept;
+            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_simple_ladder_precomputed=false, double qq=0.0) const noexcept;
+            static std::string _FILE_NAME;
 
         private:
             using OneLadder< T >::getGreen;
@@ -82,6 +97,105 @@ namespace IPT2{
             
     };
 
+    template< class T > std::string InfiniteLadders< T >::_FILE_NAME = std::string("");
+
+}
+
+template< class T >
+class ArmaMPI{
+    /* This specific class sends T-typed Armadillo matrices across MPI processes */
+    friend class IPT2::OneLadder< T >;
+    public:
+        explicit ArmaMPI(size_t n_rows, size_t n_cols);
+        ~ArmaMPI();
+        void send_Arma_mat_MPI(arma::Mat< T >& mat,int dest, int tag) const noexcept;
+        arma::Mat< T > recv_Arma_mat_MPI(int tag, int src) const noexcept;
+        void fill_TArr(arma::Mat< T >& mat) const noexcept;
+
+    private:
+        T** _TArr;
+        T* _Tmemptr;
+        size_t _n_rows;
+        size_t _n_cols;
+        //MPI_Datatype _cplx_custom_t;
+};
+
+template< class T >
+ArmaMPI< T >::ArmaMPI(size_t n_rows, size_t n_cols) : _n_rows(n_rows),_n_cols(n_cols){
+    T* data = new T[_n_rows*_n_cols];
+    _TArr = new T*[_n_rows];
+    for (size_t i=0; i<_n_rows; i++){
+        _TArr[i] = &data[i*_n_cols];
+    }
+    // constructing the MPI datatype, even if not needed..
+    //IPT2::create_mpi_data_struct_cplx(_cplx_custom_t);
+    _Tmemptr = new T[_n_rows*_n_cols];
+}
+
+template< class T >
+ArmaMPI< T >::~ArmaMPI(){
+    delete[] _TArr[0]; // Effectively deletes data*
+    delete[] _TArr;
+    delete[] _Tmemptr;
+    //MPI_Type_free(&_cplx_custom_t);
+}
+
+template< class T >
+void ArmaMPI< T >::send_Arma_mat_MPI(arma::Mat< T >& mat,int dest,int tag) const noexcept{
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            _TArr[i][j] = mat(i,j);
+        }
+    }
+    // Contiguous memory
+    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,dest,tag,MPI_COMM_WORLD);
+}
+
+template<>
+inline void ArmaMPI< std::complex<double> >::send_Arma_mat_MPI(arma::Mat< std::complex<double> >& mat,int dest,int tag) const noexcept{
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            _TArr[i][j] = mat(i,j);
+        }
+    }
+    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,dest,tag,MPI_COMM_WORLD);
+}
+
+template< class T >
+arma::Mat< T > ArmaMPI< T >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
+    arma::Mat< T > returned_mat(_n_rows,_n_cols);
+    MPI_Recv(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            returned_mat(i,j) = _TArr[i][j];
+        }
+    }
+
+    return returned_mat;
+}
+
+template<>
+inline arma::Mat< std::complex<double> > ArmaMPI< std::complex<double> >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
+    arma::Mat< std::complex<double> > returned_mat(_n_rows,_n_cols);
+    MPI_Recv(_Tmemptr,_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            returned_mat(i,j) = _Tmemptr[i*_n_cols+j];
+        }
+    }
+
+    return returned_mat;
+}
+
+template< class T >
+inline void ArmaMPI< T >::fill_TArr(arma::Mat< T >& mat) const noexcept{
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            _TArr[i][j] = mat(i,j);
+        }
+    }
 }
 
 template< class T >
@@ -134,7 +248,7 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_til
 }
 
 template< class T >
-std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq) const noexcept{
+std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed, double qq) const noexcept{
     /*  This method computes the susceptibility given the current-vertex correction for the single ladder diagram. It does so for a set
     of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
         
@@ -160,6 +274,25 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         std::cout << "outer loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
+    }
+    if (is_single_ladder_precomputed){
+        //ArmaMPI< T > armaMatObj(_splInlineobj._iwn_array.size(),_splInlineobj._iwn_array.size());
+        // Come up with UNIQUE way to attribute the tags to different Gamma matrices using Cantor pairing function
+        int tag = (int)( ((n_k_bar+n_k_tilde)*(n_k_bar+n_k_tilde+1))/2 ) + (int)n_k_tilde;
+        std::cout << "tag: " << tag << std::endl;
+        tag_vec.push_back(tag);
+        // FIlling up _TArr. Contains pointers to matrices
+        //armaMatObj.build_TArr(Gamma_n_bar_n_tilde);
+        //mat_sl_vec.push_back(armaMatObj._TArr);
+        sl_vec.push_back(Gamma_n_bar_n_tilde.memptr());
+        // for (size_t i=0; i<Gamma_n_bar_n_tilde.n_cols; i++){
+        //     std::cout << "el init: " << Gamma_n_bar_n_tilde(3,i) << std::endl;
+        // }
+        // std::cout << "\n\n\n";
+        // for (size_t i=0; i<_splInlineobj._iwn_array.size(); i++){
+        //     std::cout << "el after: " << sl_vec[0][3*_splInlineobj._iwn_array.size()+i] << std::endl;
+        // }
+        // exit(0);
     }
 
     arma::Mat< T > GG_n_bar_n_tilde(_splInlineobj._iwn_array.size(),_splInlineobj._iwn_array.size());
@@ -277,7 +410,7 @@ T IPT2::InfiniteLadders< T >::Gamma_merged_corr(arma::Mat< T >& denom_corr, T iq
 }
 
 template< class T >
-std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, double qq, bool is_single_ladder_precomputed) const noexcept{
+std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed, double qq) const noexcept{
     /*  This method computes the susceptibility given the current-vertex correction for the infinite ladder diagram. It does so for a set
     of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
         
@@ -300,7 +433,14 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     arma::Mat< T > Gamma_n_bar_n_tilde(OneLadder< T >::_splInlineobj._iwn_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size()); // Doesn't depend on iq_n
     if (is_single_ladder_precomputed){
         // Should load the data saved previously saved in the simpler simgle ladder calculation..
-        std::cerr << "Not implemented yet..." << "\n";
+        const H5std_string DATASET_NAME_OPEN("kbar_"+std::to_string(OneLadder<T>::_k_t_b[n_k_bar])+"ktilde_"+std::to_string(OneLadder<T>::_k_t_b[n_k_tilde]));
+        H5::H5File* file_open = new H5::H5File(_FILE_NAME,H5F_ACC_RDONLY);
+
+        if ( std::is_same< T,std::complex<double> >::value ){
+            Gamma_n_bar_n_tilde = readFromHDF5File(file_open,DATASET_NAME_OPEN);
+        }
+
+        delete file_open;
     } else{
         for (size_t n_bar=0; n_bar<OneLadder< T >::_splInlineobj._iwn_array.size(); n_bar++){
             clock_t begin = clock();
@@ -464,4 +604,33 @@ namespace IPT2{
         MPI_Type_create_resized(tmp_type, 0, sizeof(MPIData), &custom_type);
         MPI_Type_commit(&custom_type);
     }
+
+    void create_mpi_data_struct_cplx(MPI_Datatype& custom_type){
+        /* This function build a new MPI datatype by reference to deal with the struct cplx_t that is used to send across the different 
+        processes.
+
+            Parameters:
+                custom_type (MPI_Datatype&): MPI datatype to be created based upon cplx_t struct.
+            
+            Returns:
+                (void): committed MPI datatype.
+        */
+        int lengths[2]={ 1, 1 };
+        MPI_Aint offsets[2]={ offsetof(cplx_t,re), offsetof(cplx_t,im) };
+        MPI_Datatype types[2]={ MPI_DOUBLE, MPI_DOUBLE }, tmp_type;
+        MPI_Type_create_struct(2,lengths,offsets,types,&tmp_type);
+        // Proper padding
+        MPI_Type_create_resized(tmp_type, 0, sizeof(cplx_t), &custom_type);
+        MPI_Type_commit(&custom_type);
+    }
+}
+
+inline std::tuple<int,int> inverse_Cantor_pairing(int number){
+    // see https://en.wikipedia.org/wiki/Pairing_function for notation and explanation
+    int w = (int)std::floor( ( std::sqrt( 8.0*number + 1.0 ) - 1.0 ) / 2.0 );
+    int t = static_cast<int>( (w)*(w+1)/2 );
+    int n_k_tilde = number - t;
+    int n_k_bar = w - n_k_tilde;
+
+    return std::make_tuple( n_k_bar, n_k_tilde );
 }

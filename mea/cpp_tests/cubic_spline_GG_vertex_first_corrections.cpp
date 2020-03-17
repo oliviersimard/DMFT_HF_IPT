@@ -91,7 +91,7 @@ int main(void){
 
     spline<double> splObj;
     std::vector<double> initVec(2*Ntau,0.0); // This data contains twice as much data to perform the interpolation
-    IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn,iqn);
+    IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn);
     splInlineObj.loadFileSpline(inputFilenameLoad,IPT2::spline_type::linear);
 
     
