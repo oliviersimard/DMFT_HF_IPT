@@ -438,11 +438,13 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
 
     const H5std_string MEMBER1( "RE" );
     const H5std_string MEMBER2( "IM" );
-    const int RANK_OUT = 1;
+    const int RANK_OUT = 2;
+    arma::Mat< std::complex<double> >* ret_mat_ptr=nullptr;
     try{
         /*
         * Open the specified file and the specified dataset in the file.
         */
+        std::cout << "DATASET_NAME: " << DATASET_NAME << std::endl; 
         H5::DataSet dataset_open = file->openDataSet(DATASET_NAME);
         /*
         * Get dataspace of the dataset.
@@ -459,18 +461,24 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         H5::CompType custom_cplx( sizeof(cplx_t) );
         custom_cplx.insertMember( MEMBER1, HOFFSET(cplx_t,re), H5::PredType::NATIVE_DOUBLE );
         custom_cplx.insertMember( MEMBER2, HOFFSET(cplx_t,im), H5::PredType::NATIVE_DOUBLE );
-
+        std::cout << "NX: " << NX << " and NY: " << NY << std::endl;
+        
         cplx_t data_out[NY][NX];
         H5::DataSpace memspace_out( RANK_OUT, dims_out );
         dataset_open.read(data_out, custom_cplx, memspace_out);
         arma::Mat< std::complex<double> > ret_mat(NY,NX);
+        ret_mat_ptr = &ret_mat;
         for (size_t i=0; i<NY; i++){
             auto tmp_row = ret_mat(i,arma::span::all);
             std::transform(&(data_out[i][0]),&(data_out[i][NX]),tmp_row.begin(),[](cplx_t d){ return std::complex<double>{d.re,d.im}; });
             ret_mat(i,arma::span::all) = tmp_row;
         }
-
-        return ret_mat;
+        // for (size_t j=0; j<NX; j++){
+        //     std::cout << ret_mat_ptr->at(0,j) << std::endl;
+        // }
+        // for (size_t j=0; j<NX; j++){
+        //     std::cout << data_out[0][j].re << " " << data_out[0][j].im << std::endl;
+        // }
 
     } catch( H5::FileIException err ){
         err.printErrorStack();
@@ -491,5 +499,7 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         error.printErrorStack();
         throw std::runtime_error("H5::DataTypeIException!");
     }
+
+    return *ret_mat_ptr;
 
 }

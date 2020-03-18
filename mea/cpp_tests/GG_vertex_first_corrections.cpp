@@ -19,8 +19,8 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 201;
-    const unsigned int N_k = 9;
+    const unsigned int N_q = 51;
+    const unsigned int N_k = 5;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
@@ -64,6 +64,7 @@ int main(int argc, char** argv){
     const std::string intermediate_path = "single_ladder_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n);
     const std::string filename_sl = intermediate_path+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_q);
     const H5std_string FILE_NAME_SL( path_to_save_single_ladder_mat+intermediate_path+"/"+filename_sl+".hdf5" );
+    std::cout << "FILE_NAME_SL: " << FILE_NAME_SL << std::endl;
     #ifndef INFINITE
     if ( (world_rank==root_process) && is_single_ladder_precomputed ){
         try{
@@ -82,7 +83,7 @@ int main(int argc, char** argv){
             file_sl = new H5::H5File( FILE_NAME_SL, H5F_ACC_TRUNC );
         } catch(std::runtime_error& err){
             std::cerr << err.what() << "\n";
-            exit(0);
+            exit(1);
         }
     }
     #endif
@@ -175,7 +176,12 @@ int main(int argc, char** argv){
             #ifndef INFINITE
             if (is_single_ladder_precomputed){ // maybe take this out of the loop
                 auto mat_pt = one_ladder_obj.sl_vec[i]; // equiv to back()
-                save_matrix_in_HDF5(mat_pt,k_t_b_array[mpidataObj.k_bar],k_t_b_array[mpidataObj.k_tilde],file_sl,Ntau,Ntau);
+                try{
+                    save_matrix_in_HDF5(mat_pt,k_t_b_array[mpidataObj.k_bar],k_t_b_array[mpidataObj.k_tilde],file_sl,Ntau,Ntau);
+                } catch( std::runtime_error& err ){
+                    std::cerr << err.what() << "\n";
+                    exit(1);
+                }
             }
             #endif
         }
@@ -208,7 +214,12 @@ int main(int argc, char** argv){
                     single_ladders_to_save = armaMatObj.recv_Arma_mat_MPI(tag,an_id);
                     auto n_ks = inverse_Cantor_pairing(tag); // n_k_bar, n_k_tilde
                     std::cout << "n_bar: " << std::get<0>(n_ks) << " and n_tilde: " << std::get<1>(n_ks) << std::endl;
-                    save_matrix_in_HDF5(single_ladders_to_save,k_t_b_array[std::get<0>(n_ks)],k_t_b_array[std::get<1>(n_ks)],file_sl);
+                    try{
+                        save_matrix_in_HDF5(single_ladders_to_save,k_t_b_array[std::get<0>(n_ks)],k_t_b_array[std::get<1>(n_ks)],file_sl);
+                    } catch( std::runtime_error& err ){
+                        std::cerr << err.what() << "\n";
+                        exit(1);
+                    }
                 }
             }
             #endif
