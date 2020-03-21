@@ -311,8 +311,9 @@ void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, d
         cplx_t cplx_mat_to_save[NY][NX];
         // casting data into custom complex struct..
         for (size_t i=0; i<NY; i++){
-            auto tmp_row = mat_to_save(i,arma::span::all);
-            std::transform(tmp_row.begin(),tmp_row.end(),cplx_mat_to_save[i],[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
+            for (size_t j=0; j<NX; j++){
+                cplx_mat_to_save[i][j] = cplx_t{mat_to_save(i,j).real(),mat_to_save(i,j).imag()};
+            }
         }
         /*
         * Turn off the auto-printing when failure occurs so that we can
@@ -377,11 +378,6 @@ void save_matrix_in_HDF5(std::complex<double>* mat_to_save, double k_bar, double
     const int RANK = 2;
     try{
         cplx_t cplx_mat_to_save[NY][NX];
-        // cplx_t* cplx_arr_to_save = new cplx_t[NY*NX];
-        // cplx_t** cplx_mat_to_save = new cplx_t*[NY];
-        // for (size_t i=0; i<NY; i++){
-        //     cplx_mat_to_save[i] = &(cplx_arr_to_save[i*NX]);
-        // }
         // casting data into custom complex struct..
         for (size_t i=0; i<NY; i++){
             std::transform(&(mat_to_save[i*NX]),&(mat_to_save[i*NX+NX]),cplx_mat_to_save[i],[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
@@ -439,21 +435,21 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
     const H5std_string MEMBER1( "RE" );
     const H5std_string MEMBER2( "IM" );
     const int RANK_OUT = 2;
-    arma::Mat< std::complex<double> >* ret_mat_ptr=nullptr;
+    /*
+    * Open the specified file and the specified dataset in the file.
+    */
+    std::cout << "DATASET_NAME: " << DATASET_NAME << std::endl; 
+    H5::DataSet dataset_open = file->openDataSet(DATASET_NAME);
+    /*
+    * Get dataspace of the dataset.
+    */
+    H5::DataSpace dataspace_open = dataset_open.getSpace();
+    hsize_t dims_out[2];
+    int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
+    const size_t NY = dims_out[0];
+    const size_t NX = dims_out[1];
+    arma::Mat< std::complex<double> > ret_mat(NY,NX);
     try{
-        /*
-        * Open the specified file and the specified dataset in the file.
-        */
-        std::cout << "DATASET_NAME: " << DATASET_NAME << std::endl; 
-        H5::DataSet dataset_open = file->openDataSet(DATASET_NAME);
-        /*
-        * Get dataspace of the dataset.
-        */
-        H5::DataSpace dataspace_open = dataset_open.getSpace();
-        hsize_t dims_out[2];
-        int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
-        const size_t NY = dims_out[0];
-        const size_t NX = dims_out[1];
         /*
         * Get the class of the datatype that is used by the dataset.
         */
@@ -466,12 +462,10 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         cplx_t data_out[NY][NX];
         H5::DataSpace memspace_out( RANK_OUT, dims_out );
         dataset_open.read(data_out, custom_cplx, memspace_out);
-        arma::Mat< std::complex<double> > ret_mat(NY,NX);
-        ret_mat_ptr = &ret_mat;
         for (size_t i=0; i<NY; i++){
-            auto tmp_row = ret_mat(i,arma::span::all);
-            std::transform(&(data_out[i][0]),&(data_out[i][NX]),tmp_row.begin(),[](cplx_t d){ return std::complex<double>{d.re,d.im}; });
-            ret_mat(i,arma::span::all) = tmp_row;
+            for (size_t j=0; j<NX; j++){
+                ret_mat(i,j) = std::complex<double>( data_out[i][j].re,data_out[i][j].im );
+            }
         }
         // for (size_t j=0; j<NX; j++){
         //     std::cout << ret_mat_ptr->at(0,j) << std::endl;
@@ -500,6 +494,6 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         throw std::runtime_error("H5::DataTypeIException!");
     }
 
-    return *ret_mat_ptr;
+    return ret_mat;
 
 }

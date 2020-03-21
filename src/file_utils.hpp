@@ -31,7 +31,6 @@ struct FileData{
     std::vector<double> im;
 };
 
-//inline bool file_exists(const std::string& name);
 std::vector<std::string> glob(const std::string& pattern) noexcept(false);
 void mkdirTree(std::string sub, std::string dir) noexcept(false);
 void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir1, std::string pathToDir2) noexcept(false);
@@ -42,7 +41,6 @@ void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* 
 arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::string& DATASET_NAME) noexcept(false);
 void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, double k_bar, double k_tilde, H5::H5File* file) noexcept(false);
 void save_matrix_in_HDF5(std::complex<double>* mat_to_save, double k_bar, double k_tilde, H5::H5File* file, size_t NX, size_t NY) noexcept(false);
-//inline std::string eraseAllSubStr(std::string,const std::string&);
 
 inline bool file_exists(const std::string& name){
   struct stat buffer;   

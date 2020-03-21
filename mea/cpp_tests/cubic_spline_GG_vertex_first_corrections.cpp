@@ -1,37 +1,17 @@
-//#include "../../src/tridiagonal.hpp"
-//#include "../../src/integral_utils.hpp"
 #include "../../src/IPT2nd3rdorderSingle2.hpp"
-#include <fftw3.h>
-#include <fstream>
 #include <ctime>
-#include "H5Cpp.h" 
 /*
 Info HDF5:
 https://support.hdfgroup.org/HDF5/doc/cpplus_RM/compound_8cpp-example.html
 https://www.hdfgroup.org/downloads/hdf5/source-code/
 */
 
-struct FileData;
-
-FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
 std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj="Green");
 template<typename T> std::vector< T > generate_random_numbers(size_t arr_size, T min, T max) noexcept;
 arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector<double>& beta_arr, double U, double mu, double q=0.0, std::string opt="positive");
 inline double velocity(double k) noexcept;
-void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false);
 std::complex<double> getGreen(double k, double mu, std::complex<double> iwn, IPT2::SplineInline< std::complex<double> >& splInlineobj);
 template<typename T> T summ(std::vector< T >) noexcept;
-
-struct FileData{
-    std::vector<double> iwn;
-    std::vector<double> re;
-    std::vector<double> im;
-};
-
-typedef struct cplx_t{ // Custom data holder for the HDF5 handling
-    double re;
-    double im;
-} cplx_t;
 
 int main(void){
     
@@ -64,10 +44,7 @@ int main(void){
     // HDF5 business
     std::string filename(std::string("bb_1D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_q)+std::string("_isjj_")+std::to_string(is_jj)+std::string("_kbar_")+std::to_string(k_bar)+std::string("_ktilde_")+std::to_string(k_tilde)+std::string("_1_moment.hdf5"));
     const H5std_string FILE_NAME( filename );
-    const int RANK = 1;
     const unsigned int DATA_SET_DIM = Ntau;
-    const H5std_string MEMBER1( "RE" );
-    const H5std_string MEMBER2( "IM" );
     
     H5::H5File* file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     // Getting the data
@@ -222,85 +199,11 @@ int main(void){
     std::cout << "After the loop.." << std::endl;
 
     std::string DATASET_NAME("q_"+std::to_string(qq));
-    writeInHDF5File(cubic_spline_GG_iqn, file, DATA_SET_DIM, RANK, MEMBER1, MEMBER2, DATASET_NAME);
+    writeInHDF5File(cubic_spline_GG_iqn, file, DATA_SET_DIM, DATASET_NAME);
 
     delete file;
 
     return 0;
-
-}
-
-void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const int& RANK, const H5std_string& MEMBER1, const H5std_string& MEMBER2, const std::string& DATASET_NAME) noexcept(false){
-    /*  This method writes in an HDF5 file the data passed in the first entry "GG_iqn_q". The data has to be complex-typed. This function hinges on the
-    the existence of a custom complex structure "cplx_t" to parse in the data:
-    
-        typedef struct cplx_t{ // Custom data holder for the HDF5 handling
-            double re;
-            double im;
-        } cplx_t;
-        
-        Parameters:
-            GG_iqn_q (std::vector< std::complex<double> >&): function mesh over (iqn,q)-space.
-            file (H5::H5File*): pointer to file object.
-            DATA_SET_DIM (const unsigned int&): corresponds to the number of bosonic Matsubara frequencies and therefore to the length of columns in HDF5 file.
-            RANK (const int&): rank of the object to be saved. Should be 1.
-            MEMBER1 (const H5std_string&): name designating the internal metadata to label the first member variable of cplx_t structure.
-            MEMBER2 (const H5std_string&): name designating the internal metadata to label the second member variable of cplx_t structure.
-            DATASET_NAME (const std::string&): name of the dataset to be saved.
-        
-        Returns:
-            (void)
-    */
-    try{
-        H5::Exception::dontPrint();
-        // Casting all the real values into the following array to get around the custom type design. Also easier to read out using Python.
-        std::vector<cplx_t> custom_cplx_GG_iqn_q(DATA_SET_DIM);
-        std::transform(GG_iqn_q.begin(),GG_iqn_q.end(),custom_cplx_GG_iqn_q.begin(),[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
-
-        hsize_t dimsf[1];
-        dimsf[0] = DATA_SET_DIM;
-        H5::DataSpace dataspace( RANK, dimsf );
-
-        // H5::CompType std_cmplx_type( sizeof(std::complex<double>) );
-        // H5::FloatType datatype( H5::PredType::NATIVE_DOUBLE );
-        // datatype.setOrder( H5T_ORDER_LE );
-        // size_t size_real_cmplx = sizeof(((std::complex<double> *)0)->real());
-        // size_t size_imag_cmplx = sizeof(((std::complex<double> *)0)->imag());
-        // std_cmplx_type.insertMember( MEMBER1, size_real_cmplx, H5::PredType::NATIVE_DOUBLE);
-        // std_cmplx_type.insertMember( MEMBER2, size_imag_cmplx, H5::PredType::NATIVE_DOUBLE);
-
-        H5::CompType mCmplx_type( sizeof(cplx_t) );
-        mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
-        mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
-
-        // Create the dataset.
-        H5::DataSet* dataset;
-        // dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, std_cmplx_type, dataspace));
-        dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, mCmplx_type, dataspace));
-        // Write data to dataset
-        dataset->write( custom_cplx_GG_iqn_q.data(), mCmplx_type );
-
-        delete dataset;
-
-    } catch( H5::FileIException err ){
-        err.printErrorStack();
-        throw std::runtime_error("H5::FileIException thrown!");
-    }
-    // catch failure caused by the DataSet operations
-    catch( H5::DataSetIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSetIException!");
-    }
-    // catch failure caused by the DataSpace operations
-    catch( H5::DataSpaceIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSpaceIException!");
-    }
-    // catch failure caused by the DataSpace operations
-    catch( H5::DataTypeIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataTypeIException!");
-    }
 
 }
 
@@ -354,62 +257,6 @@ arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, 
     }
 
     return dG_tau_for_k;
-}
-
-
-FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false){
-    /*  This method fetches the data (self-energy) contained inside a file named "strName". The data has to be laid out 
-    the following way: 
-        1. 1st column are the fermionic Matsubara frequencies.
-        2. 2nd column are the real parts of the self-energy.
-        3. 3rd column are the imaginary parts of the self-energy. 
-        
-        Parameters:
-            strName (const std::string&): Filename containeing the self-energy.
-            Ntau (const unsigned int&): Number of fermionic Matsubara frequencies (length of the columns).
-        
-        Returns:
-            fileDataObj (struct FileData): struct containing a vector of data for each column in the data file.
-    */
-
-    std::vector<double> iwn(Ntau,0.0);
-    std::vector<double> re(Ntau,0.0);
-    std::vector<double> im(Ntau,0.0);
-
-    std::ifstream inputFile(strName);
-    std::string increment("");
-    unsigned int idx = 0;
-    size_t pos=0;
-    std::string token;
-    const std::string delimiter = "\t\t";
-    if (inputFile.fail()){
-        std::cerr << "Error loading the file..." << "\n";
-        throw std::ios_base::failure("Check loading file procedure..");
-    } 
-    std::vector<double> tmp_vec;
-    while (getline(inputFile,increment)){
-        if (increment[0]=='/'){
-            continue;
-        }
-        while ((pos = increment.find(delimiter)) != std::string::npos) {
-            token = increment.substr(0, pos);
-            increment.erase(0, pos + delimiter.length());
-            tmp_vec.push_back(std::atof(token.c_str()));
-        }
-        tmp_vec.push_back(std::atof(increment.c_str()));
-        iwn[idx] = tmp_vec[0];
-        re[idx] = tmp_vec[1];
-        im[idx] = tmp_vec[2];
-
-        increment.clear();
-        tmp_vec.clear();
-        idx++;
-    }
-    
-    inputFile.close();
-
-    FileData fileDataObj={iwn,re,im};
-    return fileDataObj;
 }
 
 std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj){

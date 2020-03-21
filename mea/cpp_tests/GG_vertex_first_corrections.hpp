@@ -12,11 +12,12 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 #define RETURN_DATA_TAG 3000
 #define RETURN_NUM_RECV_TO_ROOT 3001
 #define RETURN_TAGS_TO_ROOT 3002
+#define SHIFT_TO_DIFFERENTIATE_TAGS 1000000
 
 //static bool slaves_can_write_in_file = false; // This prevents that the slave processes
 static int root_process = 0;
 
-#define INFINITE
+// #define INFINITE
 
 typedef struct{
     size_t k_tilde;
@@ -47,7 +48,7 @@ namespace IPT2{
         public:
             OneLadder& operator=(const OneLadder&) = delete;
             OneLadder(const OneLadder&) = delete;
-            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed=false, double qq=0.0) const noexcept;
+            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed=false, void* arma_ptr=nullptr, double qq=0.0) const noexcept;
             OneLadder()=default;
             explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn(iqn), _k_t_b(k_arr), _iqn_tilde(iqn_tilde){
                 this->_mu = mu;
@@ -55,7 +56,6 @@ namespace IPT2{
                 this->_beta = beta;
             };
             static std::vector<int> tag_vec;
-            static std::vector< T* > sl_vec;
             //static std::vector< T** > mat_sl_vec; 
 
         protected:
@@ -72,7 +72,6 @@ namespace IPT2{
     };
     // contains tags to dicriminate matrices contained in mat_sl_vec (ordered arrangement)
     template< class T > std::vector<int> OneLadder< T >::tag_vec = {};
-    template< class T > std::vector< T* > OneLadder< T >::sl_vec = {};
     //template< class T > std::vector< T** > OneLadder< T >::mat_sl_vec = {};
 
     template< class T >
@@ -248,7 +247,7 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_til
 }
 
 template< class T >
-std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed, double qq) const noexcept{
+std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed, void* arma_ptr, double qq) const noexcept{
     /*  This method computes the susceptibility given the current-vertex correction for the single ladder diagram. It does so for a set
     of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
         
@@ -281,7 +280,7 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
         int tag = (int)( ((n_k_bar+n_k_tilde)*(n_k_bar+n_k_tilde+1))/2 ) + (int)n_k_tilde;
         std::cout << "tag: " << tag << std::endl;
         tag_vec.push_back(tag);
-        sl_vec.push_back(Gamma_n_bar_n_tilde.memptr()); // contiguous
+        *( static_cast< arma::Mat< T >* >(arma_ptr) ) = Gamma_n_bar_n_tilde;
         // for (size_t i=0; i<_splInlineobj._iwn_array.size(); i++){
         //     std::cout << "el after: " << sl_vec[0][3*_splInlineobj._iwn_array.size()+i] << std::endl;
         // }
@@ -361,9 +360,13 @@ arma::Mat< T > IPT2::InfiniteLadders< T >::Gamma_to_merge_corr(double k_bar, T i
     // compute the denominator of correction term in bunch (doesn't depend on iqn)
     arma::Mat< T > denom_corr(OneLadder< T >::_splInlineobj._k_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size());
     for (size_t n_k_pp=0; n_k_pp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_pp++){
+        clock_t begin = clock();
         for (size_t n_pp=0; n_pp<OneLadder< T >::_splInlineobj._iwn_array.size(); n_pp++){
             denom_corr(n_k_pp,n_pp) = Gamma_correction_denominator(k_bar,OneLadder< T >::_splInlineobj._k_array[n_k_pp],ikn_bar,OneLadder< T >::_splInlineobj._iwn_array[n_pp]);
         }
+        clock_t end = clock();
+        double elapsed_secs = double(end-begin) / CLOCKS_PER_SEC;
+        std::cout << "infinite ladder loop n_k_pp: " << n_k_pp << elapsed_secs << "secs.." << "\n";
     }
 
     return denom_corr;
@@ -450,7 +453,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
             }
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "outer single ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
+            std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
         }
     }
 
@@ -461,7 +464,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
         denom_corr.slice(n_bar) = Gamma_to_merge_corr(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar],qq);
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
+        std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
     }
     
     arma::Mat< T > tmp_ikn_bar_corr;

@@ -11,11 +11,17 @@ PROG=CPP-TESTS
 
 all: $(PROG)
 
-$(PROG): $(OBJ)/green_utils.o $(OBJ)/cubic_spline.o $(OBJ)/integral_utils.o
-	$(CXX) $(OBJ)/green_utils.o $(OBJ)/cubic_spline.o $(OBJ)/integral_utils.o $(CXXFLAGS) -o spl_fm.out
+$(PROG): $(OBJ)/file_utils.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/cubic_spline.o
+	$(CXX) $(OBJ)/file_utils.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/cubic_spline.o $(CXXFLAGS) -o spl_fm.out
+
+$(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/file_utils.cpp -o $(OBJ)/file_utils.o
 
 $(OBJ)/green_utils.o: $(SRC)/green_utils.cpp
 	$(CXX) -c -I$(INC) $(SRC)/green_utils.cpp -o $(OBJ)/green_utils.o
+
+$(OBJ)/IPT2nd3rdorderSingle2.o: $(SRC)/IPT2nd3rdorderSingle2.cpp
+	$(CXX) -c -I$(INC) $(SRC)/IPT2nd3rdorderSingle2.cpp -o $(OBJ)/IPT2nd3rdorderSingle2.o
 
 $(OBJ)/cubic_spline.o: $(PWD)/cubic_spline_GG_q_fewer_moments.cpp
 	$(CXX) -c -I$(INC) $(PWD)/cubic_spline_GG_q_fewer_moments.cpp -o $(OBJ)/cubic_spline.o

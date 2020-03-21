@@ -7,8 +7,8 @@ int main(int argc, char** argv){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     
-    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_128_Nit_32.dat");
-    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256");
+    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256_Nit_32.dat");
+    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true;
     const bool is_single_ladder_precomputed = true;
@@ -19,8 +19,8 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 51;
-    const unsigned int N_k = 5;
+    const unsigned int N_q = 201;
+    const unsigned int N_k = 9;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
@@ -160,11 +160,15 @@ int main(int argc, char** argv){
             
         }
         // Root process now deals with its share of the workload
+        #ifndef INFINITE
+        arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_per_proc+1);
+        #endif
         for (size_t i=0; i<=num_elem_per_proc; i++){
             auto mpidataObj = vec_to_processes[i];
             clock_t begin = clock();
             #ifndef INFINITE
-            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
+            arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
+            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed,(void*)mat_slice_ptr);
             #else
             GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
             #endif
@@ -175,9 +179,8 @@ int main(int argc, char** argv){
             printf("(%li,%li) calculated by root process\n", mpidataObj.k_bar, mpidataObj.k_tilde);
             #ifndef INFINITE
             if (is_single_ladder_precomputed){ // maybe take this out of the loop
-                auto mat_pt = one_ladder_obj.sl_vec[i]; // equiv to back()
                 try{
-                    save_matrix_in_HDF5(mat_pt,k_t_b_array[mpidataObj.k_bar],k_t_b_array[mpidataObj.k_tilde],file_sl,Ntau,Ntau);
+                    save_matrix_in_HDF5(container_sl.slice(i),k_t_b_array[mpidataObj.k_bar],k_t_b_array[mpidataObj.k_tilde],file_sl);
                 } catch( std::runtime_error& err ){
                     std::cerr << err.what() << "\n";
                     exit(1);
@@ -197,10 +200,10 @@ int main(int argc, char** argv){
             ierr = MPI_Recv( &recv_root_num_elem, 1, MPI_INT, 
                 an_id, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD, &status);
             for (int l=0; l<recv_root_num_elem; l++){
-                ierr = MPI_Probe(an_id,l,MPI_COMM_WORLD,&status); // Peeking the data received and comparing to num_elem_to_receive
+                ierr = MPI_Probe(an_id,l+SHIFT_TO_DIFFERENTIATE_TAGS,MPI_COMM_WORLD,&status); // Peeking the data received and comparing to num_elem_to_receive
                 ierr = MPI_Get_count(&status, MPI_Data_struct_t, (int*)&mpi_data_receive.size);
                 mpi_data_receive.data_struct = (MPIData*)malloc(mpi_data_receive.size*sizeof(MPIData));
-                ierr = MPI_Recv((void*)mpi_data_receive.data_struct,mpi_data_receive.size,MPI_Data_struct_t,an_id,l,MPI_COMM_WORLD,&status);
+                ierr = MPI_Recv((void*)mpi_data_receive.data_struct,mpi_data_receive.size,MPI_Data_struct_t,an_id,l+SHIFT_TO_DIFFERENTIATE_TAGS,MPI_COMM_WORLD,&status);
                 gathered_MPI_data->push_back( std::vector<MPIData>(mpi_data_receive.data_struct,mpi_data_receive.data_struct+mpi_data_receive.size) );
                 free(mpi_data_receive.data_struct);
             }
@@ -249,11 +252,15 @@ int main(int argc, char** argv){
         ierr = MPI_Recv( (void*)(vec_for_slaves.data()), num_elem_to_receive, MPI_Data_struct_t, 
             root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
         /* Calculate the sum of the portion of the array */
+        #ifndef INFINITE
+        arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_to_receive); // n_rows, n_cols, n_slices
+        #endif
         for(size_t i = 0; i < num_elem_to_receive; i++) {
             auto mpidataObj = vec_for_slaves[i];
             clock_t begin = clock();
             #ifndef INFINITE
-            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
+            arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
+            GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed,(void*)mat_slice_ptr);
             #else
             GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
             #endif
@@ -266,14 +273,14 @@ int main(int argc, char** argv){
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         ierr = MPI_Send( &num_elem_to_receive, 1 , MPI_INT, root_process, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD );
         for (int l=0; l<num_elem_to_receive; l++){
-            ierr = MPI_Send( (void*)(gathered_MPI_data->at(l).data()), gathered_MPI_data->at(l).size(), MPI_Data_struct_t, root_process, l, MPI_COMM_WORLD);
+            ierr = MPI_Send( (void*)(gathered_MPI_data->at(l).data()), gathered_MPI_data->at(l).size(), MPI_Data_struct_t, root_process, l+SHIFT_TO_DIFFERENTIATE_TAGS, MPI_COMM_WORLD);
         }
         #ifndef INFINITE
         if (is_single_ladder_precomputed){
             // Sending tags to root.
             ierr = MPI_Send( (void*)(one_ladder_obj.tag_vec.data()), num_elem_to_receive, MPI_INT, root_process, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD );
             for (size_t t=0; t<one_ladder_obj.tag_vec.size(); t++){
-                MPI_Send(one_ladder_obj.sl_vec.at(t),Ntau*Ntau,MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
+                MPI_Send(container_sl.slice(t).memptr(),Ntau*Ntau,MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
             }
         }
         #endif
