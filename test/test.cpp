@@ -236,7 +236,7 @@ namespace{
     // Loading the test file in ./data
     std::string fileToLoad("../test/data/Self_energy_1D_U_11.000000_beta_50.000000_n_0.500000_N_tau_128");
     std::vector<double> initVec(2*N_tau,0.0); // Important that it is 2*MULT_N_TAU, but changed it to be used in this test.
-    IPT2::SplineInline< std::complex<double> > splInlineObj(N_tau,initVec,vecK,iwnArr_l,iqnArr_l);
+    IPT2::SplineInline< std::complex<double> > splInlineObj(N_tau,initVec,vecK,iwnArr_l);
     splInlineObj.loadFileSpline(fileToLoad,IPT2::spline_type::linear);
     std::vector< std::complex<double> > result_before_spline = splInlineObj.get_loaded_data_interpolated();
     std::vector< std::complex<double> > result_after_spline;

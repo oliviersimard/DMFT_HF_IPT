@@ -13,6 +13,6 @@
     "q_2D": [0.0,0.0],
     "dGdPhi": false,
     "load_self": false,
-    "is_jj": true,
+    "is_jj": false,
     "solver_type": "IPT"
 }

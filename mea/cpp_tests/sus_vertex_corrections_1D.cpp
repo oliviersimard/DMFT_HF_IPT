@@ -1,4 +1,4 @@
-#include "GG_vertex_first_corrections.hpp"
+#include "sus_vertex_corrections_1D.hpp"
 
 int main(int argc, char** argv){
     MPI_Init(&argc,&argv);
@@ -7,8 +7,8 @@ int main(int argc, char** argv){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     
-    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256_Nit_32.dat");
-    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_512");
+    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_128_Nit_32.dat");
+    std::string inputFilenameLoad("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_256");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true;
     const bool is_single_ladder_precomputed = true;
@@ -19,8 +19,8 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 201;
-    const unsigned int N_k = 9;
+    const unsigned int N_q = 3;
+    const unsigned int N_k = 5;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
@@ -196,12 +196,15 @@ int main(int argc, char** argv){
         ArmaMPI< std::complex<double> > armaMatObj(Ntau,Ntau);
         arma::Mat< std::complex<double> > single_ladders_to_save;
         #endif
+        int get_size;
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
             ierr = MPI_Recv( &recv_root_num_elem, 1, MPI_INT, 
-                an_id, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD, &status);
+                an_id, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             for (int l=0; l<recv_root_num_elem; l++){
                 ierr = MPI_Probe(an_id,l+SHIFT_TO_DIFFERENTIATE_TAGS,MPI_COMM_WORLD,&status); // Peeking the data received and comparing to num_elem_to_receive
-                ierr = MPI_Get_count(&status, MPI_Data_struct_t, (int*)&mpi_data_receive.size);
+                ierr = MPI_Get_count(&status, MPI_Data_struct_t, &get_size);
+                mpi_data_receive.size = (size_t)get_size;
+                std::cout << "size mpi_data_receive: " << mpi_data_receive.size << std::endl;
                 mpi_data_receive.data_struct = (MPIData*)malloc(mpi_data_receive.size*sizeof(MPIData));
                 ierr = MPI_Recv((void*)mpi_data_receive.data_struct,mpi_data_receive.size,MPI_Data_struct_t,an_id,l+SHIFT_TO_DIFFERENTIATE_TAGS,MPI_COMM_WORLD,&status);
                 gathered_MPI_data->push_back( std::vector<MPIData>(mpi_data_receive.data_struct,mpi_data_receive.data_struct+mpi_data_receive.size) );

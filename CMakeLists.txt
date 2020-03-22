@@ -71,9 +71,16 @@ find_package(GSL REQUIRED)
 include_directories(${GSL_INCLUDE_DIRS})
 message(STATUS "gsl found: " ${GSL_FOUND})
 
+# Locate HDF5
+cmake_policy(VERSION 3.12)
+set(HDF5_ROOT $ENV{HOME}/install/HDF5/1.10.6)
+find_package(HDF5 COMPONENTS C CXX HL REQUIRED)
+include_directories(${HDF5_CXX_INCLUDE_DIRS})
+message(STATUS "HDF5 found: " ${HDF5_FOUND})
+
 #------Executables
 add_executable(MAIN ${SOURCES_MAIN})
-target_link_libraries(MAIN ${GSL_LIBRARIES} ${MPI_LIBRARIES} ${LIBRARIES_CUSTOM})
+target_link_libraries(MAIN ${GSL_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${MPI_LIBRARIES} ${LIBRARIES_CUSTOM})
 
 # Locate GTest
 find_package(GTest REQUIRED)
@@ -97,5 +104,5 @@ endif()
 # # Now simply link against gtest or gtest_main as needed. Eg
 enable_testing()
 add_executable(IPT_test test/test.cpp ${SOURCES_COMMON} ${SOURCES_TEST})
-target_link_libraries(IPT_test ${GSL_LIBRARIES} ${MPI_LIBRARIES} ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES} ${LIBRARIES_CUSTOM} gtest gmock)
+target_link_libraries(IPT_test ${GSL_LIBRARIES} ${MPI_LIBRARIES} ${HDF5_CXX_LIBRARIES} ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES} ${LIBRARIES_CUSTOM} gtest gmock)
 add_test(NAME IPT_test COMMAND ./IPT_test) ## Allows one to enter "make test" and launch the tests!
