@@ -11,6 +11,15 @@
 #define MAX_ITER_ROOT 100000
 #define ROOT_FINDING_TOL 0.0001
 
+struct cubic_roots{ // Hosting the roots of cubic equation
+    std::complex<double> x1;
+    std::complex<double> x2;
+    std::complex<double> x3;
+};
+
+std::complex<double> cbrt(std::complex<double> num);
+cubic_roots get_cubic_roots(double a, double b, double c, double d);
+
 /* Template structure to call functions in classes. */
 template<typename T, typename C, typename Q>
 struct functorStruct{

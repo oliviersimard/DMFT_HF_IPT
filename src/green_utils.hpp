@@ -12,7 +12,7 @@ extern "C" {
 }
 //#include <type_traits> // for use of std::is_same in static_assert
 
-//#define DIM 1 // 1 or 2
+#define DIM 1 // 1 or 2
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
 #define MULT_N_TAU 2 // Has to be an even number
@@ -42,6 +42,8 @@ extern double epsilonk(double);
 namespace ThreadFunctor{ struct gamma_tensor_content; };
 template<typename T> inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
 template<typename T> inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
+void DMFTloop(IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&, std::vector< std::string >&, const unsigned int) noexcept(false);
+void DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
@@ -57,35 +59,36 @@ struct Data{
         static double hyb_c;
         static double U;
         static double dtau;
-        static double mu, mu0;
         static unsigned int N_tau;
         static unsigned int N_k;
         static unsigned int objectCount; // they are treated similarly to global variables, and get initialized when the program starts
         //
+        double mu, mu0{0.0};
     explicit Data(const unsigned int, const unsigned int, const double, const double, const double);
     Data()=default;
     Data(const Data& obj);
     Data& operator=(const Data& obj);
 };
 
-inline Data::Data(const unsigned int N_tau_, const unsigned int N_k_, const double beta_, const double U_, const double hyb_c){
+inline Data::Data(const unsigned int N_tau_, const unsigned int N_k_, const double beta_, const double U_, const double hyb_c_){
     if (objectCount<1){ // Maybe try to implement it as a singleton.
-        this->N_k=N_k_;
-        this->hyb_c=hyb_c;
-        this->N_tau=N_tau_;
-        this->beta=beta_;
-        this->U=U_;
-        this->dtau=beta/N_tau;
-        this->mu=U/2.0; // starting at half-filling
+        N_k=N_k_;
+        hyb_c=hyb_c_;
+        N_tau=N_tau_;
+        beta=beta_;
+        U=U_;
+        dtau=beta/N_tau;
     }
-    objectCount++;    
+    objectCount++;
+    this->mu=U/2.0; // starting at half-filling
 }
 
 inline Data::Data(const Data& obj){}
 
 struct GreenStuff final : Data{ // Non-subclassable
     friend class IPT2::DMFTproc; // Important to access the private static variables from this struct.
-    friend void get_tau_obj(GreenStuff&,GreenStuff&); // Spits out tau-defined object.
+    friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
+    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
     // Member variables
     arma::Cube<double>& matsubara_t_pos; // Ctor: n_rows, n_cols, n_slices
     arma::Cube<double>& matsubara_t_neg;
@@ -93,30 +96,19 @@ struct GreenStuff final : Data{ // Non-subclassable
     std::vector< std::complex<double> > iwnArr;
     // Member functions
     GreenStuff();
-    explicit GreenStuff(const unsigned int N_tau, const unsigned int N_k, const double beta, const double U,
-                                        const double hyb_c, std::vector< std::complex<double> >,
+    explicit GreenStuff(const unsigned int, const unsigned int, const double, const double,
+                                        const double, std::vector< std::complex<double> >,
                                         arma::Cube<double>&, arma::Cube<double>&, arma::Cube< std::complex<double> >&) noexcept(false);
     GreenStuff(const GreenStuff& obj)=delete; // Copy constructor
     GreenStuff& operator=(const GreenStuff& obj)=delete; // Copy assignment
     arma::Cube< std::complex<double> > green_inf() const;
-    void reset_counter(){
-        this->objectCount=0; // Important to update parameters in loop.
-    }
-    double get_mu() const{
-        return this->mu;
-    }
-    double get_mu0() const{
-        return this->mu0;
-    }
-    double get_hyb_c() const{
-        return this->hyb_c;
-    }
-    void update_mu(double mu){
-        this->mu=mu;
-    }
-    void update_mu0(double mu0){
-        this->mu0=mu0;
-    }
+    static void reset_counter(){ objectCount=0; } // Important to update parameters in loop.
+    double get_mu() { return this->mu; }
+    double get_mu0() { return this->mu0; }
+    static double get_hyb_c() { return hyb_c; }
+    static double get_U() { return U; }
+    void update_mu(double mu){ this->mu=mu; }
+    void update_mu0(double mu0){ this->mu0=mu0; }
     
     private:
     /* The static variables are useful whenever default constructor called. */

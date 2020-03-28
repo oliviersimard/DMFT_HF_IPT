@@ -26,7 +26,7 @@ Data& Data::operator=(const Data& obj){
 // Static variables
 unsigned int Data::objectCount=0;
 unsigned int Data::N_k=0, Data::N_tau=0;
-double Data::mu=0.0, Data::dtau=0.0, Data::U=0.0, Data::beta=0.0, Data::hyb_c=0.0, Data::mu0=0.0;
+double Data::dtau=0.0, Data::U=0.0, Data::beta=0.0, Data::hyb_c=0.0;
 
 // Static variables
 arma::Cube<double> GreenStuff::dblVec_pos(2,2,1+1,arma::fill::zeros), GreenStuff::dblVec_neg(2,2,1+1,arma::fill::zeros);

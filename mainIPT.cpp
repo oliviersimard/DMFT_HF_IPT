@@ -2,7 +2,7 @@
 #ifdef PARALLEL
 #include "src/thread_utils.hpp"
 #else
-#include "src/susceptibilities.hpp"
+#include "src/IPT2nd3rdorderSingle2.hpp"
 #endif
 #include "src/json_utils.hpp"
 
@@ -78,14 +78,30 @@ int main(int argc, char** argv){
     arma::Cube<double> weiss_green_tmp_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_tmp_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> self_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), self_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
     arma::Cube<double> local_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), local_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
+    #ifdef AFM
+    arma::Cube<double> weiss_green_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
+    arma::Cube<double> weiss_green_tmp_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_tmp_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
+    arma::Cube<double> self_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), self_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
+    arma::Cube<double> local_green_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), local_green_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
+    #endif
     //
     arma::Cube< std::complex<double> > weiss_green_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
     arma::Cube< std::complex<double> > weiss_green_tmp_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
     arma::Cube< std::complex<double> > self_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
     arma::Cube< std::complex<double> > local_green_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros);
+    #ifdef AFM
+    arma::Cube< std::complex<double> > weiss_green_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
+    arma::Cube< std::complex<double> > weiss_green_tmp_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
+    arma::Cube< std::complex<double> > self_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
+    arma::Cube< std::complex<double> > local_green_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros);
+    #endif
     // To save the derivative of G(tau) and G(-tau)
-    arma::Cube<double> data_dG_dtau_pos(2,2,2*N_tau+1,arma::fill::zeros); 
-    arma::Cube<double> data_dG_dtau_neg(2,2,2*N_tau+1,arma::fill::zeros);
+    arma::Cube<double> data_dG_dtau_pos_A(2,2,2*N_tau+1,arma::fill::zeros); 
+    arma::Cube<double> data_dG_dtau_neg_A(2,2,2*N_tau+1,arma::fill::zeros);
+    #ifdef AFM
+    arma::Cube<double> data_dG_dtau_pos_B(2,2,2*N_tau+1,arma::fill::zeros); 
+    arma::Cube<double> data_dG_dtau_neg_B(2,2,2*N_tau+1,arma::fill::zeros);
+    #endif
     #endif /* PARALLEL */
     std::string pathToDir("./data/");
     std::string pathToDirLoad("./../data/");
@@ -133,21 +149,33 @@ int main(int argc, char** argv){
                 GreenStuff HybA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_tmp_A_matsubara_t_pos,weiss_green_tmp_A_matsubara_t_neg,weiss_green_tmp_A_matsubara_w);
                 GreenStuff SelfEnergyA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,self_A_matsubara_t_pos,self_A_matsubara_t_neg,self_A_matsubara_w);
                 GreenStuff LocalGreenA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,local_green_A_matsubara_t_pos,local_green_A_matsubara_t_neg,local_green_A_matsubara_w);
+                #ifdef AFM
+                GreenStuff WeissGreenB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_B_matsubara_t_pos,weiss_green_B_matsubara_t_neg,weiss_green_B_matsubara_w);
+                GreenStuff HybB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_tmp_B_matsubara_t_pos,weiss_green_tmp_B_matsubara_t_neg,weiss_green_tmp_B_matsubara_w);
+                GreenStuff SelfEnergyB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,self_B_matsubara_t_pos,self_B_matsubara_t_neg,self_B_matsubara_w);
+                GreenStuff LocalGreenB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,local_green_B_matsubara_t_pos,local_green_B_matsubara_t_neg,local_green_B_matsubara_w);
+                #endif
 
-                IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos,data_dG_dtau_neg,vecK,n_t_spin);
-
+                IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos_A,data_dG_dtau_neg_A,vecK,n_t_spin);
+                #ifdef AFM
+                IPT2::DMFTproc EqDMFTB(WeissGreenB,HybB,LocalGreenB,SelfEnergyB,data_dG_dtau_pos_B,data_dG_dtau_neg_B,vecK,n_t_spin);
+                #endif
                 /* Performs the complete DMFT calculations if directory doesn't already exist */
                 #ifndef DEBUG
                 struct stat infoDir;
                 int message = stat( (pathToDirLoad+customDirName).c_str(), &infoDir );
                 if ( !(infoDir.st_mode & S_IFDIR) && message!=0 ){ // If the directory doesn't already exist in ../data/ ...
+                    #ifndef AFM
                     DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
+                    #else
+                    DMFTloopAFM(EqDMFTA,EqDMFTB,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
+                    #endif
                     /* Saving the data of the Green's function into file for comparison */
                     std::ofstream dG_dtau(pathToDir+customDirName+"/dG_dtaus.dat", std::ofstream::out | std::ofstream::app);
                     double tau;
-                    for (size_t l=0; l<data_dG_dtau_pos.n_slices; l++){
+                    for (size_t l=0; l<data_dG_dtau_pos_A.n_slices; l++){
                         tau = (double)l*beta/( 2.0*N_tau );
-                        dG_dtau << tau << "\t\t" << data_dG_dtau_pos.slice(l)(0,0) << "\t\t" << data_dG_dtau_neg.slice(l)(0,0) << "\t\t" << WeissGreenA.matsubara_t_pos.slice(l)(0,0) << "\t\t" << WeissGreenA.matsubara_t_neg.slice(l)(0,0);
+                        dG_dtau << tau << "\t\t" << data_dG_dtau_pos_A.slice(l)(0,0) << "\t\t" << data_dG_dtau_neg_A.slice(l)(0,0) << "\t\t" << WeissGreenA.matsubara_t_pos.slice(l)(0,0) << "\t\t" << WeissGreenA.matsubara_t_neg.slice(l)(0,0);
                         dG_dtau << "\n";
                     }
                     dG_dtau.close();
@@ -183,7 +211,7 @@ int main(int argc, char** argv){
                     // MPI_Barrier(MPI_COMM_WORLD);
                     // calculateSusceptibilitiesParallel<IPT2::DMFTproc>(splInlineObj,pathToDir,customDirName,is_full,is_jj,ThreadFunctor::solver_prototype::IPT2_prot);
                     #else
-                    calculateSusceptibilities<IPT2::DMFTproc>(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
+                    //calculateSusceptibilities<IPT2::DMFTproc>(EqDMFTA,splInlineObj,pathToDir,customDirName,is_full,is_jj);
                     #endif
                     /* Testing */
                     #ifdef PARALLEL
@@ -232,7 +260,7 @@ int main(int argc, char** argv){
                 MPI_Barrier(MPI_COMM_WORLD);
                 calculateSusceptibilitiesParallel<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj,ndo_converged,ThreadFunctor::solver_prototype::HF_prot);
                 #else
-                calculateSusceptibilities<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj);
+                //calculateSusceptibilities<HF::FunctorBuildGk>(Gk,pathToDir,customDirName,is_full,is_jj);
                 #endif // PARALLEL
             }
         }

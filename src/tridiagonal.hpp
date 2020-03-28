@@ -51,10 +51,10 @@ class spline{
                       bd_type right, T right_value,
                       bool force_linear_extrapolation=false);
         void set_points(const std::vector<double>& x,
-                    const arma::Cube< T >& y, bool cubic_spline=true);
+                    const arma::Cube< T >& y, int index=0, bool cubic_spline=true);
         T operator() (double x) const;
         T deriv(int order, double x) const;
-        void iwn_tau_spl_extrm(const GreenStuff&, const double, const unsigned int);
+        void iwn_tau_spl_extrm(const GreenStuff&, const double, const unsigned int, int index=0);
         std::vector< std::complex< T > > fermionic_propagator(const std::vector< std::complex< T > >& iwn_arr,double beta);
         std::vector< std::complex< T > > bosonic_corr(const std::vector< std::complex< T > >& iqn_arr,double beta);
         std::vector< std::complex< T > > bosonic_corr_single_ladder(const std::vector< std::complex< T > >& ikn_tilde_arr,double beta,size_t n_bar);
@@ -169,7 +169,7 @@ void spline<T>::set_boundary(spline::bd_type left, T left_value,
 
 template<class T>
 void spline<T>::set_points(const std::vector<double>& x,
-                        const arma::Cube< T >& y, bool cubic_spline){
+                        const arma::Cube< T >& y, int index, bool cubic_spline){
     assert(x.size()==y.n_slices);
     assert(x.size()>2);
     m_x=x;
@@ -191,7 +191,7 @@ void spline<T>::set_points(const std::vector<double>& x,
             A(i,i-1)=1.0*(x[i]-x[i-1]);
             A(i,i)=2.0*(x[i+1]-x[i-1]);
             A(i,i+1)=1.0*(x[i+1]-x[i]);
-            rhs[i]=3.0*( (y.slice(i+1)(0,0)-y.slice(i)(0,0))/(x[i+1]-x[i]) - (y.slice(i)(0,0)-y.slice(i-1)(0,0))/(x[i]-x[i-1]) );
+            rhs[i]=3.0*( (y.slice(i+1)(index,index)-y.slice(i)(index,index))/(x[i+1]-x[i]) - (y.slice(i)(index,index)-y.slice(i-1)(index,index))/(x[i]-x[i-1]) );
         }
         // boundary conditions
         if(m_left == spline::second_deriv) {
@@ -204,7 +204,7 @@ void spline<T>::set_points(const std::vector<double>& x,
             // (2b[0]+b[1])(x[1]-x[0]) = 3 ((y[1]-y[0])/(x[1]-x[0]) - f')
             A(0,0)=2.0*(x[1]-x[0]);
             A(0,1)=1.0*(x[1]-x[0]);
-            rhs[0]=3.0*((y.slice(1)(0,0)-y.slice(0)(0,0))/(x[1]-x[0])-m_left_value);
+            rhs[0]=3.0*((y.slice(1)(index,index)-y.slice(0)(index,index))/(x[1]-x[0])-m_left_value);
         } else {
             assert(false);
         }
@@ -219,7 +219,7 @@ void spline<T>::set_points(const std::vector<double>& x,
             // = 3 (f' - (y[n-1]-y[n-2])/(x[n-1]-x[n-2]))
             A(n-1,n-1)=2.0*(x[n-1]-x[n-2]);
             A(n-1,n-2)=1.0*(x[n-1]-x[n-2]);
-            rhs[n-1]=3.0*(m_right_value-(y.slice(n-1)(0,0)-y.slice(n-2)(0,0))/(x[n-1]-x[n-2]));
+            rhs[n-1]=3.0*(m_right_value-(y.slice(n-1)(index,index)-y.slice(n-2)(index,index))/(x[n-1]-x[n-2]));
         } else {
             assert(false);
         }
@@ -242,7 +242,7 @@ void spline<T>::set_points(const std::vector<double>& x,
         // calculate parameters a[] and c[] based on b[]
         for(size_t i=0; i<n-1; i++) {
             m_a[i]=1.0/3.0*(m_b[i+1]-m_b[i])/(x[i+1]-x[i]);
-            m_c[i]=(y.slice(i+1)(0,0)-y.slice(i)(0,0))/(x[i+1]-x[i])
+            m_c[i]=(y.slice(i+1)(index,index)-y.slice(i)(index,index))/(x[i+1]-x[i])
                    - 1.0/3.0*(2.0*m_b[i]+m_b[i+1])*(x[i+1]-x[i]);
         }
 
@@ -250,7 +250,7 @@ void spline<T>::set_points(const std::vector<double>& x,
         for(size_t i=0; i<n-1; i++) {
             m_a[i]=0.0;
             m_b[i]=0.0;
-            m_c[i]=(m_y.slice(i+1)(0,0)-m_y.slice(i)(0,0))/(m_x[i+1]-m_x[i]);
+            m_c[i]=(m_y.slice(i+1)(index,index)-m_y.slice(i)(index,index))/(m_x[i+1]-m_x[i]);
         }
     }
     // for left extrapolation coefficients
@@ -355,15 +355,15 @@ T spline<T>::deriv(int order, double x) const{
 }
 
 template<class T>
-void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double beta, const unsigned int N_tau){
+void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double beta, const unsigned int N_tau, int index){
     // Setting the boundary conditions. The spline f_i starts at i=1, because f_0(x) = b_0(x-x_0)^2 + c_0(x-x_0) + y_0,  x_0 <= x <= x_1.
-    _S_1_0=m_y.slice(0)(0,0); // f_0(x_0) = a_0(x_0-x_0)^3 + b_0(x_0-x_0)^2 + c_0(x_0-x_0) + y_0
+    _S_1_0=m_y.slice(0)(index,index); // f_0(x_0) = a_0(x_0-x_0)^3 + b_0(x_0-x_0)^2 + c_0(x_0-x_0) + y_0
     _Sp_1_0=m_c0; // f'_0(x_0) = 3a_0(x_0-x_0)^2 + 2b_0(x_0-x_0)^1 + c_0 
     _Spp_1_0=2.0*m_b[0]; // f''_0(x_0) = 6a_0(x_0-x_0) + 2b_0
     // The spline f_i ends at i=N, because f_N(x) = b_N(x-x_N)^2 + c_N(x-x_N) + y_N, x >= x_N.
     std::vector<double>::const_iterator it = m_x.end(); // returns pointer after last element.
     const double h_last = *(it-1)-*(it-2); // This is kind of beta^{-}: f_{N-1}(x_N)
-    _S_N_beta=m_a[2*N_tau-1]*h_last*h_last*h_last+m_b[2*N_tau-1]*h_last*h_last+m_c[2*N_tau-1]*h_last+m_y.slice(2*N_tau-1)(0,0); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
+    _S_N_beta=m_a[2*N_tau-1]*h_last*h_last*h_last+m_b[2*N_tau-1]*h_last*h_last+m_c[2*N_tau-1]*h_last+m_y.slice(2*N_tau-1)(index,index); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
     _Sp_N_beta=3.0*m_a[2*N_tau-1]*h_last*h_last+2.0*m_b[2*N_tau-1]*h_last+m_c[2*N_tau-1];
     _Spp_N_beta=6.0*m_a[2*N_tau-1]*h_last+2.0*m_b[2*N_tau-1];
     // This will be used later for IFFT.
@@ -391,7 +391,7 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
         }
     }
     for(size_t i=0; i<timeGrid; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
-        SelfEnergy.matsubara_w.slice(i)(0,0)=( -1.0*( -(_S_1_0+_S_N_beta)/iwnArr_l[i] + (_Sp_1_0+_Sp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]) - (_Spp_1_0+_Spp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]) + (1.0-std::exp(1.0*iwnArr_l[i]*beta/(double)timeGrid))/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i])*(Fp[2*i]+im*Fp[2*i+1]) ) );
+        SelfEnergy.matsubara_w.slice(i)(index,index)=( -1.0*( -(_S_1_0+_S_N_beta)/iwnArr_l[i] + (_Sp_1_0+_Sp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]) - (_Spp_1_0+_Spp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]) + (1.0-std::exp(1.0*iwnArr_l[i]*beta/(double)timeGrid))/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i])*(Fp[2*i]+im*Fp[2*i+1]) ) );
     }
 }
 

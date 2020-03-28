@@ -1,18 +1,18 @@
 SRC=$(PWD)/src
 OBJ=$(PWD)/obj
 
-CXX=mpic++ -std=c++11 -Wall -g -DDEBUG -DPARALLEL
-INC=${HOME}/gsl/include
-LIB=${HOME}/gsl/lib
+CXX=mpic++ -g -std=c++11 -Wall -DDIM=1 -DDEBUG
+INC=${HOME}/gsl/include -I${HOME}/install/HDF5/1.10.6/include
+LIB=${HOME}/gsl/lib -L${HOME}/install/HDF5/1.10.6/lib
 
-CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -ljson_spirit #-lgtest -lgmock -lpthread
+CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -ljson_spirit -lhdf5 -lhdf5_hl -lhdf5_cpp #-lgtest -lgmock -lpthread
 
 PROG=IPT-DMFT-OLI
 
 all: $(PROG)
 
-$(PROG): $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(OBJ)/thread_utils.o
-	$(CXX) $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(OBJ)/thread_utils.o $(CXXFLAGS) -o mainIPT.out
+$(PROG): $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o
+	$(CXX) $(OBJ)/mainIPT.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/json_utils.o $(OBJ)/file_utils.o $(CXXFLAGS) -o mainIPT.out
 
 $(OBJ)/mainIPT.o: $(PWD)/mainIPT.cpp
 	$(CXX) -c -I$(INC) $(PWD)/mainIPT.cpp -o $(OBJ)/mainIPT.o
@@ -31,9 +31,6 @@ $(OBJ)/json_utils.o: $(SRC)/json_utils.cpp
 
 $(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
 	$(CXX) -c -I$(INC) $(SRC)/file_utils.cpp -o $(OBJ)/file_utils.o
-
-$(OBJ)/thread_utils.o: $(SRC)/thread_utils.cpp
-	$(CXX) -c -I$(INC) $(SRC)/thread_utils.cpp -o $(OBJ)/thread_utils.o
 
 clean:
 	rm -f $(OBJ)/* $(PWD)/mainIPT.out && cd test && make clean

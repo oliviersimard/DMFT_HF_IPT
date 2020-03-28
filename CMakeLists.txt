@@ -59,8 +59,7 @@ set(SOURCES_COMMON
         src/integral_utils
         src/green_utils
         src/file_utils
-        src/json_utils
-        src/thread_utils)
+        src/json_utils)
 
 set(SOURCES_MAIN mainIPT ${SOURCES_COMMON})
 set(SOURCES_TEST test/src/test_utils)

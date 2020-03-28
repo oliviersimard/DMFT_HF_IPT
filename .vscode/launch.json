@@ -15,7 +15,19 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb",
-            "preLaunchTask": "g++ build active file"
+            "preLaunchTask": "g++ build active file",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Additional libs for lldb",
+                    "name": "LD_LIBRARY_PATH",
+                    "text": "${LD_LIBRARY_PATH}:${env:HOME}/install/HDF5/1.10.6/lib"
+                }
+            ]
         },
         {
             "name": "(lldb) Launch CMake",

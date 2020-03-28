@@ -4,14 +4,17 @@
 #include<functional>
 #include<cmath> // double abs(double)
 #include<stdexcept>
-//#include<algorithm> // copy() and assign()
+#include<algorithm> // copy() and assign()
 //#include<limits> // numeric_limits
 #include<iomanip> // set_precision
+#include<tuple>
 #include "tridiagonal.hpp"
 #include "file_utils.hpp"
 #include "integral_utils.hpp"
 
 #define TOL 0.000000001
+
+#define AFM
 
 //namespace IPT2{ class DMFTproc; };
 struct GreenStuff;
@@ -19,11 +22,16 @@ namespace IPT2{ template< class T > class OneLadder; template< class T > class I
 
 // Prototypes
 void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&);
-void DMFTloop(IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&, std::vector< std::string >&, const unsigned int) noexcept(false);
 double Hsuperior(double tau, double mu, double c, double beta);
 double Hpsuperior(double tau, double mu, double c, double beta);
 double Hinferior(double tau, double mu, double c, double beta);
 double Hpinferior(double tau, double mu, double c, double beta);
+cubic_roots get_cubic_roots_G_inf(double n_m_sigma_sublatt, double U, double mu, double mu0);
+double get_Hyb_AFM(double n_m_sigma_sublatt, double U, double mu);
+double Fsuperior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
+double Finferior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
+double Fpsuperior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
+double Fpinferior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
 
 
 class FFTtools{
@@ -33,6 +41,7 @@ class FFTtools{
 
         void fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<double>& data2);
         void fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>&, arma::Cube<double>&, Spec);
+        void fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>& data_dg_dtau_pos,arma::Cube<double>& data_dg_dtau_neg, Spec specialization, double n_a_up);
         
 };
 
@@ -42,6 +51,7 @@ enum spline_type : short { linear, cubic };
 class DMFTproc{
     friend void ::saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW);
     friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
+    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
     template<class T>
     friend class ::Susceptibility;
     public:
@@ -50,11 +60,15 @@ class DMFTproc{
         DMFTproc(const DMFTproc&)=delete;
         DMFTproc& operator=(const DMFTproc&)=delete;
         void update_impurity_self_energy();
+        void update_impurity_self_energy_AFM(double n_a_up);
         void update_parametrized_self_energy(FFTtools);
+        void update_parametrized_self_energy_AFM(FFTtools,double n_a_up);
         double density_mu(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu(const arma::Cube< std::complex<double> >&) const;
+        std::tuple<double,double> density_mu_AFM(const arma::Cube< std::complex<double> >& G) const;
         double density_mu0(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu0(const arma::Cube< std::complex<double> >&) const;
+        std::tuple<double,double> density_mu0_AFM(const arma::Cube< std::complex<double> >& G0_1) const;
         double double_occupancy() const;
         double dbl_occupancy(unsigned int iter) const;
     private:

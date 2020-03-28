@@ -1,13 +1,13 @@
 #ifndef test_H_
 #define test_H_
 
-#include<string>
-#include<iostream>
+// #include<string>
+// #include<iostream>
 #include<utility> // pair
-#include<vector>
+// #include<vector>
 #include<ctime>
 #include<cstdlib> // srand and rand
-#include "../../src/susceptibilities.hpp"
+#include "../../src/IPT2nd3rdorderSingle2.hpp"
 #include "../../src/integral_utils.hpp"
 
 extern std::vector<float> vecFloat;

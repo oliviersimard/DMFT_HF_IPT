@@ -261,3 +261,40 @@ std::complex<double> Integrals::I1D_CPLX(std::vector< std::complex<double> >& ve
     
     return result;
 }
+
+std::complex<double> cbrt(std::complex<double> num){
+    // computing the cubic root of a complex number using exponential representation of complex number
+    double modulus = std::sqrt((num*std::conj(num)).real());
+    double angle = std::atan(num.imag()/num.real());
+
+    std::complex<double> cbrt_num = std::cbrt(modulus)*std::exp(std::complex<double>(0.0,1.0/3.0)*angle);
+
+    return cbrt_num;
+}
+
+cubic_roots get_cubic_roots(double a, double b, double c, double d){
+    // solves eqaution of the form a*x^3 + b*x^2 + c*x + d = 0 using Cardano's formula.
+    // Info: https://proofwiki.org/wiki/Cardano%27s_Formula
+    constexpr std::complex<double> im(0.0,1.0);
+    std::complex<double> S, T;
+    double Q = (3.0*a*c-b*b)/(9.0*a*a);
+    double R = (9.0*a*b*c-27.0*a*a*d-2.0*b*b*b)/(54.0*a*a*a);
+    double D = Q*Q*Q + R*R;
+    //std::cout << "The determinant is " << D << std::endl;
+    if (D<0){ // all roots are real
+        S = cbrt(R+im*std::sqrt(std::abs(D)));
+        T = cbrt(R-im*std::sqrt(std::abs(D)));
+    } else{ // some roots are imaginary
+        S = std::cbrt(R+std::sqrt(D));
+        T = std::cbrt(R-std::sqrt(D));
+    }
+    std::complex<double> x1 = S + T - b/(3.0*a);
+    std::complex<double> x2 = -(S+T)/2.0 - b/(3.0*a) + im*std::sqrt(3.0)/2.0*(S-T);
+    std::complex<double> x3 = -(S+T)/2.0 - b/(3.0*a) - im*std::sqrt(3.0)/2.0*(S-T);
+
+    // std::cout << "check x1: " << a*x1*x1*x1 + b*x1*x1 + c*x1 + d << std::endl;
+    // std::cout << "check x2: " << a*x2*x2*x2 + b*x2*x2 + c*x2 + d << std::endl;
+    // std::cout << "check x3: " << a*x3*x3*x3 + b*x3*x3 + c*x3 + d << std::endl;
+
+    return cubic_roots{ x1, x2, x3 };
+}
