@@ -159,7 +159,9 @@ template<class T>
 void spline<T>::set_boundary(spline::bd_type left, T left_value,
                           spline::bd_type right, T right_value,
                           bool force_linear_extrapolation){
+    #ifndef AFM
     assert(m_x.size()==0);          // set_points() must not have happened yet
+    #endif
     m_left=left;
     m_right=right;
     m_left_value=left_value;

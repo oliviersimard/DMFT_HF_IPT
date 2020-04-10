@@ -52,7 +52,8 @@ def get_filenames() -> tuple:
 	if is_Green_component:
 		U=float(re.findall(r"(?<=U_)(\d*\.\d+|\d+)",name)[0])
 		beta=float(re.findall(r"(?<=beta_)(\d*\.\d+|\d+)",name)[0])
-		nn=float(re.findall(r"(?<=n_)(\d*\.\d+|\d+)",name)[-1])
+		#nn=float(re.findall(r"(?<=n_)(\d*\.\d+|\d+)",name)[-1])
+		nn=0.5
 		m=re.findall(r"^(?!analytic)(^[a-zA-Z]+_[a-zA-Z]+)",name)
 		name=name.replace(m[0],'')
 		m=re.findall(r"\d+\.dat$",name)

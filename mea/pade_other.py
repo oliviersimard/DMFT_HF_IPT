@@ -9,19 +9,11 @@ from optparse import OptionParser
 def pade(w, iw, G):
 
     """Calculates the Pade approximation of the analytical continuation of the
-
     Matsubara Green's function in frequency space on the real axis.
-
-
     :omega: Real frequencies on which to calculate G(omega)
-
     :iomega: The imaginary frequencies on which G(i omega) is given.
-
     :G: The values of G(i omega).
-
     :returns: The values of G(omega).
-
-
     """
 
     N = len(iw)

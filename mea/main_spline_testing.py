@@ -3,7 +3,6 @@ from LU_Doolittle_alg import *
 
 def G_iwn(self, iwn : float, beta : int, omega_0 : float, D_omega : float) -> complex:
     """Generates the Green's function in terms of Matsubara frequencies.
-
     Args:
         iwn(float): Fermionic Matsubara frequencies.
     

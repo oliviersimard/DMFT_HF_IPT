@@ -14,14 +14,15 @@
 
 #define TOL 0.000000001
 
-#define AFM
+//#define AFM
 
 //namespace IPT2{ class DMFTproc; };
 struct GreenStuff;
 namespace IPT2{ template< class T > class OneLadder; template< class T > class InfiniteLadders; };
 
 // Prototypes
-void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&);
+void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&) noexcept;
+void saveEachIt_AFM(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept;
 double Hsuperior(double tau, double mu, double c, double beta);
 double Hpsuperior(double tau, double mu, double c, double beta);
 double Hinferior(double tau, double mu, double c, double beta);
@@ -49,9 +50,10 @@ namespace IPT2{
 enum spline_type : short { linear, cubic };
 
 class DMFTproc{
-    friend void ::saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW);
+    friend void ::saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept;
+    friend void ::saveEachIt_AFM(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept;
     friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
-    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
+    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector<std::ofstream*> vec_sub_2_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
     template<class T>
     friend class ::Susceptibility;
     public:

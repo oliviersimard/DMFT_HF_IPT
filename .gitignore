@@ -17,6 +17,7 @@ __pycache__
 data
 mea/test_bb_splines
 mea/bb*
+mea/*.o
 mea/cpp_tests/bb*
 mea/cpp_tests/sl_data
 *.hdf5

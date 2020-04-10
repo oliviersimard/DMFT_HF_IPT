@@ -171,4 +171,3 @@ if __name__=="__main__":
     plt.plot(bubble_GG_iqn_cubic_real,c="red",marker='.',label="cubic spline")
     plt.legend()
     plt.show()
-

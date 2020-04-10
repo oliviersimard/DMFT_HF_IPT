@@ -34,9 +34,21 @@ int main(int argc, char** argv){
     #elif DIM == 2
     const double Hyb_c=4; // For the 2D square lattice with nearest-neighbor hopping. 
     #endif
+
+    #ifndef AFM
     std::ofstream objSaveStreamGloc;
     std::ofstream objSaveStreamSE;
     std::ofstream objSaveStreamGW;
+    #else
+    std::ofstream objSaveStreamGloc_A;
+    std::ofstream objSaveStreamSE_A;
+    std::ofstream objSaveStreamGW_A;
+    std::ofstream objSaveStreamGloc_B;
+    std::ofstream objSaveStreamSE_B;
+    std::ofstream objSaveStreamGW_B;
+    std::vector<std::ofstream*> vecA_ofstreams{ &objSaveStreamGloc_A, &objSaveStreamSE_A, &objSaveStreamGW_A };
+    std::vector<std::ofstream*> vecB_ofstreams{ &objSaveStreamGloc_B, &objSaveStreamSE_B, &objSaveStreamGW_B };
+    #endif
 
     for (size_t k=0; k<=N_k; k++){ // Used when computing the susceptibilities.
         double epsilonk = -1.0*M_PI + 2.0*(double)k*M_PI/N_k;
@@ -168,7 +180,7 @@ int main(int argc, char** argv){
                     #ifndef AFM
                     DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
                     #else
-                    DMFTloopAFM(EqDMFTA,EqDMFTB,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
+                    DMFTloopAFM(EqDMFTA,EqDMFTB,vecA_ofstreams,vecB_ofstreams,vecFiles,N_it);
                     #endif
                     /* Saving the data of the Green's function into file for comparison */
                     std::ofstream dG_dtau(pathToDir+customDirName+"/dG_dtaus.dat", std::ofstream::out | std::ofstream::app);

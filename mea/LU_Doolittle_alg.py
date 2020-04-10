@@ -5,7 +5,6 @@ from scipy.integrate import quad
 
 class Data:
     """ Class data container to be passed along.
-
     Args:
         beta(float): temperature of calculations
         omega_0(float): mid-distance in energy between the two poles (poles are centered around).
@@ -51,7 +50,6 @@ class SplineUtils(object):
     @staticmethod
     def n_F(omega_0: float, D_omega: float, beta: float) -> tuple:
         """Fermi-Dirac distribution adapted to the problem.
-
         Returns:
             n_f_p(float): higher energy Fermi distribution of the test Green's function (first element).
             n_f_n(float): lower energy Fermi distribution of the test Green's function (second element).
@@ -77,7 +75,6 @@ class SplineUtils(object):
     @staticmethod
     def G_taus(tau : float, iqn : float, omega_0: float, D_omega: float, beta: float) -> complex:
         """Generates the analytical components of the Green's function.
-
         Returns:
             bubble(float): positive*negative imaginary-time definition of the test bubble function.
         """
@@ -91,7 +88,6 @@ class SplineUtils(object):
         
     def boundary_conditions(self) -> tuple:
         """ Sets the boundary conditions used in the cubic spline.
-
         Returns:
             dG_dtau_pos(array): floating-point-valued array expressing the imaginary-time derivative of the positively-defined Green's function.
             dG_dtau_neg(array): floating-point-valued array expressing the imaginary-time derivative of the negatively-defined Green's function.
@@ -174,7 +170,6 @@ class SplineUtils(object):
     def tdma(superdiag : list, diag : list, subdiag : list, rhs : list) -> None:
         """Solution of a linear system of algebraic equations with a
             tri-diagonal matrix of coefficients using the Thomas-algorithm.
-
         Args:
             superdiag(array): an array containing lower diagonal (a[0] is not used)
             diag(array): an array containing main diagonal 
