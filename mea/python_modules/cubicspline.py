@@ -3,10 +3,17 @@ from math import isclose
 import matplotlib.pyplot as plt
 from copy import deepcopy
 
-def get_iwn_to_tau(G_iwn, beta : float, type_of="Green"):
-    """This function computes transformation from iwn to tau for Green's function (type="Green") or
-    for it derivative (type=Derivative). *args represents the set of moments used to compute the extremal 
-    value of the derivative of G(tau) (sum rule). Usually only the first moment is included.
+def get_iwn_to_tau(G_iwn, beta : float, type_of="Simple"):
+    """
+    This function computes transformation from iwn to tau for fermionic functions (type_of="Simple") or
+    for its derivative (type_of=Derivative). The leading moments have been subtracted.
+
+    Parameters:
+        G_iwn (array): function defined in fermionic Matsubara frequencies to transform to imaginary time.
+        beta (float): inverse temperature
+
+    Returns:
+        tau_final_G (array): function defined in imaginary time (tau)
     """
     MM = len(G_iwn) # N = M/2
     tau_final_G = np.zeros(MM+1,dtype=float)
@@ -15,7 +22,7 @@ def get_iwn_to_tau(G_iwn, beta : float, type_of="Green"):
     for i in range(MM):
         tau_final_G[i] = ( np.exp( -1.j * np.pi * i * ( 1.0/(MM) - 1.0 ) )*tau_resolved_G[i] ).real
 
-    if type_of=="Green":
+    if type_of=="Simple":
         for i in range(MM):
             tau_final_G[MM] += ( np.exp( -1.j * np.pi * (1.0-(MM)) )*G_iwn[i] ).real
         tau_final_G *= (1./beta)
@@ -26,7 +33,8 @@ def get_iwn_to_tau(G_iwn, beta : float, type_of="Green"):
     return tau_final_G
 
 class Cubic_spline(object):
-    """Class for cubic spline.
+    """
+    Class for cubic spline.
     """
     _one_instance = True
     _delta_beta = 0.0
@@ -49,7 +57,8 @@ class Cubic_spline(object):
     
     @classmethod
     def reset(cls) -> None:
-        """Needed to reset the internal data to Cubic_spline class.
+        """
+        Needed to reset the internal data to Cubic_spline class.
         """
         cls._one_instance = True
         
@@ -57,7 +66,8 @@ class Cubic_spline(object):
 
     @classmethod
     def building_matrix_components(cls, left_der : float, right_der : float) -> None:
-        """It is assumed here that the beta step is constant.
+        """
+        It is assumed here that the beta step is constant.
         """
         size = len(cls._funct)
         cls._subdiagonal = np.empty((size-1,),dtype=float)
@@ -137,7 +147,8 @@ class Cubic_spline(object):
 
     @classmethod
     def get_spline(cls, beta_array, x : float, opt="no_derivative") -> float:
-        """Computing the cubic spline of GG(tau)
+        """
+        Computing the cubic spline of GG(tau)
         """
         beta_array_mod = beta_array - x
         idx = (np.where(beta_array_mod >= 0.0)[0])[0] - 1
@@ -153,7 +164,8 @@ class Cubic_spline(object):
 
     @staticmethod
     def get_derivative(x_arr, y_arr):
-        """Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
+        """
+        Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
         made to treat the boudary points (the ones relevant in fact for the spline). The ideal is to use a dense beta array.
         """
         assert len(x_arr)==len(y_arr), "The lengths of x_arr and y_arr have to be the same."
@@ -179,7 +191,8 @@ class Cubic_spline(object):
 
     @staticmethod
     def get_derivative_4th_order(x_arr, y_arr):
-        """Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
+        """
+        Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
         made to treat the boudary points (the ones relevant in fact for the spline). The ideal is to use a dense beta array.
         """
         assert len(x_arr)==len(y_arr), "The lengths of x_arr and y_arr have to be the same."
@@ -207,7 +220,8 @@ class Cubic_spline(object):
 
     @staticmethod
     def get_derivative_6th_order(x_arr, y_arr):
-        """Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
+        """
+        Static method that returns an array of N-2 elements representing the derivative of an input array of N points. Special care has to be 
         made to treat the boudary points (the ones relevant in fact for the spline). The ideal is to use a dense beta array.
         """
         assert len(x_arr)==len(y_arr), "The lengths of x_arr and y_arr have to be the same."
@@ -239,7 +253,8 @@ class Cubic_spline(object):
 
     @staticmethod
     def get_derivative_FFT(G_k_iwn, funct_dispersion, iwn_arr, k_arr, U : float, beta : float, mu : float, q=0.0, opt="positive"):
-        """This method computes the derivatives of G(tau) at boundaries for the cubic spline. Recall that only positive imaginary time
+        """
+        This method computes the derivatives of G(tau) at boundaries for the cubic spline. Recall that only positive imaginary time
         is used, i.e 0 < tau < beta. It takes care of subtracting the leading moments for smoother results.
         
         Parameters:
@@ -293,7 +308,8 @@ class FermionsvsBosons(Cubic_spline):
     _x_array = np.array([],dtype=float)
 
     def __init__(self,beta,x_array):
-        """Internal variables:
+        """
+        Internal variables:
         cubic_spline_funct_size: represents the size of the tau-defined function to be interpolated over.
         """
         cubic_spline_funct_size = len(x_array)
@@ -309,7 +325,8 @@ class FermionsvsBosons(Cubic_spline):
     
     @classmethod
     def reset(cls) -> None:
-        """Needed to reset the internal data to FermionvsBosons class.
+        """
+        Needed to reset the internal data to FermionvsBosons class.
         """
         cls._one_instance = True
         

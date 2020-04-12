@@ -1,6 +1,16 @@
 import numpy as np
 
 def linear_spline_tau_to_iwn(G_tau, beta : float):
+    """
+    Function computing the fermionic Matsubara frequency representation of inputted imaginary-time object using a linear spline.
+
+    Parameters:
+        G_tau (array): imaginary-time defined object to be transformed
+        beta (float): inverse temperature
+
+    Returns:
+        G_iwn (array): fermionic Matsubara frequency representation of the inputted imaginary-time object
+    """
     M = len(G_tau)
     NN = M//2
     assert np.mod(M,2)==1, "The imaginary-time length has got to be odd. (iwn has to be even for mirroring reasons.)"
@@ -25,7 +35,8 @@ def linear_spline_tau_to_iwn(G_tau, beta : float):
     return G_iwn
 
 def linear_spline_tau_to_iqn_corr(corr_funct, beta : float):
-    """The correlation function (corr_funct) is a function defined over tau-space. Since the number of fermionic Matsubara frequencies (MF) 
+    """
+    The correlation function (corr_funct) is a function defined over tau-space. Since the number of fermionic Matsubara frequencies (MF) 
     is even (for mirroring during FFTs, because negative MFs are used), the number of imaginary-time points has gotten to be odd.
     """
     M = len(corr_funct)
