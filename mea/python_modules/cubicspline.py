@@ -299,6 +299,50 @@ class Cubic_spline(object):
         
         return dG_tau_for_k
 
+    @staticmethod
+    def get_derivative_FFT_G0(G0_iwn, iwn_arr, beta_arr, h : float, mu : float, hyb_c : float, opt="positive"):
+        """
+        This method computes the derivatives of G(tau) at boundaries for the cubic spline. Recall that only positive imaginary time
+        is used, i.e 0 < tau < beta. It takes care of subtracting the leading moments for smoother results.
+        
+        Parameters:
+            G0_iwn (complex np.ndarray): Weiss Green's function mesh over (iwn)-space.
+            iwn_arr (complex np.array): Fermionic Matsubara frequencies.
+            beta (float): Inverse temperature.
+            mu (float): chemical potential.
+            opt (str): positive or negative imaginary-time Green's function derivated. Takes in "positive" of "negative". 
+            Defaults opt="postitive".
+        
+        Returns:
+            dG_tau (float np.ndarray): imaginary-time Green's function derivative mesh over (tau)-space.
+
+        """
+        beta = beta_arr[-1]
+        dG_tau = np.empty((len(iwn_arr)+1),dtype=float)
+        G0_iwn_tmp = deepcopy(G0_iwn)
+        # Subtracting the leading moments of the Green's function
+        for i,iwn in enumerate(iwn_arr):
+            moments = 1.0/(iwn + mu - h - hyb_c/iwn)
+            # G
+            G0_iwn_tmp[i] -= moments
+            if opt=="negative":
+                G0_iwn_tmp[i] = np.conj(G0_iwn_tmp[i]) # because G(-tau)
+        G0_iwn_tmp[i] *= -1.0*iwn
+        
+        # Calculating the dG/dtau objects
+        
+        dG_tau[:] = get_iwn_to_tau(G0_iwn_tmp,beta,type_of="Derivative")
+        z1=-(mu-h)*0.5+0.5*np.sqrt((mu-h)**2+4.0*hyb_c); z2=-(mu-h)*0.5-0.5*np.sqrt((mu-h)**2+4.0*hyb_c)
+        for j,tau in enumerate(beta_arr):
+            if opt=="positive":
+                dG_tau[j] += (z1**2/(z1-z2))*1.0/(np.exp(z1*tau)+np.exp(z1*(tau-beta))) + (z2**2/(z2-z1))*1.0/(np.exp(z2*tau)+np.exp(z2*(tau-beta)))
+            elif opt=="negative":
+                dG_tau[j] += (z1**2/(z1-z2))*1.0/(np.exp(-z1*tau)+np.exp(z1*(beta-tau))) + (z2**2/(z2-z1))*1.0/(np.exp(-z2*tau)+np.exp(z2*(beta-tau)))
+        
+        dG_tau[-1] = -(mu-h) - 1.0*dG_tau[0] # Assuming half-filling
+        
+        return dG_tau
+
 class FermionsvsBosons(Cubic_spline):
 
     _iqn_array = np.array([],dtype=complex)
@@ -313,10 +357,11 @@ class FermionsvsBosons(Cubic_spline):
         cubic_spline_funct_size: represents the size of the tau-defined function to be interpolated over.
         """
         cubic_spline_funct_size = len(x_array)
+        NN = cubic_spline_funct_size//2
         if FermionsvsBosons._one_instance:
             FermionsvsBosons._one_instance = False
             FermionsvsBosons._iqn_array = np.array([1.0j*(2.0*n)*np.pi/beta for n in range(cubic_spline_funct_size-1)],dtype=complex)
-            FermionsvsBosons._iwn_array = np.array([1.0j*(2.0*n+1.0)*np.pi/beta for n in range(cubic_spline_funct_size-1)],dtype=complex)
+            FermionsvsBosons._iwn_array = np.array([1.0j*(2.0*n+1.0)*np.pi/beta for n in range(-(NN),NN)],dtype=complex)
             FermionsvsBosons._x_array = np.asarray(x_array)
             FermionsvsBosons._cubic_spline = np.zeros((cubic_spline_funct_size-1,),dtype=complex)
         #print("size: ", cubic_spline_funct_size)
@@ -367,7 +412,7 @@ class FermionsvsBosons(Cubic_spline):
     @classmethod
     def fermionic_propagator(cls):
         size_iwn = len(cls._iwn_array)
-        
+        NN = size_iwn//2
         # Relevant coefficients to enter Fourier transform
         S_0 = Cubic_spline._funct[0]; S_beta = Cubic_spline._ma[-2]*Cubic_spline._delta_beta**3 + Cubic_spline._mb[-2]*Cubic_spline._delta_beta**2 + Cubic_spline._mc[-2]*Cubic_spline._delta_beta + Cubic_spline._funct[-2] # Minus 2 here 
         Sp_0 = Cubic_spline._mc[0]; Sp_beta = 3.0*Cubic_spline._ma[-2]*Cubic_spline._delta_beta**2 + 2.0*Cubic_spline._mb[-2]*Cubic_spline._delta_beta + Cubic_spline._mc[-2]
@@ -383,6 +428,8 @@ class FermionsvsBosons(Cubic_spline):
         
         # Fourier transformation
         Sppp_iwn = (size_iwn)*np.fft.ifft(Sppp) #
+        # Mirroring
+        Sppp_iwn = np.concatenate((Sppp_iwn[NN:],Sppp_iwn[:NN]))
         
         for j,iwn in enumerate(cls._iwn_array):
             cls._cubic_spline[j] = -( S_beta + S_0 ) / ( iwn ) + ( Sp_beta + Sp_0 ) / ( iwn**2 ) - ( Spp_beta + Spp_0 ) / ( iwn**3 ) + ( ( 1.0-np.exp(iwn*Cubic_spline._delta_beta) ) / ( iwn**4 ) )*Sppp_iwn[j]#  
@@ -390,5 +437,64 @@ class FermionsvsBosons(Cubic_spline):
         return cls._cubic_spline, cls._iwn_array
 
 
+def compute_Sigma_iwn_cubic_spline(G0_iwn : np.ndarray,G0_tau : np.ndarray,G0_m_tau : np.ndarray,delta_tau : float,U : float,h : float,hyb_c : float,mu : float,beta : float,tau_array : np.ndarray,iwn_array : np.ndarray,SE_tau_tmp : np.ndarray):
+    """
+    Computes the IPT self-energy in femrionic Matsubara frequencies given the imaginary-time Weiss Green's functions G_0. 
+    To be used in the AFM case scenario.
 
+    Parameters:
+        G0_iwn (ndarray): 
+    """
+    # Self-energy impurity
+    for i in range(SE_tau_tmp.shape[0]):
+        SE_tau_tmp[i,0,0] = -1.0*U*U*G0_tau[i,0,0]*G0_m_tau[i,1,1]*G0_tau[i,1,1] #up
+        SE_tau_tmp[i,1,1] = -1.0*U*U*G0_tau[i,1,1]*G0_m_tau[i,0,0]*G0_tau[i,0,0] #down
+    # up
+    # getting the boundary conditions
+    der_G0_up = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,0,0],iwn_array,tau_array,h,mu,hyb_c)
+    der_G0_down = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,1,1],iwn_array,tau_array,h,mu,hyb_c)
+    der_G0_m_down = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,1,1],iwn_array,tau_array,h,mu,hyb_c,opt="negative")
+    left_der_up = der_G0_up[0]*G0_m_tau[0,1,1]*G0_tau[0,1,1] + G0_tau[0,0,0]*der_G0_m_down[0]*G0_tau[0,1,1] + G0_tau[0,0,0]*G0_m_tau[0,1,1]*der_G0_down[0]
+    right_der_up = der_G0_up[-1]*G0_m_tau[-1,1,1]*G0_tau[-1,1,1] + G0_tau[-1,0,0]*der_G0_m_down[-1]*G0_tau[-1,1,1] + G0_tau[-1,0,0]*G0_m_tau[-1,1,1]*der_G0_down[-1]
+    
+    plt.figure(2)
+    plt.title(r"$\frac{\mathrm{d}\Sigma^{(2)}_{\sigma}(\tau)}{\mathrm{d}\tau}$ vs $\tau$")
+    plt.plot(tau_array,-1.0*U*U*np.dot(der_G0_up,np.dot(der_G0_m_down,der_G0_down)),c="red",label=r"$\sigma=\uparrow$")
+    plt.xlabel(r"$\tau$")
+    
+    Cubic_spline(delta_tau,SE_tau_tmp[:,0,0])
+    Cubic_spline.building_matrix_components(left_der_up,right_der_up)
+    Cubic_spline.tridiagonal_LU_decomposition()
+    Cubic_spline.tridiagonal_LU_solve()
+    # Getting m_a and m_c from the b's
+    Cubic_spline.construct_coeffs(tau_array)
+    FermionsvsBosons(beta,tau_array)
+    Sigma_up_iwn, *_ = FermionsvsBosons.fermionic_propagator()
+    # cleaning
+    FermionsvsBosons.reset()
+    Cubic_spline.reset()
 
+    # down
+    # getting the boundary conditions
+    der_G0_up = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,0,0],iwn_array,tau_array,-1.0*h,mu,hyb_c)
+    der_G0_down = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,1,1],iwn_array,tau_array,-1.0*h,mu,hyb_c)
+    der_G0_m_up = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,0,0],iwn_array,tau_array,-1.0*h,mu,hyb_c,opt="negative")
+    left_der_down = der_G0_down[0]*G0_m_tau[0,0,0]*G0_tau[0,0,0] + G0_tau[0,1,1]*der_G0_m_up[0]*G0_tau[0,0,0] + G0_tau[0,1,1]*G0_m_tau[0,0,0]*der_G0_up[0]
+    right_der_down = der_G0_down[-1]*G0_m_tau[-1,0,0]*G0_tau[-1,0,0] + G0_tau[-1,1,1]*der_G0_m_up[-1]*G0_tau[-1,0,0] + G0_tau[-1,1,1]*G0_m_tau[-1,0,0]*der_G0_up[-1]
+   
+    plt.plot(tau_array,-1.0*U*U*np.dot(der_G0_down,np.dot(der_G0_m_up,der_G0_up)),c="green",label=r"$\sigma=\downarrow$")
+    plt.legend()
+
+    Cubic_spline(delta_tau,SE_tau_tmp[:,1,1])
+    Cubic_spline.building_matrix_components(left_der_down,right_der_down)
+    Cubic_spline.tridiagonal_LU_decomposition()
+    Cubic_spline.tridiagonal_LU_solve()
+    # Getting m_a and m_c from the b's
+    Cubic_spline.construct_coeffs(tau_array)
+    FermionsvsBosons(beta,tau_array)
+    Sigma_down_iwn, *_ = FermionsvsBosons.fermionic_propagator()
+    # cleaning
+    FermionsvsBosons.reset()
+    Cubic_spline.reset()
+
+    return Sigma_up_iwn, Sigma_down_iwn
