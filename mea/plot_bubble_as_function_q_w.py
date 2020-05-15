@@ -62,7 +62,7 @@ def pade(omega_n, f_n, omega):
 
 if __name__=="__main__":
 
-    is_ready_to_plot = True
+    is_ready_to_plot = False
     type_of_plot = {"plot_3D" : 0, "plot_2D_colormap" : 1}
     is_this_plot = 1
     parser = OptionParser()

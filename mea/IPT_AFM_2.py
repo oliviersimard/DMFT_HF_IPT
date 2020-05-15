@@ -4,6 +4,8 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 import linearspline as ls
 import cubicspline as cs
+import os
+from time import sleep
 
 # Max number of iterations in DMFT loop
 MAX_ITER = 100
@@ -95,8 +97,8 @@ if __name__ == "__main__":
     SE_tau = np.ndarray((2*Ntau+1,2,2,),dtype=float) # self-energy (tau)
     #Sigma_Hartree_2nd = np.ndarray((2*Ntau+1,2,2,),dtype=float) # self-energy second-order Hartree
     
-    for U in np.arange(0.25,1.0,0.25):
-        for beta in np.arange(20.0,45.0,1.0):
+    for U in np.arange(3.0,3.1,2.0):
+        for beta in np.arange(25.0,25.1,1.0):
             print("U: ", U, " and beta: ", beta)
             it=0 # DMFT iteration initialization
             is_converged = False
@@ -152,14 +154,14 @@ if __name__ == "__main__":
                         SE_tau[i,1,1] = -1.0*U*U*G0_tau[i,1,1]*G0_m_tau[i,0,0]*G0_tau[i,0,0] #down
                     Sigma_up_iwn = ls.linear_spline_Sigma_tau_to_iwn(SE_tau[:,0,0],beta)
                     Sigma_down_iwn = ls.linear_spline_Sigma_tau_to_iwn(SE_tau[:,1,1],beta)
-                    # 2nd order Hartree term
-                    # Convolution
-                    Sigma_Hartree_2nd_up = 0.0; Sigma_Hartree_2nd_down = 0.0
-                    for i in range(2*Ntau+1):
-                        Sigma_Hartree_2nd_up += -1.0*delta_tau*G0_tau[i,1,1]*G0_tau[2*Ntau-i,1,1]#delta_tau*G0_tau[j-i,1,1]*G0_tau[2*Ntau-(j-i),1,1]
-                        Sigma_Hartree_2nd_down += -1.0*delta_tau*G0_tau[i,0,0]*G0_tau[2*Ntau-i,0,0]#delta_tau*G0_tau[j-i,0,0]*G0_tau[2*Ntau-(j-i),0,0]
-                    Sigma_Hartree_2nd_up *= U*U*(n0_up-0.5)
-                    Sigma_Hartree_2nd_down *= U*U*(n0_down-0.5)
+                # 2nd order Hartree term
+                # Convolution
+                Sigma_Hartree_2nd_up = 0.0; Sigma_Hartree_2nd_down = 0.0
+                for i in range(2*Ntau+1):
+                    Sigma_Hartree_2nd_up += -1.0*delta_tau*G0_tau[i,1,1]*G0_tau[2*Ntau-i,1,1]#delta_tau*G0_tau[j-i,1,1]*G0_tau[2*Ntau-(j-i),1,1]
+                    Sigma_Hartree_2nd_down += -1.0*delta_tau*G0_tau[i,0,0]*G0_tau[2*Ntau-i,0,0]#delta_tau*G0_tau[j-i,0,0]*G0_tau[2*Ntau-(j-i),0,0]
+                Sigma_Hartree_2nd_up *= U*U*(n0_up-0.5)
+                Sigma_Hartree_2nd_down *= U*U*(n0_down-0.5)
                 SE[:,0,0] = U*(n0_down-0.5) + Sigma_up_iwn + Sigma_Hartree_2nd_up #up
                 SE[:,1,1] = U*(n0_up-0.5) + Sigma_down_iwn + Sigma_Hartree_2nd_down #down
                 ########################## plotting #######################################
@@ -205,9 +207,8 @@ if __name__ == "__main__":
                 GAA_latt_up_k = np.empty((Nk,),dtype=complex)
                 GAA_latt_down_k = np.empty((Nk,),dtype=complex)
                 GAB_latt_up_k = np.empty((Nk,),dtype=complex)
-                GAB_latt_down_k = np.empty((Nk,),dtype=complex)
+                #GAB_latt_down_k = np.empty((Nk,),dtype=complex)
                 for i,iwn in enumerate(iwn_array):
-                    #print(i)
                     if dim==1:
                         for j,k in enumerate(k_array):
                             GAA_latt_up_k[j] = 1.0/( iwn + mu - h - SE[i,0,0] - epsilonk(k)**2/( iwn + mu + h - SE[i,1,1] ) )
@@ -238,8 +239,9 @@ if __name__ == "__main__":
                     G_alpha_beta[0,0]=GAA_up_loc; G_alpha_beta[0,1]=GAB_up_loc
                     G_alpha_beta[1,0]=GAB_up_loc; G_alpha_beta[1,1]=GAA_down_loc
                     G_alpha_beta_inv[i,:,:] = np.linalg.inv(G_alpha_beta)
+            
                 # update the hybdridisation function and set Weiss Green's function for the next iteration
-                alpha = 0.2
+                alpha = 0.1
                 for i,iwn in enumerate(iwn_array):
                     Hyb[i,0,0] = (1.0-alpha)*(iwn + mu - h - SE[i,0,0] - G_alpha_beta_inv[i,0,0]) + alpha*(Hyb[i,0,0]) # up
                     G0[i,0,0] = 1.0/( iwn + mu - h - Hyb[i,0,0] ) # up Have to search for mu away from half-filling
@@ -247,15 +249,19 @@ if __name__ == "__main__":
                     G0[i,1,1] = 1.0/( iwn + mu + h - Hyb[i,1,1] ) # down
                 
                 # Saving files at each iteration
-                # filename = "data_test_IPT/Green_loc_{0}D".format(dim)+"_AFM_"+type_spline+"_U_{0:.5f}".format(U)+"_beta_{0:.5f}".format(beta)+"_N_tau_{0:d}".format(Ntau)+"_h_{0:.5f}".format(h)+"_Nit_{0:d}".format(it)+".dat"
-                # with open(filename,"w+") as floc:
-                #     for i in range(len(iwn_array)):
-                #         if i==0:
-                #             floc.write("iwn\t\tRe Gloc up\t\tIm Gloc up\t\tRe Gloc down\t\tIm Gloc down\n")
-                #         floc.write("{0:.8f}\t\t{1:.8f}\t\t{2:.8f}\t\t{3:.8f}\t\t{4:.8f}\n".format(iwn_array[i].imag,Gloc[i,0,0].real,Gloc[i,0,0].imag,Gloc[i,1,1].real,Gloc[i,1,1].imag))
-                # floc.close()
+                directory_container = "{0:d}D_U_{1:.5f}_beta_{2:.5f}_n_{3:.5f}_Ntau_{4:d}".format(dim,U,beta,0.5,Ntau)
+                if not os.path.isdir("./data_test_IPT/"+directory_container):
+                    os.mkdir("./data_test_IPT/"+directory_container)
 
-                filename = "data_test_IPT/Green_Weiss_tau_{0}D".format(dim)+"_AFM_"+type_spline+"_U_{0:.5f}".format(U)+"_beta_{0:.5f}".format(beta)+"_N_tau_{0:d}".format(Ntau)+"_h_{0:.5f}".format(h)+"_Nit_{0:d}".format(it)+".dat"
+                filename = "Green_loc_{0}D".format(dim)+"_AFM_"+type_spline+"_U_{0:.5f}".format(U)+"_beta_{0:.5f}".format(beta)+"_N_tau_{0:d}".format(Ntau)+"_h_{0:.5f}".format(h)+"_Nit_{0:d}".format(it)+".dat"
+                with open(filename,"w+") as floc:
+                    for i in range(len(iwn_array)):
+                        if i==0:
+                            floc.write("iwn\t\tRe Gloc up\t\tIm Gloc up\t\tRe Gloc down\t\tIm Gloc down\n")
+                        floc.write("{0:.8f}\t\t{1:.8f}\t\t{2:.8f}\t\t{3:.8f}\t\t{4:.8f}\n".format(iwn_array[i].imag,Gloc[i,0,0].real,Gloc[i,0,0].imag,Gloc[i,1,1].real,Gloc[i,1,1].imag))
+                floc.close()
+
+                filename = "./data_test_IPT/"+directory_container+"/Green_Weiss_tau_{0}D".format(dim)+"_AFM_"+type_spline+"_U_{0:.5f}".format(U)+"_beta_{0:.5f}".format(beta)+"_N_tau_{0:d}".format(Ntau)+"_h_{0:.5f}".format(h)+"_Nit_{0:d}".format(it)+".dat"
                 with open(filename,"w+") as floc_tau:
                     for i in range(len(tau_array)):
                         if i==0:

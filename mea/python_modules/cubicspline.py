@@ -3,14 +3,16 @@ from math import isclose
 import matplotlib.pyplot as plt
 from copy import deepcopy
 
-def get_iwn_to_tau(G_iwn, beta : float, type_of="Simple"):
+def get_iwn_to_tau(G_iwn, beta : float, type_of="Simple", opt="positive"):
     """
     This function computes transformation from iwn to tau for fermionic functions (type_of="Simple") or
     for its derivative (type_of=Derivative). The leading moments have been subtracted.
 
     Parameters:
         G_iwn (array): function defined in fermionic Matsubara frequencies to transform to imaginary time.
-        beta (float): inverse temperature
+        beta (float): inverse temperature.
+        opt (str): string to determine whether the Fourier transform concerns G(-tau) (opt="negative") or
+        G(tau) (opt="positive")
 
     Returns:
         tau_final_G (array): function defined in imaginary time (tau)
@@ -18,7 +20,10 @@ def get_iwn_to_tau(G_iwn, beta : float, type_of="Simple"):
     MM = len(G_iwn) # N = M/2
     tau_final_G = np.zeros(MM+1,dtype=float)
     # FFT
-    tau_resolved_G = np.fft.fft(G_iwn)
+    if opt=="positive":
+        tau_resolved_G = np.fft.fft(G_iwn)
+    elif opt=="negative":
+        tau_resolved_G = np.fft.fft(np.conj(G_iwn))
     for i in range(MM):
         tau_final_G[i] = ( np.exp( -1.j * np.pi * i * ( 1.0/(MM) - 1.0 ) )*tau_resolved_G[i] ).real
 
@@ -308,8 +313,10 @@ class Cubic_spline(object):
         Parameters:
             G0_iwn (complex np.ndarray): Weiss Green's function mesh over (iwn)-space.
             iwn_arr (complex np.array): Fermionic Matsubara frequencies.
-            beta (float): Inverse temperature.
+            beta_arr (float): Inverse temperature.
+            h (float): staggered magnetization (only relevant for AFM case).
             mu (float): chemical potential.
+            hyb_c (float): numerator to leading moment of the hybridisation function.
             opt (str): positive or negative imaginary-time Green's function derivated. Takes in "positive" of "negative". 
             Defaults opt="postitive".
         
@@ -457,10 +464,12 @@ def compute_Sigma_iwn_cubic_spline(G0_iwn : np.ndarray,G0_tau : np.ndarray,G0_m_
     left_der_up = der_G0_up[0]*G0_m_tau[0,1,1]*G0_tau[0,1,1] + G0_tau[0,0,0]*der_G0_m_down[0]*G0_tau[0,1,1] + G0_tau[0,0,0]*G0_m_tau[0,1,1]*der_G0_down[0]
     right_der_up = der_G0_up[-1]*G0_m_tau[-1,1,1]*G0_tau[-1,1,1] + G0_tau[-1,0,0]*der_G0_m_down[-1]*G0_tau[-1,1,1] + G0_tau[-1,0,0]*G0_m_tau[-1,1,1]*der_G0_down[-1]
     
-    plt.figure(2)
-    plt.title(r"$\frac{\mathrm{d}\Sigma^{(2)}_{\sigma}(\tau)}{\mathrm{d}\tau}$ vs $\tau$")
-    plt.plot(tau_array,-1.0*U*U*np.dot(der_G0_up,np.dot(der_G0_m_down,der_G0_down)),c="red",label=r"$\sigma=\uparrow$")
+    plt.figure(0)
+    plt.title(r"$\Sigma^{(2)}_{\sigma}(\tau)$ vs $\tau$")
+    plt.plot(tau_array,SE_tau_tmp[:,0,0],c="red",label=r"$\sigma=\uparrow$")
+    plt.plot(tau_array,SE_tau_tmp[:,1,1],c="green",label=r"$\sigma=\downarrow$")
     plt.xlabel(r"$\tau$")
+    plt.legend()
     
     Cubic_spline(delta_tau,SE_tau_tmp[:,0,0])
     Cubic_spline.building_matrix_components(left_der_up,right_der_up)
@@ -481,9 +490,6 @@ def compute_Sigma_iwn_cubic_spline(G0_iwn : np.ndarray,G0_tau : np.ndarray,G0_m_
     der_G0_m_up = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,0,0],iwn_array,tau_array,-1.0*h,mu,hyb_c,opt="negative")
     left_der_down = der_G0_down[0]*G0_m_tau[0,0,0]*G0_tau[0,0,0] + G0_tau[0,1,1]*der_G0_m_up[0]*G0_tau[0,0,0] + G0_tau[0,1,1]*G0_m_tau[0,0,0]*der_G0_up[0]
     right_der_down = der_G0_down[-1]*G0_m_tau[-1,0,0]*G0_tau[-1,0,0] + G0_tau[-1,1,1]*der_G0_m_up[-1]*G0_tau[-1,0,0] + G0_tau[-1,1,1]*G0_m_tau[-1,0,0]*der_G0_up[-1]
-   
-    plt.plot(tau_array,-1.0*U*U*np.dot(der_G0_down,np.dot(der_G0_m_up,der_G0_up)),c="green",label=r"$\sigma=\downarrow$")
-    plt.legend()
 
     Cubic_spline(delta_tau,SE_tau_tmp[:,1,1])
     Cubic_spline.building_matrix_components(left_der_down,right_der_down)

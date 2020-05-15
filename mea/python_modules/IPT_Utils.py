@@ -1,9 +1,10 @@
 import numpy as np
 from linearspline import linear_spline_tau_to_iwn, linear_spline_Sigma_tau_to_iwn
-from cubicspline import get_iwn_to_tau
+import cubicspline as cs
 from scipy.integrate import simps, quad
 from sys import exit
 import matplotlib.pyplot as plt
+from time import sleep
 
 # Max number of iterations in the false position root finding method
 MAX_ITER_ROOT = 40
@@ -162,6 +163,7 @@ def check_converged_AFM(G_0_last : np.ndarray, G_0_current : np.ndarray, it : in
         G_0_up_diff += np.abs(G_0_last[l,0,0]-G_0_current[l,0,0])
         G_0_down_diff += np.abs(G_0_last[l,1,1]-G_0_current[l,1,1])
 
+    print("G_0_up_diff at it ", it, " is ", G_0_up_diff, " and G_0_down_diff is ", G_0_down_diff)
     if G_0_up_diff<MIN_TOL and G_0_down_diff<MIN_TOL and it>2:
         return True
     else:
@@ -222,7 +224,7 @@ class Sublattice(object):
         This static method sets some of the static variables living in Sublattice class space. It sets for instance "_delta_tau",
         "_iwn_arr", and "_tau_arr", having set previously all the remaining static variables in main.
         """
-        Sublattice._delta_tau = Sublattice._beta/Sublattice._Ntau
+        Sublattice._delta_tau = Sublattice._beta/(2.0*Sublattice._Ntau)
         for n in range(-Sublattice._Ntau,Sublattice._Ntau):
             Sublattice._iwn_arr = np.append(Sublattice._iwn_arr,complex(0.0,(2.0*n+1.0)*np.pi/Sublattice._beta))
         for l in range(2*Sublattice._Ntau+1):
@@ -237,7 +239,7 @@ class Sublattice(object):
 
     # Static variables must be initiated before calling the constructor
     # Hybridisation function, Self energy, Weiss Green's function and Local Green's function containers in constructor
-    def __init__(self, mu : float, mu0 : float, Hyb : np.ndarray, G0 : np.ndarray, Gloc : np.ndarray, SE : np.ndarray, SE_tau : np.ndarray, Gimp_tau : np.ndarray, n_up=0.5, n_down=0.5):
+    def __init__(self, mu : float, mu0 : float, Hyb : np.ndarray, G0 : np.ndarray, Gloc : np.ndarray, Gloc_tau : np.ndarray, SE : np.ndarray, SE_tau : np.ndarray, n_up=0.5, n_down=0.5):
         """
         Constructor of Sublattice class.
         """
@@ -246,16 +248,22 @@ class Sublattice(object):
         self._Hyb = Hyb # Hybridisation (iwn)
         self._G0 = G0 # Weiss Green (iwn)
         self._Gloc = Gloc # Local Green (iwn)
+        self._Gloc_tau = Gloc_tau # Local Green (tau)
         self._SE = SE # Self energy (iwn)
-        self._SE_2nd = SE # second-order self-energy (iwn)
         self._SE_tau = SE_tau # Self energy (tau)
-        self._Gimp_tau = Gimp_tau # Impurity Green (tau)
         self._n_up = n_up # up-spin density
         self._n_down = n_down # down-spin density
         self._n0_up = n_up # up-spin Weiss density
         self._n0_down = n_down # down-spin Weiss density
+    
+    def set_mu_to_0(self):
+        """
+            Sets the impurity chemical potential to 0 in the AFM case, since the chemical potential enters the 
+            definition of the Hartree term.
+        """
+        self._mu=0.0
 
-    def update_self_energy_AFM(self) -> None:
+    def update_self_energy_AFM(self,type_spline : str) -> None:
         """
         Method updating the IPT impurity self-energy in AFM scenario. The Weiss Green's function is transformed into
         G_0(tau) and G_0(-tau) to compute the self-energy Sigma(tau) for the two spins. Then, Sigma(tau) is transformed back 
@@ -272,31 +280,54 @@ class Sublattice(object):
         G0_m_tau = np.ndarray((2*Sublattice._Ntau+1,2,2,),dtype=float)
         # subtracting the leadind tail
         for j,iwn in enumerate(Sublattice._iwn_arr):
-            self._G0[j,0,0] -= 1.0/( iwn - Sublattice._h + self._mu0 - Sublattice._hyb_c/iwn )
-            self._G0[j,1,1] -= 1.0/( iwn + Sublattice._h + self._mu0 - Sublattice._hyb_c/iwn )
-        G0_tau[:,0,0] = get_iwn_to_tau_hyb(self._G0[:,0,0],Sublattice._beta,self._mu0-Sublattice._h,Sublattice._hyb_c) #up
-        G0_m_tau[:,0,0] = get_iwn_to_tau_hyb(self._G0[:,0,0],Sublattice._beta,self._mu0-Sublattice._h,Sublattice._hyb_c,opt="negative") #up
-        G0_tau[:,1,1] = get_iwn_to_tau_hyb(self._G0[:,1,1],Sublattice._beta,self._mu0+Sublattice._h,Sublattice._hyb_c) #down
-        G0_m_tau[:,1,1] = get_iwn_to_tau_hyb(self._G0[:,1,1],Sublattice._beta,self._mu0+Sublattice._h,Sublattice._hyb_c,opt="negative") #down
+            self._G0[j,0,0] -= 1.0/( iwn )
+            self._G0[j,1,1] -= 1.0/( iwn )
+        G0_tau[:,0,0] = cs.get_iwn_to_tau(self._G0[:,0,0],Sublattice._beta) #up
+        G0_m_tau[:,0,0] = cs.get_iwn_to_tau(self._G0[:,0,0],Sublattice._beta,opt="negative") #up
+        G0_tau[:,1,1] = cs.get_iwn_to_tau(self._G0[:,1,1],Sublattice._beta) #down
+        G0_m_tau[:,1,1] = cs.get_iwn_to_tau(self._G0[:,1,1],Sublattice._beta,opt="negative") #down
+        
+        for i in range(len(Sublattice._tau_arr)):
+            G0_tau[i,0,0] += -0.5 #up
+            G0_tau[i,1,1] += -0.5 #down
+            G0_m_tau[i,0,0] += 0.5 #up
+            G0_m_tau[i,1,1] += 0.5 #down
+        for j,iwn in enumerate(Sublattice._iwn_arr):
+            self._G0[j,0,0] += 1.0/( iwn )
+            self._G0[j,1,1] += 1.0/( iwn )
+
         # Weiss Green's function densities used for Hartree term
         self._n0_up = -1.0*G0_tau[-1,0,0]
-        n0_down = -1.0*G0_tau[-1,1,1]
-        print("n0_up: ", self._n0_up, " and n0_down: ", n0_down)
+        self._n0_down = -1.0*G0_tau[-1,1,1]
+        print("n0_up: ", self._n0_up, " and n0_down: ", self._n0_down)
         # Self-energy impurity
-        for i in range(self._SE_tau.shape[0]):
-            self._SE_tau[i,0,0] = G0_tau[i,0,0]*G0_m_tau[i,1,1]*G0_tau[i,1,1] #up
-            self._SE_tau[i,1,1] = G0_tau[i,1,1]*G0_m_tau[i,0,0]*G0_tau[i,0,0] #down
-        # Fourier transforming back the self-energy to iwn
-        self._SE[:,0,0] = Sublattice._U*(1.0-self._n0_up) - Sublattice._U*Sublattice._U*linear_spline_tau_to_iwn(self._SE_tau[:,0,0],Sublattice._beta) #up
-        self._SE[:,1,1] = Sublattice._U*self._n0_up - Sublattice._U*Sublattice._U*linear_spline_tau_to_iwn(self._SE_tau[:,1,1],Sublattice._beta) #down
+        if type_spline=="cubic":
+            Sigma_up_iwn, Sigma_down_iwn = cs.compute_Sigma_iwn_cubic_spline(self._G0,G0_tau,G0_m_tau,Sublattice._delta_tau,Sublattice._U, \
+                Sublattice._h,Sublattice._hyb_c,self._mu,Sublattice._beta,Sublattice._tau_arr,Sublattice._iwn_arr,self._SE_tau)
+        elif type_spline=="linear":
+            for i in range(self._SE_tau.shape[0]):
+                self._SE_tau[i,0,0] = -1.0*Sublattice._U**2*G0_tau[i,0,0]*G0_m_tau[i,1,1]*G0_tau[i,1,1] #up
+                self._SE_tau[i,1,1] = -1.0*Sublattice._U**2*G0_tau[i,1,1]*G0_m_tau[i,0,0]*G0_tau[i,0,0] #down
+            Sigma_up_iwn = linear_spline_Sigma_tau_to_iwn(self._SE_tau[:,0,0],Sublattice._beta)
+            Sigma_down_iwn = linear_spline_Sigma_tau_to_iwn(self._SE_tau[:,1,1],Sublattice._beta)
+        # 2nd order Hartree term
+        # Convolution
+        Sigma_Hartree_2nd_up = 0.0; Sigma_Hartree_2nd_down = 0.0
+        for i in range(2*Sublattice._Ntau+1):
+            Sigma_Hartree_2nd_up += -1.0*Sublattice._delta_tau*G0_tau[i,1,1]*G0_tau[2*Sublattice._Ntau-i,1,1]#delta_tau*G0_tau[j-i,1,1]*G0_tau[2*Ntau-(j-i),1,1]
+            Sigma_Hartree_2nd_down += -1.0*Sublattice._delta_tau*G0_tau[i,0,0]*G0_tau[2*Sublattice._Ntau-i,0,0]#delta_tau*G0_tau[j-i,0,0]*G0_tau[2*Ntau-(j-i),0,0]
+        Sigma_Hartree_2nd_up *= Sublattice._U*Sublattice._U*(self._n0_up-0.5)
+        Sigma_Hartree_2nd_down *= Sublattice._U*Sublattice._U*(self._n0_down-0.5)
+        self._SE[:,0,0] = Sublattice._U*(self._n0_down-0.5) + Sigma_up_iwn + Sigma_Hartree_2nd_up #up
+        self._SE[:,1,1] = Sublattice._U*(self._n0_up-0.5) + Sigma_down_iwn + Sigma_Hartree_2nd_down #down
 
-    def update_self_energy(self) -> None:
+    def update_self_energy(self,type_spline : str) -> None:
         """
         Method updating the IPT impurity self-energy in PM scenario. Basically, the Weiss Green's function is transformed into
         G_0(tau) and G_0(-tau) to compute the self-energy Sigma(tau). Then, Sigma(tau) is transformed into Sigma(iwn).
 
         Parameters:
-            None
+            type_spline (str): determines the type of spline to be used in the impurity solver.
         
         Returns:
             self._SE (ndarray): updated self-energy in fermionic Matsubara frequencies.
@@ -306,9 +337,14 @@ class Sublattice(object):
         G0_m_tau = np.ndarray((2*Sublattice._Ntau+1,2,2,),dtype=float)
         # subtracting the leading tail
         for j,iwn in enumerate(Sublattice._iwn_arr):
-            self._G0[j,0,0] -= 1.0/( iwn + self._mu0 - Sublattice._hyb_c/iwn )
-        G0_tau[:,0,0] = get_iwn_to_tau_hyb(self._G0[:,0,0],Sublattice._beta,self._mu0,Sublattice._hyb_c) #up
-        G0_m_tau[:,0,0] = get_iwn_to_tau_hyb(self._G0[:,0,0],Sublattice._beta,self._mu0,Sublattice._hyb_c,opt="negative") #up
+            self._G0[j,0,0] -= 1.0/( iwn + self._mu0 - Sublattice._hyb_c/iwn ) # 1.0/iwn
+        G0_tau[:,0,0] = get_iwn_to_tau_hyb(self._G0[:,0,0],Sublattice._beta,self._mu0,Sublattice._hyb_c) #up cs.get_iwn_to_tau(self._G0[:,0,0],Sublattice._beta)
+        G0_m_tau[:,0,0] = get_iwn_to_tau_hyb(self._G0[:,0,0],Sublattice._beta,self._mu0,Sublattice._hyb_c,opt="negative") #up cs.get_iwn_to_tau(self._G0[:,0,0],Sublattice._beta,opt="negative") #
+        # for j in range(len(Sublattice._tau_arr)):
+        #     G0_tau[j,0,0] += -0.5
+        #     G0_m_tau[j,0,0] += 0.5
+        for l,iwn in enumerate(Sublattice._iwn_arr):
+            self._G0[l,0,0] += 1.0/( iwn + self._mu0 - Sublattice._hyb_c/iwn )
         # Weiss Green's function densities used for Hartree term
         self._n0_up = -1.0*G0_tau[-1,0,0]
         print("n0_up: ", self._n0_up)
@@ -318,15 +354,38 @@ class Sublattice(object):
         A = self._n_up*(1.0-self._n_up) / ( self._n0_up*(1.0-self._n0_up) )
         B = ( (1.0-self._n_up)*Sublattice._U + self._mu0 - self._mu ) / ( self._n0_up*(1.0-self._n0_up)*Sublattice._U**2 )
         print("A: ", A, " B: ", B)
-        self._SE_2nd[:,0,0] = linear_spline_Sigma_tau_to_iwn(self._SE_tau[:,0,0],Sublattice._beta)
-        plt.figure(0)
-        plt.plot(list(map(lambda x: x.imag,Sublattice._iwn_arr)),list(map(lambda x: x.imag,self._SE_2nd[:,0,0])),c="red",ms=2.0)
+        if type_spline=="linear":
+            SE_2nd_up = linear_spline_Sigma_tau_to_iwn(self._SE_tau[:,0,0],Sublattice._beta)
+        elif type_spline=="cubic":
+            cs.Cubic_spline(Sublattice._delta_tau,self._SE_tau[:,0,0])
+            # getting the boundary conditions
+            der_G0_up = cs.Cubic_spline.get_derivative_FFT_G0(self._G0[:,0,0],Sublattice._iwn_arr,Sublattice._tau_arr,0.0,self._mu0,Sublattice._hyb_c)
+            der_G0_m_up = cs.Cubic_spline.get_derivative_FFT_G0(self._G0[:,0,0],Sublattice._iwn_arr,Sublattice._tau_arr,0.0,self._mu0,Sublattice._hyb_c,opt="negative")
+            left_der_up = 2.0*der_G0_up[0]*G0_m_tau[0,0,0] + G0_tau[0,0,0]*der_G0_m_up[0]*G0_tau[0,0,0]
+            right_der_up = 2.0*der_G0_up[-1]*G0_m_tau[-1,0,0] + G0_tau[-1,0,0]*der_G0_m_up[-1]*G0_tau[-1,0,0]
+            
+            cs.Cubic_spline.building_matrix_components(left_der_up,right_der_up)
+            cs.Cubic_spline.tridiagonal_LU_decomposition()
+            cs.Cubic_spline.tridiagonal_LU_solve()
+            # Getting m_a and m_c from the b's
+            cs.Cubic_spline.construct_coeffs(Sublattice._tau_arr)
+            cs.FermionsvsBosons(Sublattice._beta,Sublattice._tau_arr)
+            SE_2nd_up, *_ = cs.FermionsvsBosons.fermionic_propagator()
+
+            plt.figure(0)
+            plt.title(r"$\Sigma^{(2)}_{\sigma}(i\omega_n)$ vs $i\omega_n$")
+            plt.plot(list(map(lambda x: x.imag, self._iwn_arr)),list(map(lambda x: x.imag, SE_2nd_up)),c="red",ms=2.0,label=r"$\sigma=\uparrow$")
+            plt.xlabel(r"$i\omega_n$")
+            # cleaning
+            cs.FermionsvsBosons.reset()
+            cs.Cubic_spline.reset()
+
         plt.show()
         # Fourier transforming back the self-energy to iwn
         for i in range(len(Sublattice._iwn_arr)):
-            self._SE[i,0,0] = Sublattice._U*(1.0-self._n0_up) + A*self._SE_2nd[i,0,0]/( 1.0 - B*self._SE_2nd[i,0,0] ) #up
+            self._SE[i,0,0] = Sublattice._U*(1.0-self._n0_up) + A*SE_2nd_up[i]/( 1.0 - B*SE_2nd_up[i] ) #up
 
-    def DMFT_AFM(self) -> None:
+    def DMFT_AFM(self,dim : int,type_spline : str) -> None:
         """
         Method implementing the core DMFT procedure for AFM scenario. Basically, having computed the self-energy in Matsubara frequencies,
         the impurity Green's function is calculated to obtain the local density for both spins. This density is used later on to compute 
@@ -336,43 +395,65 @@ class Sublattice(object):
         convergence is reached for both spin Weiss Green's functions.
 
         Parameters:
-            None
+            dim (int): dimension of the system.
+            type_spline (str): determines the type of spline to be used in the impurity solver.
 
         Returns:
-             self._Hyb (ndarray): Matsubara hybridisation function set for the next iteration
-             self._G0 (ndarray): Matsubara Weiss Green's function set for the next iteration
+            self._Hyb (ndarray): Matsubara hybridisation function set for the next iteration
+            self._G0 (ndarray): Matsubara Weiss Green's function set for the next iteration
         """
         # update the self-energy with the updated objects from last iteration
-        self.update_self_energy_AFM()
+        self.update_self_energy_AFM(type_spline)
+        plt.figure(2)
+        plt.title(r"$\operatorname{Im}\Sigma^{tot}_{\sigma} (i\omega_n)$ vs $i\omega_n$")
+        plt.plot(list(map(lambda x: x.imag,Sublattice._iwn_arr)),list(map(lambda x: x.imag,self._SE[:,0,0])),marker='d',ms=2.5,c='red',label=r"$\sigma=\uparrow$")
+        plt.plot(list(map(lambda x: x.imag,Sublattice._iwn_arr)),list(map(lambda x: x.imag,self._SE[:,1,1])),marker='s',ms=2.5,c='green',label=r"$\sigma=\downarrow$")
+        plt.xlabel(r"$i\omega_n$")
+        plt.legend()
+        plt.show()
         # computing the physical particle density
-        G_imp_iwn = np.ndarray((2*Sublattice._Ntau,2,2,),dtype=complex)
         for i,iwn in enumerate(Sublattice._iwn_arr):
-            G_imp_iwn[i,0,0] = 1.0/( iwn + self._mu - self._Hyb[i,0,0] - self._SE[i,0,0] ) - 1.0/( iwn + self._mu - Sublattice._hyb_c/iwn - Sublattice._U*(self._n_down) - (Sublattice._U**2*self._n_down*(1.0-self._n_down))/(iwn) ) # up
-            G_imp_iwn[i,1,1] = 1.0/( iwn + self._mu - self._Hyb[i,1,1] - self._SE[i,1,1] ) - 1.0/( iwn + self._mu - Sublattice._hyb_c/iwn - Sublattice._U*(self._n_up) - (Sublattice._U**2*self._n_up*(1.0-self._n_up))/(iwn) ) # down
-        self._Gimp_tau[:,0,0] = get_iwn_to_tau_hyb(G_imp_iwn[:,0,0],Sublattice._beta,self._mu-Sublattice._U*(self._n_down),Sublattice._hyb_c+Sublattice._U**2*self._n_down*(1.0-self._n_down))
-        self._Gimp_tau[:,1,1] = get_iwn_to_tau_hyb(G_imp_iwn[:,1,1],Sublattice._beta,self._mu-Sublattice._U*(self._n_up),Sublattice._hyb_c+Sublattice._U**2*self._n_up*(1.0-self._n_up))
-        del G_imp_iwn
-        self._n_up = -1.0*self._Gimp_tau[-1,0,0]
-        self._n_down = -1.0*self._Gimp_tau[-1,1,1]
+            self._Gloc[i,0,0] = 1.0/( iwn + self._mu - Sublattice._h - self._Hyb[i,0,0] - self._SE[i,0,0] ) - 1.0/iwn #- 1.0/( iwn + self._mu - Sublattice._h - Sublattice._hyb_c/iwn - Sublattice._U*(self._n_down) - (Sublattice._U**2*self._n_down*(1.0-self._n_down))/(iwn) ) # up
+            self._Gloc[i,1,1] = 1.0/( iwn + self._mu + Sublattice._h - self._Hyb[i,1,1] - self._SE[i,1,1] ) - 1.0/iwn #- 1.0/( iwn + self._mu + Sublattice._h - Sublattice._hyb_c/iwn - Sublattice._U*(self._n_up) - (Sublattice._U**2*self._n_up*(1.0-self._n_up))/(iwn) ) # down
+        self._Gloc_tau[:,0,0] = cs.get_iwn_to_tau(self._Gloc[:,0,0],Sublattice._beta) #get_iwn_to_tau_hyb(G_imp_iwn[:,0,0],Sublattice._beta,self._mu-Sublattice._h-Sublattice._U*(self._n_down),Sublattice._hyb_c+Sublattice._U**2*self._n_down*(1.0-self._n_down))
+        self._Gloc_tau[:,1,1] = cs.get_iwn_to_tau(self._Gloc[:,1,1],Sublattice._beta) #get_iwn_to_tau_hyb(G_imp_iwn[:,1,1],Sublattice._beta,self._mu+Sublattice._h-Sublattice._U*(self._n_up),Sublattice._hyb_c+Sublattice._U**2*self._n_up*(1.0-self._n_up))
+        for i in range(len(Sublattice._tau_arr)):
+            self._Gloc_tau[i,0,0] += -0.5
+            self._Gloc_tau[i,1,1] += -0.5
+        for i,iwn in enumerate(Sublattice._iwn_arr):
+            self._Gloc[i,0,0] += 1.0/iwn
+            self._Gloc[i,1,1] += 1.0/iwn
+        self._n_up = -1.0*self._Gloc_tau[-1,0,0]
+        self._n_down = -1.0*self._Gloc_tau[-1,1,1]
         print("impurity n_up: ", self._n_up, " and n_down: ", self._n_down)
-        #k_array spanning from -pi/2.0 to pi/2.0. Not os stable if using quad to integrate. Better to use simps, even though much longer
-        k_array = np.array([-np.pi/2.0+l*(1.0*np.pi/(Sublattice._Nk-1)) for l in range(Sublattice._Nk)],dtype=float)
+        G_alpha_beta = np.ndarray((2,2,),dtype=complex)
+        G_alpha_beta_inv = np.ndarray((2*Sublattice._Ntau,2,2,),dtype=complex)
+        GAA_latt_up_k = np.empty((Sublattice._Nk,),dtype=complex)
+        GAA_latt_down_k = np.empty((Sublattice._Nk,),dtype=complex)
+        GAB_latt_up_k = np.empty((Sublattice._Nk,),dtype=complex)
         for i,iwn in enumerate(Sublattice._iwn_arr):
-            k_def_G_latt_up = np.empty((Sublattice._Nk,),dtype=complex)
-            k_def_G_latt_down = np.empty((Sublattice._Nk,),dtype=complex)
-            for j,k in enumerate(k_array):
-                k_def_G_latt_up[j] = 1.0/( iwn + self._mu - self._SE[i,0,0] - epsilonk_1D(k)**2/( iwn + self._mu - self._SE[i,1,1] ) )
-                k_def_G_latt_down[j] = 1.0/( iwn + self._mu - self._SE[i,1,1] - epsilonk_1D(k)**2/( iwn + self._mu - self._SE[i,0,0] ) )
-            self._Gloc[i,0,0] = 1.0/np.pi*simps(k_def_G_latt_up,k_array) #up
-            self._Gloc[i,1,1] = 1.0/np.pi*simps(k_def_G_latt_down,k_array) #down
+            if dim==1:
+                for j,k in enumerate(Sublattice._k_AFM_arr):
+                    GAA_latt_up_k[j] = 1.0/( iwn + self._mu - Sublattice._h - self._SE[i,0,0] - epsilonk_1D(k)**2/( iwn + self._mu + Sublattice._h - self._SE[i,1,1] ) )
+                    GAA_latt_down_k[j] = 1.0/( iwn + self._mu + Sublattice._h - self._SE[i,1,1] - epsilonk_1D(k)**2/( iwn + self._mu - Sublattice._h - self._SE[i,0,0] ) )
+                    GAB_latt_up_k[j] = epsilonk_1D(k)/( ( iwn + self._mu - Sublattice._h - self._SE[i,0,0] )*( iwn + self._mu + Sublattice._h - self._SE[i,1,1] ) - epsilonk_1D(k)**2 )
+                GAA_up_loc = 1.0/(np.pi)*np.trapz(GAA_latt_up_k,Sublattice._k_AFM_arr) #up
+                GAA_down_loc = 1.0/(np.pi)*np.trapz(GAA_latt_down_k,Sublattice._k_AFM_arr) #down
+                GAB_up_loc = 1.0/(np.pi)*np.trapz(GAB_latt_up_k,Sublattice._k_AFM_arr) # off-diagonal terms
+            # solving for inverse Gloc up and down
+            G_alpha_beta[0,0]=GAA_up_loc; G_alpha_beta[0,1]=GAB_up_loc
+            G_alpha_beta[1,0]=GAB_up_loc; G_alpha_beta[1,1]=GAA_down_loc
+            G_alpha_beta_inv[i,:,:] = np.linalg.inv(G_alpha_beta)
+            
         # update the hybdridisation function and set Weiss Green's function for the next iteration
+        alpha = 0.1
         for i,iwn in enumerate(Sublattice._iwn_arr):
-            self._Hyb[i,0,0] = iwn + self._mu - self._SE[i,0,0] - 1.0/self._Gloc[i,0,0] # up
-            self._G0[i,0,0] = 1.0/( iwn + self._mu0 - Sublattice._h - self._Hyb[i,0,0] ) # up
-            self._Hyb[i,1,1] = iwn + self._mu - self._SE[i,1,1] - 1.0/self._Gloc[i,1,1] # down
-            self._G0[i,1,1] = 1.0/( iwn + self._mu0 + Sublattice._h - self._Hyb[i,1,1] ) # down
+            self._Hyb[i,0,0] = (1.0-alpha)*(iwn + self._mu - Sublattice._h - self._SE[i,0,0] - G_alpha_beta_inv[i,0,0]) + alpha*(self._Hyb[i,0,0]) # up
+            self._G0[i,0,0] = 1.0/( iwn + self._mu - Sublattice._h - self._Hyb[i,0,0] ) # up Have to search for mu away from half-filling
+            self._Hyb[i,1,1] = (1.0-alpha)*(iwn + self._mu + Sublattice._h - self._SE[i,1,1] - G_alpha_beta_inv[i,1,1]) + alpha*(self._Hyb[i,1,1]) # down
+            self._G0[i,1,1] = 1.0/( iwn + self._mu + Sublattice._h - self._Hyb[i,1,1] ) # down
     
-    def DMFT(self,dim : int) -> None:
+    def DMFT(self,dim : int,type_spline : str) -> None:
         """
         Method implementing the core DMFT procedure for PM scenario. Basically, having computed the self-energy in Matsubara frequencies,
         the impurity Green's function is calculated to obtain the local density. This density is used later on to compute leading moments
@@ -381,23 +462,23 @@ class Sublattice(object):
         solver, and thereof it goes on until convergence is reached.
 
         Parameters:
-            None
+            dim (int): dimension of the system
+            type_spline (str): determines the type of spline to be used in the impurity solver
 
         Returns:
              self._Hyb (ndarray): Matsubara hybridisation function set for the next iteration
              self._G0 (ndarray): Matsubara Weiss Green's function set for the next iteration
         """
         # update the self-energy with the updated objects from last iteration
-        self.update_self_energy()
+        self.update_self_energy(type_spline)
         # computing the physical particle density
-        G_imp_iwn = np.ndarray((2*Sublattice._Ntau,2,2,),dtype=complex)
         for i,iwn in enumerate(Sublattice._iwn_arr):
-            G_imp_iwn[i,0,0] = 1.0/( iwn + self._mu - self._Hyb[i,0,0] - self._SE[i,0,0] ) - 1.0/( iwn + self._mu - Sublattice._hyb_c/iwn - Sublattice._U*(1.0-self._n_up) - (Sublattice._U**2*self._n_up*(1.0-self._n_up))/(iwn) )
-        self._Gimp_tau[:,0,0] = get_iwn_to_tau_hyb(G_imp_iwn[:,0,0],Sublattice._beta,self._mu-Sublattice._U*(1.0-self._n_up),Sublattice._hyb_c+Sublattice._U**2*self._n_up*(1.0-self._n_up))
-        del G_imp_iwn
-        self._n_up = -1.0*self._Gimp_tau[-1,0,0]
+            self._Gloc[i,0,0] = 1.0/( iwn + self._mu - self._Hyb[i,0,0] - self._SE[i,0,0] ) - 1.0/( iwn + self._mu - Sublattice._hyb_c/iwn - Sublattice._U*(1.0-self._n_up) - (Sublattice._U**2*self._n_up*(1.0-self._n_up))/(iwn) ) # 1.0/iwn
+        self._Gloc_tau[:,0,0] = get_iwn_to_tau_hyb(self._Gloc[:,0,0],Sublattice._beta,self._mu-Sublattice._U*(1.0-self._n_up),Sublattice._hyb_c+Sublattice._U**2*self._n_up*(1.0-self._n_up)) #cs.get_iwn_to_tau(G_imp_iwn[:,0,0],Sublattice._beta)#
+        # for j in range(len(Sublattice._tau_arr)):
+        #     self._Gimp_tau[j,0,0] += -0.5
+        self._n_up = -1.0*self._Gloc_tau[-1,0,0]
         print("impurity n_up: ", self._n_up)
-        #k_array spanning from -pi/2.0 to pi/2.0
         if dim==1:
             for i,iwn in enumerate(Sublattice._iwn_arr):
                 funct_integrate_re = lambda k: ( 1.0/( iwn + self._mu - self._SE[i,0,0] - epsilonk_1D(k) ) ).real
@@ -429,20 +510,6 @@ class Sublattice(object):
             D_iwn[j] = (self._SE[j,0,0]-Sublattice._U*(1.0-self._n0_up))*self._Gloc[j,0,0]
         D = (1.0-self._n0_up)*self._n0_up + 1.0/Sublattice._U/Sublattice._beta*np.sum(D_iwn).real
         print("double occupancy: ", D)
-    
-    def update_mu0(self, mu : float, n_target : float, mu0 : float) -> float:
-        D_iwn = np.empty((2*Sublattice._Ntau,),dtype=complex)
-        #print("yo n0: ", self._n0_up, " and mu0: ", mu0)
-        A = n_target*(1.0-n_target) / ( self._n0_up*(1.0-self._n0_up) )
-        B = ( (1.0-n_target)*Sublattice._U + mu0 - mu ) / ( self._n0_up*(1.0-self._n0_up)*Sublattice._U**2 )
-        #print("yo A: ", A, " and B: ",B)
-        for i in range(len(Sublattice._iwn_arr)):
-            D_iwn[i] = A*self._SE_2nd[i,0,0]/( 1.0 - B*self._SE_2nd[i,0,0] ) #up
-        for j in range(len(Sublattice._iwn_arr)):
-            D_iwn[j] = D_iwn[j]*self._Gloc[j,0,0]
-        D = (1.0-self._n0_up)*self._n0_up + 1.0/Sublattice._U/Sublattice._beta*np.sum(D_iwn).real
-        #print("yo D: ", D)
-        return D
 
     @staticmethod
     def update_mu(arr_mu : np.ndarray, mu : float) -> float:
@@ -500,7 +567,6 @@ class Sublattice(object):
             self._mu0 (float): Weiss chemical potential matching n_target within tolerance set.
             self._mu (float): impurity chemical potential matching n_target within tolerance set.
         """
-        # D = 0.5-n_target
         n0_mu0 = np.ndarray((2*Sublattice._Ntau,2,2,),dtype=complex)
         n_mu = np.ndarray((2*Sublattice._Ntau,2,2,),dtype=complex)
         for i,iwn in enumerate(Sublattice._iwn_arr):
@@ -512,23 +578,11 @@ class Sublattice(object):
         get_new_n = lambda mu: Sublattice.update_mu(n_mu,mu)-n_target
         new_mu = false_position_method(get_new_n,Sublattice._U/2.0-20.0,Sublattice._U/2.0+20.0,0.001)
 
-        # new_D_mu0 = 0.0
-        # if it>5:
-        #     get_new_D_mu0 = lambda mu0: self.update_mu0(new_mu,n_target,mu0)-D
-        #     with open("lol.dat","w") as f:
-        #         for mu0 in np.linspace(-20.0,20.0,1000):
-        #             f.write("{0:.5f}\t\t{1:.5f}".format(mu0,get_new_D_mu0(mu0))+"\n")
-        #     f.close()
-        #     new_D_mu0 = false_position_method(get_new_D_mu0,-20.0,20.0,0.001)
-
-        print("new mu: ", new_mu, " new mu0: ", new_mu0)#, " and new_D_mu0: ", new_D_mu0)
+        print("new mu: ", new_mu, " new mu0: ", new_mu0)
         # Updating the chemical potentials according to the target density
         self._mu0 = new_mu0
         if it>0:
             self._mu = new_mu
-        # if it>5:
-        #     self._mu0 = new_D_mu0
-
 
     def update_densities_AFM(self, it : float, n_target : float) -> None:
         """
@@ -562,7 +616,7 @@ class Sublattice(object):
             self._mu = new_mu
 
     
-    def save_Gloc_AFM(self, it : int, dim : int) -> None:
+    def save_Gloc_AFM(self, it : int, dim : int, type_spline : str) -> None:
         """
         Method to save the local Green's function in the AFM scenario (as a function of iwn).
 
@@ -572,7 +626,7 @@ class Sublattice(object):
         Returns:
             None
         """
-        filename = "./Green_loc_{0:d}".format(dim)+"D_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
+        filename = "./Green_loc_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
         with open(filename,"w+") as f:
             for i in range(len(Sublattice._iwn_arr)):
                 if i==0:
@@ -581,7 +635,7 @@ class Sublattice(object):
         f.close()
     
 
-    def save_SE_AFM(self, it : int, dim : int) -> None:
+    def save_SE_AFM(self, it : int, dim : int, type_spline : str) -> None:
         """
         Method to save the self-energy function in the AFM scenario (as a function of iwn).
 
@@ -591,7 +645,7 @@ class Sublattice(object):
         Returns:
             None
         """
-        filename = "./Self_energy_{0:d}".format(dim)+"D_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
+        filename = "./Self_energy_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
         with open(filename,"w+") as f:
             for i in range(len(Sublattice._iwn_arr)):
                 if i==0:
@@ -600,7 +654,7 @@ class Sublattice(object):
         f.close()
     
 
-    def save_Gloc(self, it : int, dim : int) -> None:
+    def save_Gloc(self, it : int, dim : int, type_spline : float) -> None:
         """
         Method to save the local Green's function in the PM scenario (as a function of iwn).
 
@@ -610,7 +664,7 @@ class Sublattice(object):
         Returns:
             None
         """
-        filename = "./Green_loc_{0:d}".format(dim)+"D_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
+        filename = "./Green_loc_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
         with open(filename,"w+") as f:
             for i in range(len(Sublattice._iwn_arr)):
                 if i==0:
@@ -618,7 +672,7 @@ class Sublattice(object):
                 f.write("{0:.8f}\t\t{1:.8f}\t\t{2:.8f}\n".format(Sublattice._iwn_arr[i].imag,self._Gloc[i,0,0].real,self._Gloc[i,0,0].imag))
         f.close()
 
-    def save_SE(self, it : int, dim : int) -> None:
+    def save_SE(self, it : int, dim : int, type_spline : str) -> None:
         """
         Method to save the self-energy in the PM scenario (as a function of iwn).
 
@@ -628,7 +682,7 @@ class Sublattice(object):
         Returns:
             None
         """
-        filename = "./Self_energy_{0:d}".format(dim)+"D_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
+        filename = "./Self_energy_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
         with open(filename,"w+") as f:
             for i in range(len(Sublattice._iwn_arr)):
                 if i==0:

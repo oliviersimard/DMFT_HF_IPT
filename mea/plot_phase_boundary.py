@@ -31,6 +31,23 @@ def put_element_in_list_if_different(list_elements : list, element_to_compare) -
     
     return list_elements
 
+def get_params_with_many_Ntau(Us : list, betas : list, dict_params : dict) -> dict:
+    """
+        This function selects the parameter set with the highest Ntau, when U and beta are the same.
+    """
+    tmp_dict = {}
+    for U in Us:
+        for beta in betas:
+            tmp_dict[(U,beta)] = [0]
+            for key in dict_params.keys():
+                if beta == key[1] and U == key[2]:
+                    tmp_dict[(U,beta)][0] += 1
+                    tmp_dict[(U,beta)].append(key[0])
+            if tmp_dict[(U,beta)][0] > 1:
+                del dict_params[(min(tmp_dict[(U,beta)][1:]),beta,U)]
+    return dict_params
+
+
 def extract_largest_int(list_str : list) -> tuple:
     """
         This function extracts the highest number associated with the iteration number from a set of files.
@@ -106,8 +123,6 @@ def get_according_to_condition(path : str, funct) -> list:
     dict_to_store_passing_cond_files = {}
     Us = []
     betas = []
-    # Ntau should remain the same
-    N_tau=0
     # navigating through the directory containing the data
     for root, dirs, files in os.walk(u"./data_test_IPT"):
         path = root.split(os.sep) # os.sep is equivalent to "/"
@@ -115,7 +130,6 @@ def get_according_to_condition(path : str, funct) -> list:
         if files != []:
             largest_int, file_largest_int = extract_largest_int(files)
             Ntau = int(findall(r"(?<=N_tau_)(\d+)",file_largest_int)[0])
-            N_tau=Ntau
             beta = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",file_largest_int)[0])
             U = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",file_largest_int)[0])
             # fetching last iteration
@@ -124,6 +138,8 @@ def get_according_to_condition(path : str, funct) -> list:
             put_element_in_list_if_different(Us,U)
             put_element_in_list_if_different(betas,beta)
     
+    # Keeping the data with the highest Ntau for parameter sets having smae beta and U
+    get_params_with_many_Ntau(Us,betas,dict_to_store_passing_cond_files)
     params_respecting_condiction = []
     for U in Us:
         print("U:", U)
@@ -131,7 +147,7 @@ def get_according_to_condition(path : str, funct) -> list:
         for beta in betas:
             print("beta: ", beta)
             for key in dict_to_store_passing_cond_files.keys():
-                if (N_tau,beta,U) == key:
+                if beta == key[1] and U == key[2]: # Should be regardless of the tau grid
                     f = dict_to_store_passing_cond_files[key]._largest_int_file_for_params
                     print("largest int file: ", f)
                     #sleep(2)
