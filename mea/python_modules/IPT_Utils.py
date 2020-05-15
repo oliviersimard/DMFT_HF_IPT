@@ -5,6 +5,7 @@ from scipy.integrate import simps, quad
 from sys import exit
 import matplotlib.pyplot as plt
 from time import sleep
+import os
 
 # Max number of iterations in the false position root finding method
 MAX_ITER_ROOT = 40
@@ -236,6 +237,17 @@ class Sublattice(object):
         
         assert len(Sublattice._iwn_arr)==len(Sublattice._tau_arr)-1, "Length of Matsubara array has to be shorter by one element compared to tau array."
 
+    @staticmethod
+    def reset_static_attrs():
+        """
+        This static method resets some of the static variables living in Sublattice class space. It resets for instance "_delta_tau",
+        "_iwn_arr", and "_tau_arr", having set previously all the remaining unchanging static variables in main.
+        """
+        Sublattice._delta_tau = 0.0
+        Sublattice._iwn_arr = np.array([],dtype=complex)
+        Sublattice._tau_arr = np.array([],dtype=float)
+        Sublattice._k_arr = np.array([],dtype=float)
+        Sublattice._k_AFM_arr = np.array([],dtype=float)
 
     # Static variables must be initiated before calling the constructor
     # Hybridisation function, Self energy, Weiss Green's function and Local Green's function containers in constructor
@@ -622,6 +634,8 @@ class Sublattice(object):
 
         Parameters:
             it (float): iteration number.
+            dim (int): dimension of the system.
+            type_spline (str): type of spline used in impurity solver.
         
         Returns:
             None
@@ -641,6 +655,8 @@ class Sublattice(object):
 
         Parameters:
             it (float): iteration number.
+            dim (int): dimension of the system.
+            type_spline (str): type of spline used in impurity solver.
         
         Returns:
             None
@@ -652,6 +668,31 @@ class Sublattice(object):
                     f.write("iwn\t\tRe SE up\t\tIm SE up\t\tRe SE down\t\tIm SE down\n")
                 f.write("{0:.8f}\t\t{1:.8f}\t\t{2:.8f}\t\t{3:.8f}\t\t{4:.8f}\n".format(Sublattice._iwn_arr[i].imag,self._SE[i,0,0].real,self._SE[i,0,0].imag,self._SE[i,1,1].real,self._SE[i,1,1].imag))
         f.close()
+
+    def save_Gloc_tau_AFM(self, it : int, dim : int, type_spline : str) -> None:
+        """
+        Method to save the local Green's function in the AFM scenario (as a function of tau). Particularly useful
+        when used in conjunction with the program plot_phase_boundary.py.
+
+        Parameters:
+            it (float): iteration number.
+            dim (int): dimension of the system.
+            type_spline (str): type of spline used in impurity solver.
+        
+        Returns:
+            None
+        """
+        # Saving files at each iteration
+        directory_container = "{0:d}D_U_{1:.5f}_beta_{2:.5f}_n_{3:.5f}_Ntau_{4:d}_{5}".format(dim,Sublattice._U,Sublattice._beta,0.5,Sublattice._Ntau,type_spline)
+        if not os.path.isdir("./data_test_IPT/"+directory_container):
+            os.mkdir("./data_test_IPT/"+directory_container)
+        filename = "./data_test_IPT/"+directory_container+"/Green_loc_tau_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
+        with open(filename,"w+") as f:
+            for i in range(len(Sublattice._tau_arr)):
+                if i==0:
+                    f.write("tau\t\tGloc up\t\tGloc down\n")
+                f.write("{0:.8f}\t\t{1:.8f}\t\t{2:.8f}\n".format(Sublattice._tau_arr[i],self._Gloc_tau[i,0,0],self._Gloc_tau[i,1,1]))
+        f.close()
     
 
     def save_Gloc(self, it : int, dim : int, type_spline : float) -> None:
@@ -660,6 +701,8 @@ class Sublattice(object):
 
         Parameters:
             it (float): iteration number.
+            dim (int): dimension of the system.
+            type_spline (str): type of spline used in impurity solver.
         
         Returns:
             None
@@ -678,6 +721,8 @@ class Sublattice(object):
 
         Parameters:
             it (float): iteration number.
+            dim (int): dimension of the system.
+            type_spline (str): type of spline used in impurity solver.
         
         Returns:
             None
@@ -689,3 +734,5 @@ class Sublattice(object):
                     f.write("iwn\t\tRe SE up\t\tIm SE up\n")
                 f.write("{0:.8f}\t\t{1:.8f}\t\t{2:.8f}\n".format(Sublattice._iwn_arr[i].imag,self._SE[i,0,0].real,self._SE[i,0,0].imag))
         f.close()
+    
+    
