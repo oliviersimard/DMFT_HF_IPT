@@ -32,14 +32,14 @@ typedef struct cplx_t{ // Custom data holder for the HDF5 handling
 
 int main(void){
     
-    std::string inputFilename("../data/Self_energy_1D_U_14.000000_beta_30.000000_n_0.500000_N_tau_8192_Nit_12.dat");
+    std::string inputFilename("../data/Self_energy_1D_U_14.000000_beta_30.000000_n_0.500000_N_tau_4096_Nit_12.dat");
     // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_jj = true; 
-    const unsigned int Ntau = 2*8192;
+    const unsigned int Ntau = 2*4096;
     const unsigned int N_k = 800;
     const unsigned int N_q = 31;
-    const double beta = 30.0;
-    const double U = 14.0;
+    const double beta = 50.0;
+    const double U = 10.0;
     const double mu = U/2.0; // Half-filling
     spline<double> splObj;
     // beta array constructed

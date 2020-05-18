@@ -147,7 +147,17 @@ class Cubic_spline(object):
         
         cls._ma[size-1] = 0.0
         cls._mc[size-1] = 3.0*cls._ma[len(beta_array)-2]*cls._delta_beta*cls._delta_beta+2.0*cls._mb[len(beta_array)-2]*cls._delta_beta+cls._mc[len(beta_array)-2]
-        
+
+        # for i in range(size):
+        #     print("mc: ", cls._mc[i])
+        # print("\n")
+        # for i in range(size):
+        #     print("mb: ", cls._mb[i])
+        # print("\n")
+        # for i in range(size):
+        #     print("ma: ", cls._ma[i])
+        # exit(0)
+
         return None
 
     @classmethod
@@ -334,8 +344,9 @@ class Cubic_spline(object):
             G0_iwn_tmp[i] -= moments
             if opt=="negative":
                 G0_iwn_tmp[i] = np.conj(G0_iwn_tmp[i]) # because G(-tau)
-        G0_iwn_tmp[i] *= -1.0*iwn
-        
+    
+            G0_iwn_tmp[i] *= -1.0*iwn
+
         # Calculating the dG/dtau objects
         
         dG_tau[:] = get_iwn_to_tau(G0_iwn_tmp,beta,type_of="Derivative")
@@ -345,7 +356,6 @@ class Cubic_spline(object):
                 dG_tau[j] += (z1**2/(z1-z2))*1.0/(np.exp(z1*tau)+np.exp(z1*(tau-beta))) + (z2**2/(z2-z1))*1.0/(np.exp(z2*tau)+np.exp(z2*(tau-beta)))
             elif opt=="negative":
                 dG_tau[j] += (z1**2/(z1-z2))*1.0/(np.exp(-z1*tau)+np.exp(z1*(beta-tau))) + (z2**2/(z2-z1))*1.0/(np.exp(-z2*tau)+np.exp(z2*(beta-tau)))
-        
         dG_tau[-1] = -(mu-h) - 1.0*dG_tau[0] # Assuming half-filling
         
         return dG_tau
@@ -428,11 +438,11 @@ class FermionsvsBosons(Cubic_spline):
         # print("Sp_beta: ", Sp_beta, " Sp_0 ", Sp_0)
         # print("Spp_beta: ", Spp_beta, " Spp_0 ", Spp_0)
         Sppp = np.zeros((size_iwn,),dtype=complex)
-        
+
         for i in range(size_iwn):
             Sppp[i] = 6.0*Cubic_spline._ma[i]*np.exp(1.0j*np.pi*i/(size_iwn))
             #print("Sppp[{0}]: ".format(i), Sppp[i])
-        
+
         # Fourier transformation
         Sppp_iwn = (size_iwn)*np.fft.ifft(Sppp) #
         # Mirroring
@@ -456,6 +466,7 @@ def compute_Sigma_iwn_cubic_spline(G0_iwn : np.ndarray,G0_tau : np.ndarray,G0_m_
     for i in range(SE_tau_tmp.shape[0]):
         SE_tau_tmp[i,0,0] = -1.0*U*U*G0_tau[i,0,0]*G0_m_tau[i,1,1]*G0_tau[i,1,1] #up
         SE_tau_tmp[i,1,1] = -1.0*U*U*G0_tau[i,1,1]*G0_m_tau[i,0,0]*G0_tau[i,0,0] #down
+    
     # up
     # getting the boundary conditions
     der_G0_up = Cubic_spline.get_derivative_FFT_G0(G0_iwn[:,0,0],iwn_array,tau_array,h,mu,hyb_c)
@@ -464,12 +475,12 @@ def compute_Sigma_iwn_cubic_spline(G0_iwn : np.ndarray,G0_tau : np.ndarray,G0_m_
     left_der_up = der_G0_up[0]*G0_m_tau[0,1,1]*G0_tau[0,1,1] + G0_tau[0,0,0]*der_G0_m_down[0]*G0_tau[0,1,1] + G0_tau[0,0,0]*G0_m_tau[0,1,1]*der_G0_down[0]
     right_der_up = der_G0_up[-1]*G0_m_tau[-1,1,1]*G0_tau[-1,1,1] + G0_tau[-1,0,0]*der_G0_m_down[-1]*G0_tau[-1,1,1] + G0_tau[-1,0,0]*G0_m_tau[-1,1,1]*der_G0_down[-1]
     
-    plt.figure(0)
-    plt.title(r"$\Sigma^{(2)}_{\sigma}(\tau)$ vs $\tau$")
-    plt.plot(tau_array,SE_tau_tmp[:,0,0],c="red",label=r"$\sigma=\uparrow$")
-    plt.plot(tau_array,SE_tau_tmp[:,1,1],c="green",label=r"$\sigma=\downarrow$")
-    plt.xlabel(r"$\tau$")
-    plt.legend()
+    # plt.figure(0)
+    # plt.title(r"$\Sigma^{(2)}_{\sigma}(\tau)$ vs $\tau$")
+    # plt.plot(tau_array,SE_tau_tmp[:,0,0],c="red",label=r"$\sigma=\uparrow$")
+    # plt.plot(tau_array,SE_tau_tmp[:,1,1],c="green",label=r"$\sigma=\downarrow$")
+    # plt.xlabel(r"$\tau$")
+    # plt.legend()
     
     Cubic_spline(delta_tau,SE_tau_tmp[:,0,0])
     Cubic_spline.building_matrix_components(left_der_up,right_der_up)
@@ -502,5 +513,13 @@ def compute_Sigma_iwn_cubic_spline(G0_iwn : np.ndarray,G0_tau : np.ndarray,G0_m_
     # cleaning
     FermionsvsBosons.reset()
     Cubic_spline.reset()
+
+    # print("up SE")
+    # for i in range(len(iwn_array)):
+    #     print(Sigma_up_iwn[i])
+    # print("down SE")
+    # for i in range(len(iwn_array)):
+    #     print(Sigma_down_iwn[i])
+    # exit(0)
 
     return Sigma_up_iwn, Sigma_down_iwn

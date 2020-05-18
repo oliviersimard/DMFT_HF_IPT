@@ -42,12 +42,8 @@ int main(int argc, char** argv){
     #else
     std::ofstream objSaveStreamGloc_A;
     std::ofstream objSaveStreamSE_A;
-    std::ofstream objSaveStreamGW_A;
-    std::ofstream objSaveStreamGloc_B;
-    std::ofstream objSaveStreamSE_B;
-    std::ofstream objSaveStreamGW_B;
-    std::vector<std::ofstream*> vecA_ofstreams{ &objSaveStreamGloc_A, &objSaveStreamSE_A, &objSaveStreamGW_A };
-    std::vector<std::ofstream*> vecB_ofstreams{ &objSaveStreamGloc_B, &objSaveStreamSE_B, &objSaveStreamGW_B };
+    std::ofstream objSaveStreamGloc_A_tau;
+    std::vector<std::ofstream*> vecA_ofstreams{ &objSaveStreamGloc_A, &objSaveStreamSE_A, &objSaveStreamGloc_A_tau };
     #endif
 
     for (size_t k=0; k<=N_k; k++){ // Used when computing the susceptibilities.
@@ -90,30 +86,16 @@ int main(int argc, char** argv){
     arma::Cube<double> weiss_green_tmp_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_tmp_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> self_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), self_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
     arma::Cube<double> local_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), local_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
-    #ifdef AFM
-    arma::Cube<double> weiss_green_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
-    arma::Cube<double> weiss_green_tmp_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_tmp_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
-    arma::Cube<double> self_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), self_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
-    arma::Cube<double> local_green_B_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), local_green_B_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros);
-    #endif
     //
     arma::Cube< std::complex<double> > weiss_green_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
     arma::Cube< std::complex<double> > weiss_green_tmp_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
     arma::Cube< std::complex<double> > self_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
     arma::Cube< std::complex<double> > local_green_A_matsubara_w(2,2,2*N_tau,arma::fill::zeros);
-    #ifdef AFM
-    arma::Cube< std::complex<double> > weiss_green_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
-    arma::Cube< std::complex<double> > weiss_green_tmp_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
-    arma::Cube< std::complex<double> > self_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros); 
-    arma::Cube< std::complex<double> > local_green_B_matsubara_w(2,2,2*N_tau,arma::fill::zeros);
-    #endif
+
     // To save the derivative of G(tau) and G(-tau)
     arma::Cube<double> data_dG_dtau_pos_A(2,2,2*N_tau+1,arma::fill::zeros); 
     arma::Cube<double> data_dG_dtau_neg_A(2,2,2*N_tau+1,arma::fill::zeros);
-    #ifdef AFM
-    arma::Cube<double> data_dG_dtau_pos_B(2,2,2*N_tau+1,arma::fill::zeros); 
-    arma::Cube<double> data_dG_dtau_neg_B(2,2,2*N_tau+1,arma::fill::zeros);
-    #endif
+    
     #endif /* PARALLEL */
     std::string pathToDir("./data/");
     std::string pathToDirLoad("./../data/");
@@ -134,11 +116,20 @@ int main(int argc, char** argv){
 
             /* Computing according to solver chosen. */
             if ( (solver_type_s.compare("IPT")==0) ){
+                #ifndef AFM
                 std::string customDirName(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau));
+                #else
+                std::string customDirName(std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n_t_spin)+trailingStr+"_N_tau_"+std::to_string(N_tau)+"_AFM");
+                #endif
                 std::string filenameToSaveGloc(pathToDir+customDirName+"/Green_loc_"+customDirName);
                 std::string filenameToSaveSE(pathToDir+customDirName+"/Self_energy_"+customDirName);
+                #ifndef AFM
                 std::string filenameToSaveGW(pathToDir+customDirName+"/Weiss_Green_"+customDirName);
                 std::vector< std::string > vecFiles={filenameToSaveGloc,filenameToSaveSE,filenameToSaveGW};
+                #else
+                std::string filenameToSaveGlocTau(pathToDir+customDirName+"/Green_loc_tau_"+customDirName);
+                std::vector< std::string > vecFiles={filenameToSaveGloc,filenameToSaveSE,filenameToSaveGlocTau};
+                #endif
                 try{ // Ensures that we don't overwrite any files within build/.
                     check_file_content(vecFiles,pathToDir+customDirName+"/analytic_continuations",pathToDir+customDirName+"/susceptibilities"); // Checks whether files already exist to avoid overwritting. Also creates 
                 } catch (const std::runtime_error& err){                                                                                            // directory architecture
@@ -161,17 +152,9 @@ int main(int argc, char** argv){
                 GreenStuff HybA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_tmp_A_matsubara_t_pos,weiss_green_tmp_A_matsubara_t_neg,weiss_green_tmp_A_matsubara_w);
                 GreenStuff SelfEnergyA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,self_A_matsubara_t_pos,self_A_matsubara_t_neg,self_A_matsubara_w);
                 GreenStuff LocalGreenA(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,local_green_A_matsubara_t_pos,local_green_A_matsubara_t_neg,local_green_A_matsubara_w);
-                #ifdef AFM
-                GreenStuff WeissGreenB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_B_matsubara_t_pos,weiss_green_B_matsubara_t_neg,weiss_green_B_matsubara_w);
-                GreenStuff HybB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,weiss_green_tmp_B_matsubara_t_pos,weiss_green_tmp_B_matsubara_t_neg,weiss_green_tmp_B_matsubara_w);
-                GreenStuff SelfEnergyB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,self_B_matsubara_t_pos,self_B_matsubara_t_neg,self_B_matsubara_w);
-                GreenStuff LocalGreenB(N_tau,N_k,beta,U,Hyb_c,iwnArr_l,local_green_B_matsubara_t_pos,local_green_B_matsubara_t_neg,local_green_B_matsubara_w);
-                #endif
-
+            
                 IPT2::DMFTproc EqDMFTA(WeissGreenA,HybA,LocalGreenA,SelfEnergyA,data_dG_dtau_pos_A,data_dG_dtau_neg_A,vecK,n_t_spin);
-                #ifdef AFM
-                IPT2::DMFTproc EqDMFTB(WeissGreenB,HybB,LocalGreenB,SelfEnergyB,data_dG_dtau_pos_B,data_dG_dtau_neg_B,vecK,n_t_spin);
-                #endif
+    
                 /* Performs the complete DMFT calculations if directory doesn't already exist */
                 #ifndef DEBUG
                 struct stat infoDir;
@@ -180,7 +163,7 @@ int main(int argc, char** argv){
                     #ifndef AFM
                     DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);
                     #else
-                    DMFTloopAFM(EqDMFTA,EqDMFTB,vecA_ofstreams,vecB_ofstreams,vecFiles,N_it);
+                    DMFTloopAFM(EqDMFTA,vecA_ofstreams,vecFiles,N_it);
                     #endif
                     /* Saving the data of the Green's function into file for comparison */
                     std::ofstream dG_dtau(pathToDir+customDirName+"/dG_dtaus.dat", std::ofstream::out | std::ofstream::app);

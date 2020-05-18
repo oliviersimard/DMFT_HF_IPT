@@ -268,9 +268,14 @@ void spline<T>::set_points(const std::vector<double>& x,
         m_b[n-1]=0.0;
     m_c[0]=m_c0; // What the hell happened to m_c[0]? Reset to 0 for some stupid reasons...
 
-    // for (auto el : m_c) std::cout << "m_c: " << el << std::endl;
-    // for (auto el : m_b) std::cout << "m_b: " << el << std::endl;
-    // for (auto el : m_a) std::cout << "m_c: " << el << std::endl; 
+    // if (index==1){
+    //     for (auto el : m_c) std::cout << "m_c: " << el << std::endl;
+    //     std::cout << "\n";
+    //     for (auto el : m_b) std::cout << "m_b: " << el << std::endl;
+    //     std::cout << "\n";
+    //     for (auto el : m_a) std::cout << "m_a: " << el << std::endl;
+    //     exit(0);
+    // }
     
 }
 
@@ -368,17 +373,21 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
     _S_N_beta=m_a[2*N_tau-1]*h_last*h_last*h_last+m_b[2*N_tau-1]*h_last*h_last+m_c[2*N_tau-1]*h_last+m_y.slice(2*N_tau-1)(index,index); // In Shaheen's code it is m_y.slice(2*tau-1)...but this is not beta...
     _Sp_N_beta=3.0*m_a[2*N_tau-1]*h_last*h_last+2.0*m_b[2*N_tau-1]*h_last+m_c[2*N_tau-1];
     _Spp_N_beta=6.0*m_a[2*N_tau-1]*h_last+2.0*m_b[2*N_tau-1];
+    const unsigned int timeGrid = 2*N_tau;
+    constexpr std::complex< T > im(0.0,1.0);
+    // if (index==1){
+    //     std::cout << "_S_1_0: " << _S_1_0 << " _Sp_1_0: " << _Sp_1_0 << " _Spp_1_0: " << _Spp_1_0 << "\n";
+    //     std::cout << "_S_N_beta: " << _S_N_beta << " _Sp_N_beta: " << _Sp_N_beta << " _Spp_N_beta: " << _Spp_N_beta << "\n";
+    // }
     // This will be used later for IFFT.
     for (size_t n=0; n<m_x.size()-1; n++){
-        _Sppp.push_back(6.0*m_a[n]);
+        _Sppp.push_back(6.0*m_a[n]*std::exp(im*M_PI*(double)n/(double)timeGrid));
     }
     // Putting the _S's to use in the Fourier transformation from tau (double) to complex<double> (iwn).
-    const unsigned int timeGrid = 2*N_tau;
     T F[2*timeGrid],Fp[2*timeGrid];
-    const std::complex< T > im(0.0,1.0);
     for(size_t i=0; i<timeGrid; i++){
-        F[2*i] = (std::exp(im*M_PI*(double)i/(double)timeGrid)*_Sppp[i]).real();
-        F[2*i+1] = (std::exp(im*M_PI*(double)i/(double)timeGrid)*_Sppp[i]).imag();
+        F[2*i] = (_Sppp[i]).real();
+        F[2*i+1] = (_Sppp[i]).imag();
     }
     
     gsl_fft_complex_radix2_backward(F, 1, timeGrid);
@@ -392,6 +401,7 @@ void spline<T>::iwn_tau_spl_extrm(const GreenStuff& SelfEnergy, const double bet
             Fp[2*i+1] = F[2*i+1-timeGrid];
         }
     }
+
     for(size_t i=0; i<timeGrid; i++){ // timeGrid (N in paper) factor is absorbed by IFFT.
         SelfEnergy.matsubara_w.slice(i)(index,index)=( -1.0*( -(_S_1_0+_S_N_beta)/iwnArr_l[i] + (_Sp_1_0+_Sp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]) - (_Spp_1_0+_Spp_N_beta)/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]) + (1.0-std::exp(1.0*iwnArr_l[i]*beta/(double)timeGrid))/(iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i]*iwnArr_l[i])*(Fp[2*i]+im*Fp[2*i+1]) ) );
     }

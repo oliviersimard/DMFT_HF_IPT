@@ -187,7 +187,7 @@ double Integrals::falsePosMethod(std::function<double(double)> funct, double a, 
 }
 
 std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,double tol,unsigned int maxDelta) const{
-    double dk=(kf-k0)/(double)maxDelta;
+    double dk;
     std::complex<double> result(0.0,0.0), prevResult(0.0,0.0), resultSumNk;
     unsigned int iter=1;
     bool is_converged=false;

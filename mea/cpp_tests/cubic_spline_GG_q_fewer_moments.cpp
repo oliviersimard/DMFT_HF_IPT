@@ -14,7 +14,7 @@ inline void sum_rule_iqn_0(double n_k, double k, double& sum_rule_total, unsigne
 
 int main(void){
     
-    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_50.000000_n_0.500000_N_tau_2048_Nit_32.dat");
+    std::string inputFilename("../data/Self_energy_1D_U_10.000000_beta_30.000000_n_0.500000_N_tau_4096_Nit_25.dat");
     // Choose whether current-current or spin-spin correlation function is computed.
     std::vector<std::string> results;
     std::vector<std::string> fetches = {"U", "beta", "N_tau"};
@@ -22,7 +22,7 @@ int main(void){
     results = get_info_from_filename(inputFilename,fetches);
     const bool is_jj = true; 
     const unsigned int Ntau = 2*(unsigned int)atof(results[2].c_str());
-    const unsigned int N_k = 400;
+    const unsigned int N_k = 601;
     const unsigned int N_q = 31;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
@@ -110,7 +110,7 @@ int main(void){
     /* TEST G(-tau) */
     std::ofstream test2("test_2_fewer_moments.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test2 << beta_array[j] << "  " << -1.0*G_k_tau(52,Ntau-j) << "\n";
+        test2 << beta_array[j] << "  " << -1.0*G_k_tau(3,Ntau-j) << "\n";
     }
     test2.close();
     

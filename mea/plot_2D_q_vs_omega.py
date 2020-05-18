@@ -13,10 +13,10 @@ def get_derivative(p1 : float, p2 : float, p3 : float, p4 : float, delta_x : flo
 
 if __name__=="__main__":
 
-    range_plot = 0.5 # Range of q values to be plotted
+    range_plot = 0.8 # Range of q values to be plotted
     center_plot = 0.0 # Center around which the q values are plotted
 
-    filename = "cpp_tests/bb_1D_U_10.000000_beta_50.000000_Ntau_4096_Nk_400_isjj_1.hdf5.pade_wmax_20.0"
+    filename = "cpp_tests/bb_1D_U_10.000000_beta_30.000000_Ntau_8192_Nk_601_isjj_1.hdf5.pade_wmax_20.0"
 
     wmax = float(findall(r"(?<=wmax_)(\d*\.\d+|\d+)",filename)[0])
     Ntau = int(findall(r"(?<=Ntau_)(\d+)",filename)[0])

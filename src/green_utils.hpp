@@ -12,10 +12,11 @@ extern "C" {
 }
 //#include <type_traits> // for use of std::is_same in static_assert
 
-#define DIM 1 // 1 or 2
+#define DIM 2 // 1 or 2
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
 #define MULT_N_TAU 2 // Has to be an even number
+#define AFM
 
 // Some declarations
 namespace IPT2{ class DMFTproc; };
@@ -43,7 +44,7 @@ namespace ThreadFunctor{ struct gamma_tensor_content; };
 template<typename T> inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);
 template<typename T> inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
 void DMFTloop(IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&, std::vector< std::string >&, const unsigned int) noexcept(false);
-void DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector<std::ofstream*> vec_sub_2_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
+void DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
@@ -80,7 +81,11 @@ inline Data::Data(const unsigned int N_tau_, const unsigned int N_k_, const doub
         dtau=beta/N_tau;
     }
     objectCount++;
+    #ifdef AFM
+    this->mu=0.0; // starting at half-filling, where the Ising spin is 1/2, so the chemical potential is 0
+    #else
     this->mu=U/2.0; // starting at half-filling
+    #endif
 }
 
 inline Data::Data(const Data& obj){}
@@ -88,7 +93,7 @@ inline Data::Data(const Data& obj){}
 struct GreenStuff final : Data{ // Non-subclassable
     friend class IPT2::DMFTproc; // Important to access the private static variables from this struct.
     friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
-    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector<std::ofstream*> vec_sub_2_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
+    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
     // Member variables
     arma::Cube<double>& matsubara_t_pos; // Ctor: n_rows, n_cols, n_slices
     arma::Cube<double>& matsubara_t_neg;
@@ -105,6 +110,7 @@ struct GreenStuff final : Data{ // Non-subclassable
     static void reset_counter(){ objectCount=0; } // Important to update parameters in loop.
     double get_mu() { return this->mu; }
     double get_mu0() { return this->mu0; }
+    static double get_beta() { return beta; }
     static double get_hyb_c() { return hyb_c; }
     static double get_U() { return U; }
     void update_mu(double mu){ this->mu=mu; }

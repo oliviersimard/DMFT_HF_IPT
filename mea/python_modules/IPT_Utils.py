@@ -332,6 +332,13 @@ class Sublattice(object):
         Sigma_Hartree_2nd_down *= Sublattice._U*Sublattice._U*(self._n0_down-0.5)
         self._SE[:,0,0] = Sublattice._U*(self._n0_down-0.5) + Sigma_up_iwn + Sigma_Hartree_2nd_up #up
         self._SE[:,1,1] = Sublattice._U*(self._n0_up-0.5) + Sigma_down_iwn + Sigma_Hartree_2nd_down #down
+        # print("SE up")
+        # for i in range(len(Sublattice._iwn_arr)):
+        #     print(self._SE[i,0,0])
+        # print("SE down")
+        # for i in range(len(Sublattice._iwn_arr)):
+        #     print(self._SE[i,1,1])
+        # exit(0)
 
     def update_self_energy(self,type_spline : str) -> None:
         """
@@ -416,13 +423,13 @@ class Sublattice(object):
         """
         # update the self-energy with the updated objects from last iteration
         self.update_self_energy_AFM(type_spline)
-        plt.figure(2)
-        plt.title(r"$\operatorname{Im}\Sigma^{tot}_{\sigma} (i\omega_n)$ vs $i\omega_n$")
-        plt.plot(list(map(lambda x: x.imag,Sublattice._iwn_arr)),list(map(lambda x: x.imag,self._SE[:,0,0])),marker='d',ms=2.5,c='red',label=r"$\sigma=\uparrow$")
-        plt.plot(list(map(lambda x: x.imag,Sublattice._iwn_arr)),list(map(lambda x: x.imag,self._SE[:,1,1])),marker='s',ms=2.5,c='green',label=r"$\sigma=\downarrow$")
-        plt.xlabel(r"$i\omega_n$")
-        plt.legend()
-        plt.show()
+        # plt.figure(2)
+        # plt.title(r"$\operatorname{Im}\Sigma^{tot}_{\sigma} (i\omega_n)$ vs $i\omega_n$")
+        # plt.plot(list(map(lambda x: x.imag,Sublattice._iwn_arr)),list(map(lambda x: x.imag,self._SE[:,0,0])),marker='d',ms=2.5,c='red',label=r"$\sigma=\uparrow$")
+        # plt.plot(list(map(lambda x: x.imag,Sublattice._iwn_arr)),list(map(lambda x: x.imag,self._SE[:,1,1])),marker='s',ms=2.5,c='green',label=r"$\sigma=\downarrow$")
+        # plt.xlabel(r"$i\omega_n$")
+        # plt.legend()
+        # plt.show()
         # computing the physical particle density
         for i,iwn in enumerate(Sublattice._iwn_arr):
             self._Gloc[i,0,0] = 1.0/( iwn + self._mu - Sublattice._h - self._Hyb[i,0,0] - self._SE[i,0,0] ) - 1.0/iwn #- 1.0/( iwn + self._mu - Sublattice._h - Sublattice._hyb_c/iwn - Sublattice._U*(self._n_down) - (Sublattice._U**2*self._n_down*(1.0-self._n_down))/(iwn) ) # up
@@ -456,7 +463,7 @@ class Sublattice(object):
             G_alpha_beta[0,0]=GAA_up_loc; G_alpha_beta[0,1]=GAB_up_loc
             G_alpha_beta[1,0]=GAB_up_loc; G_alpha_beta[1,1]=GAA_down_loc
             G_alpha_beta_inv[i,:,:] = np.linalg.inv(G_alpha_beta)
-            
+    
         # update the hybdridisation function and set Weiss Green's function for the next iteration
         alpha = 0.1
         for i,iwn in enumerate(Sublattice._iwn_arr):
@@ -464,7 +471,7 @@ class Sublattice(object):
             self._G0[i,0,0] = 1.0/( iwn + self._mu - Sublattice._h - self._Hyb[i,0,0] ) # up Have to search for mu away from half-filling
             self._Hyb[i,1,1] = (1.0-alpha)*(iwn + self._mu + Sublattice._h - self._SE[i,1,1] - G_alpha_beta_inv[i,1,1]) + alpha*(self._Hyb[i,1,1]) # down
             self._G0[i,1,1] = 1.0/( iwn + self._mu + Sublattice._h - self._Hyb[i,1,1] ) # down
-    
+
     def DMFT(self,dim : int,type_spline : str) -> None:
         """
         Method implementing the core DMFT procedure for PM scenario. Basically, having computed the self-energy in Matsubara frequencies,
@@ -640,7 +647,10 @@ class Sublattice(object):
         Returns:
             None
         """
-        filename = "./Green_loc_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
+        directory_container = "{0:d}D_U_{1:.5f}_beta_{2:.5f}_n_{3:.5f}_Ntau_{4:d}_{5}".format(dim,Sublattice._U,Sublattice._beta,0.5,Sublattice._Ntau,type_spline)
+        if not os.path.isdir("./data_test_IPT/"+directory_container):
+            os.mkdir("./data_test_IPT/"+directory_container)
+        filename = "./data_test_IPT/"+directory_container+"/Green_loc_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
         with open(filename,"w+") as f:
             for i in range(len(Sublattice._iwn_arr)):
                 if i==0:
@@ -661,7 +671,10 @@ class Sublattice(object):
         Returns:
             None
         """
-        filename = "./Self_energy_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
+        directory_container = "{0:d}D_U_{1:.5f}_beta_{2:.5f}_n_{3:.5f}_Ntau_{4:d}_{5}".format(dim,Sublattice._U,Sublattice._beta,0.5,Sublattice._Ntau,type_spline)
+        if not os.path.isdir("./data_test_IPT/"+directory_container):
+            os.mkdir("./data_test_IPT/"+directory_container)
+        filename = "./data_test_IPT/"+directory_container+"/Self_energy_{0:d}".format(dim)+"D_"+"{0}".format(type_spline)+"_AFM_U_{0:.5f}".format(Sublattice._U)+"_beta_{0:.5f}".format(Sublattice._beta)+"_N_tau_{0:d}".format(Sublattice._Ntau)+"_Nit_{0:d}".format(it)+".dat"
         with open(filename,"w+") as f:
             for i in range(len(Sublattice._iwn_arr)):
                 if i==0:

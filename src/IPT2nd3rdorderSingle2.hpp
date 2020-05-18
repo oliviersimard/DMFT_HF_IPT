@@ -13,8 +13,7 @@
 #include "integral_utils.hpp"
 
 #define TOL 0.000000001
-
-//#define AFM
+#define ALPHA 0.1 // Parameter to mix the Hybridisation function between the different iterations (current and previous ones)
 
 //namespace IPT2{ class DMFTproc; };
 struct GreenStuff;
@@ -22,7 +21,7 @@ namespace IPT2{ template< class T > class OneLadder; template< class T > class I
 
 // Prototypes
 void saveEachIt(const IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&) noexcept;
-void saveEachIt_AFM(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept;
+void saveEachIt_AFM(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGloc_tau) noexcept;
 double Hsuperior(double tau, double mu, double c, double beta);
 double Hpsuperior(double tau, double mu, double c, double beta);
 double Hinferior(double tau, double mu, double c, double beta);
@@ -40,7 +39,7 @@ class FFTtools{
     public:
         enum Spec { plain_positive, plain_negative, dG_dtau_positive, dG_dtau_negative };
 
-        void fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<double>& data2);
+        void fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<double>& data2, int index=0);
         void fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>&, arma::Cube<double>&, Spec);
         void fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>& data_dg_dtau_pos,arma::Cube<double>& data_dg_dtau_neg, Spec specialization, double n_a_up);
         
@@ -51,9 +50,9 @@ enum spline_type : short { linear, cubic };
 
 class DMFTproc{
     friend void ::saveEachIt(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept;
-    friend void ::saveEachIt_AFM(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept;
+    friend void ::saveEachIt_AFM(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGloc_tau) noexcept;
     friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
-    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector<std::ofstream*> vec_sub_2_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
+    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
     template<class T>
     friend class ::Susceptibility;
     public:
@@ -62,9 +61,9 @@ class DMFTproc{
         DMFTproc(const DMFTproc&)=delete;
         DMFTproc& operator=(const DMFTproc&)=delete;
         void update_impurity_self_energy();
-        void update_impurity_self_energy_AFM(double n_a_up);
+        void update_impurity_self_energy_AFM(double h);
         void update_parametrized_self_energy(FFTtools);
-        void update_parametrized_self_energy_AFM(FFTtools,double n_a_up);
+        void update_parametrized_self_energy_AFM(FFTtools,double h);
         double density_mu(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu(const arma::Cube< std::complex<double> >&) const;
         std::tuple<double,double> density_mu_AFM(const arma::Cube< std::complex<double> >& G) const;

@@ -21,7 +21,7 @@ DMFTproc::DMFTproc(GreenStuff& WeissGreen_,GreenStuff& Hyb_,GreenStuff& LocalGre
     }
     objCount++;
 }
-
+#ifndef AFM
 void DMFTproc::update_parametrized_self_energy(FFTtools FFTObj){
     /* update_impurity_self_energy() has to be launched before this very method */
     // To compute the spline, the derivatives have to be known
@@ -34,41 +34,58 @@ void DMFTproc::update_parametrized_self_energy(FFTtools FFTObj){
     s.set_boundary(spline<double>::bd_type::first_deriv,left_der,spline<double>::bd_type::first_deriv,right_der);
     // tau array
     std::vector<double> tau_arr;
-    for (int j=0; j<=2.0*GreenStuff::N_tau; j++){
+    for (int j=0; j<=2*GreenStuff::N_tau; j++){
         tau_arr.push_back(j*GreenStuff::beta/(2.0*GreenStuff::N_tau));
     }
     s.set_points(tau_arr,SelfEnergy.matsubara_t_pos);
     s.iwn_tau_spl_extrm(SelfEnergy,GreenStuff::beta,GreenStuff::N_tau); // Sets up for the new Sigma(iwn) computed with the cubic spline.
 }
-
-void DMFTproc::update_parametrized_self_energy_AFM(FFTtools FFTObj, double n_a_up){
+#else
+void DMFTproc::update_parametrized_self_energy_AFM(FFTtools FFTObj, double h){
     /* update_impurity_self_energy() has to be launched before this very method */
-    // To compute the spline, the derivatives have to be known
-    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.dG_dtau_positive,n_a_up);
-    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.dG_dtau_negative,n_a_up);
     // tau array
     std::vector<double> tau_arr;
-    for (int j=0; j<=2.0*GreenStuff::N_tau; j++){
+    for (int j=0; j<=2*GreenStuff::N_tau; j++){
         tau_arr.push_back(j*GreenStuff::beta/(2.0*GreenStuff::N_tau));
     }
     spline<double> s;
     int index;
     double left_der,right_der;
     // computing spin down Matsubara self-energy (index=0, default)
+    // To compute the spline, the derivatives have to be known
+    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.dG_dtau_positive,h);
+    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.dG_dtau_negative,h);
     left_der=data_dg_dtau_pos.slice(0)(0,0)*WeissGreen.matsubara_t_neg.slice(0)(1,1)*WeissGreen.matsubara_t_pos.slice(0)(1,1) + WeissGreen.matsubara_t_pos.slice(0)(0,0)*data_dg_dtau_neg.slice(0)(1,1)*WeissGreen.matsubara_t_pos.slice(0)(1,1) + WeissGreen.matsubara_t_pos.slice(0)(0,0)*WeissGreen.matsubara_t_neg.slice(0)(1,1)*data_dg_dtau_pos.slice(0)(1,1);
     right_der=data_dg_dtau_pos.slice(2.0*GreenStuff::N_tau)(0,0)*WeissGreen.matsubara_t_neg.slice(2.0*GreenStuff::N_tau)(1,1)*WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(1,1) + WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(0,0)*data_dg_dtau_neg.slice(2.0*GreenStuff::N_tau)(1,1)*WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(1,1) + WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(0,0)*WeissGreen.matsubara_t_neg.slice(2.0*GreenStuff::N_tau)(1,1)*data_dg_dtau_pos.slice(2.0*GreenStuff::N_tau)(1,1);
     s.set_boundary(spline<double>::bd_type::first_deriv,left_der,spline<double>::bd_type::first_deriv,right_der);
     s.set_points(tau_arr,SelfEnergy.matsubara_t_pos);
     s.iwn_tau_spl_extrm(SelfEnergy,GreenStuff::beta,GreenStuff::N_tau); // Sets up for the new Sigma(iwn) computed with the cubic spline.
+    
     // computing spin up Matsubara self-energy (index=1)
+    spline<double> s2;
     index=1;
+    // To compute the spline, the derivatives have to be known
+    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.dG_dtau_positive,-1.0*h);
+    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.dG_dtau_negative,-1.0*h);
     left_der=data_dg_dtau_pos.slice(0)(1,1)*WeissGreen.matsubara_t_neg.slice(0)(0,0)*WeissGreen.matsubara_t_pos.slice(0)(0,0) + WeissGreen.matsubara_t_pos.slice(0)(1,1)*data_dg_dtau_neg.slice(0)(0,0)*WeissGreen.matsubara_t_pos.slice(0)(0,0) + WeissGreen.matsubara_t_pos.slice(0)(1,1)*WeissGreen.matsubara_t_neg.slice(0)(0,0)*data_dg_dtau_pos.slice(0)(0,0);
     right_der=data_dg_dtau_pos.slice(2.0*GreenStuff::N_tau)(1,1)*WeissGreen.matsubara_t_neg.slice(2.0*GreenStuff::N_tau)(0,0)*WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(0,0) + WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(1,1)*data_dg_dtau_neg.slice(2.0*GreenStuff::N_tau)(0,0)*WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(0,0) + WeissGreen.matsubara_t_pos.slice(2.0*GreenStuff::N_tau)(1,1)*WeissGreen.matsubara_t_neg.slice(2.0*GreenStuff::N_tau)(0,0)*data_dg_dtau_pos.slice(2.0*GreenStuff::N_tau)(0,0);
-    s.set_boundary(spline<double>::bd_type::first_deriv,left_der,spline<double>::bd_type::first_deriv,right_der);
-    s.set_points(tau_arr,SelfEnergy.matsubara_t_pos,index);
-    s.iwn_tau_spl_extrm(SelfEnergy,GreenStuff::beta,GreenStuff::N_tau,index); // Sets up for the new Sigma(iwn) computed with the cubic spline.
-}
+    s2.set_boundary(spline<double>::bd_type::first_deriv,left_der,spline<double>::bd_type::first_deriv,right_der);
+    s2.set_points(tau_arr,SelfEnergy.matsubara_t_pos,index);
+    s2.iwn_tau_spl_extrm(SelfEnergy,GreenStuff::beta,GreenStuff::N_tau,index); // Sets up for the new Sigma(iwn) computed with the cubic spline.
 
+    // std::cout << "up SE" << "\n";
+    // for (size_t j=0; j<2*GreenStuff::N_tau; j++){
+    //     std::cout << -1.0*SelfEnergy.matsubara_w.slice(j)(0,0) << "\n";
+    // }
+    // std::cout << "\n" << "down SE" << "\n";
+    // for (size_t j=0; j<2*GreenStuff::N_tau; j++){
+    //     std::cout << -1.0*SelfEnergy.matsubara_w.slice(j)(1,1) << "\n";
+    // }
+    // exit(0);
+}
+#endif
+
+#ifndef AFM
 void DMFTproc::update_impurity_self_energy(){ // Returns the full parametrized self-energy.
     FFTtools FFTObj;
     // parametrization of the self-energy allowing to wander off half-filling.
@@ -88,23 +105,44 @@ void DMFTproc::update_impurity_self_energy(){ // Returns the full parametrized s
         SelfEnergy.matsubara_w.slice(i)(0,0) = GreenStuff::U*n + A*GreenStuff::U*GreenStuff::U*SelfEnergy.matsubara_w.slice(i)(0,0)/(1.0-B*GreenStuff::U*GreenStuff::U*SelfEnergy.matsubara_w.slice(i)(0,0));
     }
 }
-
-void DMFTproc::update_impurity_self_energy_AFM(double n_a_up){ // Returns the full parametrized self-energy.
+#else
+void DMFTproc::update_impurity_self_energy_AFM(double h){ // Returns the full parametrized self-energy.
     FFTtools FFTObj;
     // Compute the Fourier transformation to tau space for impurity self-energy calculation
     // Stores data in matsubara_t_pos and matsubara_t_neg
-    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.plain_positive,n_a_up);
-    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.plain_negative,n_a_up);
+    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.plain_positive,h);
+    FFTObj.fft_spec_AFM(WeissGreen,WeissGreen,data_dg_dtau_pos,data_dg_dtau_neg,FFTObj.plain_negative,h);
     for (size_t j=0; j<=2*GreenStuff::N_tau; j++){ // IPT2 self-energy diagram
-        SelfEnergy.matsubara_t_pos.slice(j)(0,0)=WeissGreen.matsubara_t_pos.slice(j)(0,0)*WeissGreen.matsubara_t_pos.slice(j)(1,1)*WeissGreen.matsubara_t_neg.slice(j)(1,1);
-        SelfEnergy.matsubara_t_pos.slice(j)(1,1)=WeissGreen.matsubara_t_pos.slice(j)(1,1)*WeissGreen.matsubara_t_pos.slice(j)(0,0)*WeissGreen.matsubara_t_neg.slice(j)(0,0);
+        SelfEnergy.matsubara_t_pos.slice(j)(0,0)=-1.0*GreenStuff::U*GreenStuff::U*WeissGreen.matsubara_t_pos.slice(j)(0,0)*WeissGreen.matsubara_t_pos.slice(j)(1,1)*WeissGreen.matsubara_t_neg.slice(j)(1,1);
+        SelfEnergy.matsubara_t_pos.slice(j)(1,1)=-1.0*GreenStuff::U*GreenStuff::U*WeissGreen.matsubara_t_pos.slice(j)(1,1)*WeissGreen.matsubara_t_pos.slice(j)(0,0)*WeissGreen.matsubara_t_neg.slice(j)(0,0);
     }
-    update_parametrized_self_energy_AFM(FFTObj,n_a_up); // Updates Sigma(iwn) for IPT2::
+    
+    update_parametrized_self_energy_AFM(FFTObj,h); // Updates Sigma(iwn) for IPT2::
+    // Now dealing with the second-order Hartree term of the self-energy renormalizing the chemical potential..
+    double sigma_Hartree_2nd_up=0.0, sigma_Hartree_2nd_down=0.0;
+    double n0_up = -1.0*WeissGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(0,0), n0_down = -1.0*WeissGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(1,1);
+    std::cout << "n0A_up: " << n0_up << " and n0A_down: " << n0_down << " for mu0: " << WeissGreen.get_mu0() << "\n";
+    for (size_t i=0; i<=2*GreenStuff::N_tau; i++){
+        sigma_Hartree_2nd_up += GreenStuff::beta/(2.0*GreenStuff::N_tau)*WeissGreen.matsubara_t_pos.slice(i)(1,1)*WeissGreen.matsubara_t_neg.slice(i)(1,1);
+        sigma_Hartree_2nd_down += GreenStuff::beta/(2.0*GreenStuff::N_tau)*WeissGreen.matsubara_t_pos.slice(i)(0,0)*WeissGreen.matsubara_t_neg.slice(i)(0,0);
+    }
+    sigma_Hartree_2nd_up *= GreenStuff::U*GreenStuff::U*(n0_up-0.5);
+    sigma_Hartree_2nd_down *= GreenStuff::U*GreenStuff::U*(n0_down-0.5);
     for (size_t i=0; i<2*GreenStuff::N_tau; i++){
-        SelfEnergy.matsubara_w.slice(i)(0,0) = GreenStuff::U*n_a_up + GreenStuff::U*GreenStuff::U*SelfEnergy.matsubara_w.slice(i)(0,0);
-        SelfEnergy.matsubara_w.slice(i)(1,1) = GreenStuff::U*(1.0-n_a_up) + GreenStuff::U*GreenStuff::U*SelfEnergy.matsubara_w.slice(i)(1,1);
+        SelfEnergy.matsubara_w.slice(i)(0,0) = GreenStuff::U*(n0_down-0.5) + sigma_Hartree_2nd_up - SelfEnergy.matsubara_w.slice(i)(0,0);
+        SelfEnergy.matsubara_w.slice(i)(1,1) = GreenStuff::U*(n0_up-0.5) + sigma_Hartree_2nd_down - SelfEnergy.matsubara_w.slice(i)(1,1);
     }
+    // std::cout << "SE up" << "\n";
+    // for (size_t i=0; i<2*GreenStuff::N_tau; i++){
+    //     std::cout << SelfEnergy.matsubara_w.slice(i)(0,0) << "\n";
+    // }
+    // std::cout << "SE down" << "\n";
+    // for (size_t i=0; i<2*GreenStuff::N_tau; i++){
+    //     std::cout << SelfEnergy.matsubara_w.slice(i)(1,1) << "\n";
+    // }
+    // exit(0);
 }
+#endif
 
 double DMFTproc::density_mu(double mu, const arma::Cube< std::complex<double> >& G) const{
     double nn=0.0;
@@ -137,20 +175,6 @@ double DMFTproc::density_mu(const arma::Cube< std::complex<double> >& G) const{
     return -1.0*n;
 }
 
-std::tuple<double,double> DMFTproc::density_mu_AFM(const arma::Cube< std::complex<double> >& G) const{
-    double n_up=0.0, n_down=0.0;
-    constexpr std::complex<double> im(0.0,1.0);
-    for (size_t j=0; j<iwnArr_l.size(); j++){ // Takes in actual mu value.
-        n_up += ( 1.0/( G.slice(j)(0,0) + this->WeissGreen.mu ) - 1./iwnArr_l[j] ).real();
-        n_down += ( 1.0/( G.slice(j)(1,1) + this->WeissGreen.mu ) - 1./iwnArr_l[j] ).real();
-    }
-    n_up*=1./GreenStuff::beta*(std::exp(im*M_PI*(iwnArr_l.size()-1.0))).real();
-    n_down*=1./GreenStuff::beta*(std::exp(im*M_PI*(iwnArr_l.size()-1.0))).real();
-    n_up-=0.5;
-    n_down-=0.5;
-    return std::make_tuple(-1.0*n_up,-1.0*n_down);
-}
-
 double DMFTproc::density_mu0(double mu0, const arma::Cube< std::complex<double> >& G0_1) const{
     double nn0=0.0;
     for (size_t j=0; j<iwnArr_l.size(); j++){
@@ -172,6 +196,21 @@ double DMFTproc::density_mu0(const arma::Cube< std::complex<double> >& G0_1) con
     return -1.0*n0;
 }
 
+#ifdef AFM
+std::tuple<double,double> DMFTproc::density_mu_AFM(const arma::Cube< std::complex<double> >& G) const{
+    double n_up=0.0, n_down=0.0;
+    constexpr std::complex<double> im(0.0,1.0);
+    for (size_t j=0; j<iwnArr_l.size(); j++){ // Takes in actual mu value.
+        n_up += ( 1.0/( G.slice(j)(0,0) + this->WeissGreen.mu ) - 1./iwnArr_l[j] ).real();
+        n_down += ( 1.0/( G.slice(j)(1,1) + this->WeissGreen.mu ) - 1./iwnArr_l[j] ).real();
+    }
+    n_up*=1./GreenStuff::beta*(std::exp(im*M_PI*(iwnArr_l.size()-1.0))).real();
+    n_down*=1./GreenStuff::beta*(std::exp(im*M_PI*(iwnArr_l.size()-1.0))).real();
+    n_up-=0.5;
+    n_down-=0.5;
+    return std::make_tuple(-1.0*n_up,-1.0*n_down);
+}
+
 std::tuple<double,double> DMFTproc::density_mu0_AFM(const arma::Cube< std::complex<double> >& G0_1) const{
     double n0_up=0.0,n0_down=0.0;
     constexpr std::complex<double> im(0.0,1.0);
@@ -185,6 +224,7 @@ std::tuple<double,double> DMFTproc::density_mu0_AFM(const arma::Cube< std::compl
     n0_down-=0.5;
     return std::make_tuple(-1.0*n0_up,-1.0*n0_down);
 }
+#endif
 
 double DMFTproc::double_occupancy() const{
     double D=0.0;
@@ -233,28 +273,29 @@ double DMFTproc::dbl_occupancy(unsigned int iter) const{
 
 /**************************************************************************************************/
 
-void FFTtools::fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<double>& data2){
+void FFTtools::fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<double>& data2, int index){
     std::complex<double>* inUp=new std::complex<double> [2*GreenStuff::N_tau];
     std::complex<double>* outUp=new std::complex<double> [2*GreenStuff::N_tau];
     fftw_plan pUp; //fftw_plan pDown;
     for(size_t k=0;k<2*GreenStuff::N_tau;k++){
-        inUp[k]=data1.slice(k)(0,0);
+        inUp[k]=data1.slice(k)(index,index);
     }
     pUp=fftw_plan_dft_1d(2*GreenStuff::N_tau, reinterpret_cast<fftw_complex*>(inUp), reinterpret_cast<fftw_complex*>(outUp), FFTW_FORWARD, FFTW_ESTIMATE);
     fftw_execute(pUp); //fftw_execute(pDown);
 
     for(size_t j=0;j<2*GreenStuff::N_tau;j++){
-        data2.slice(j)(0,0)=(outUp[j]*std::exp(std::complex<double>(0.0,(double)(2*GreenStuff::N_tau-1)*(double)j*M_PI/((double)2*GreenStuff::N_tau)))).real()/GreenStuff::beta;
+        data2.slice(j)(index,index)=(outUp[j]*std::exp(std::complex<double>(0.0,(double)(2*GreenStuff::N_tau-1)*(double)j*M_PI/((double)2*GreenStuff::N_tau)))).real()/GreenStuff::beta;
     }
-    data2.slice(2*GreenStuff::N_tau)(0,0)=0.0; // Up spin
+    data2.slice(2*GreenStuff::N_tau)(index,index)=0.0; // Up spin
     for(size_t k=0;k<2*GreenStuff::N_tau;k++){
-        data2.slice(2*GreenStuff::N_tau)(0,0)+=(data1.slice(k)(0,0)*std::exp(std::complex<double>(0.0,(double)(2*GreenStuff::N_tau-1)*M_PI))).real()/GreenStuff::beta;
+        data2.slice(2*GreenStuff::N_tau)(index,index)+=(data1.slice(k)(index,index)*std::exp(std::complex<double>(0.0,(double)(2*GreenStuff::N_tau-1)*M_PI))).real()/GreenStuff::beta;
     }
     delete [] inUp;
     delete [] outUp;
     fftw_destroy_plan(pUp); //fftw_destroy_plan(pDown);
 }
 
+#ifndef AFM
 void FFTtools::fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>& data_dg_dtau_pos,
                                                 arma::Cube<double>& data_dg_dtau_neg, Spec specialization){
     /* FFT from Matsubara frequency to imaginary time */
@@ -330,27 +371,25 @@ void FFTtools::fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>
         break;
     }
 }
-
+#else
 void FFTtools::fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>& data_dg_dtau_pos,
-                                                arma::Cube<double>& data_dg_dtau_neg, Spec specialization, double n_a_up){
+                                                arma::Cube<double>& data_dg_dtau_neg, Spec specialization, double h){
     /* FFT from Matsubara frequency to imaginary time */
     const unsigned int timeGrid = 2*Data::N_tau;
     std::vector< std::complex<double> > substractG_up, substractG_down;
-    for (unsigned int j=0; j<timeGrid; j++){
-        substractG_up.push_back( data1.matsubara_w.slice(j)(0,0) - 1.0/( iwnArr_l[j] + data1.mu0 - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(1.0-n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
-        substractG_down.push_back( data1.matsubara_w.slice(j)(1,1) - 1.0/( iwnArr_l[j] + data1.mu0 - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
-    }
     // cubic_roots roots_up = get_cubic_roots_G_inf(1.0-n_a_up,Data::U,data1.mu,data1.mu0);
     // cubic_roots roots_down = get_cubic_roots_G_inf(n_a_up,Data::U,data1.mu,data1.mu0);
 
     double F_decal_up[2*timeGrid];
     double F_decal_down[2*timeGrid];
-
     double tau;
-    const std::complex<double> im(0.0,1.0);
+    constexpr std::complex<double> im(0.0,1.0);
     switch (specialization){
     case plain_positive:
-    
+        for (unsigned int j=0; j<timeGrid; j++){
+            substractG_up.push_back( data1.matsubara_w.slice(j)(0,0) - 1.0/iwnArr_l[j] ); // 1.0/( iwnArr_l[j] - h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(1.0-n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+            substractG_down.push_back( data1.matsubara_w.slice(j)(1,1) - 1.0/iwnArr_l[j] ); // 1.0/( iwnArr_l[j] + h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+        }
         for(size_t i=0; i<timeGrid; i++){
             F_decal_up[2*i]=substractG_up[i].real();
             F_decal_up[2*i+1]=substractG_up[i].imag();
@@ -361,15 +400,18 @@ void FFTtools::fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<dou
         gsl_fft_complex_radix2_forward(F_decal_down, 1, timeGrid);
         for(size_t i=0; i<timeGrid; i++){
             tau=i*Data::beta/(double)timeGrid;
-            data2.matsubara_t_pos.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) + Hsuperior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
-            data2.matsubara_t_pos.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) + Hsuperior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
+            data2.matsubara_t_pos.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) - 0.5 ).real(); // + Hsuperior(tau, data1.mu-h, Data::hyb_c, Data::beta)
+            data2.matsubara_t_pos.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) - 0.5 ).real(); // + Hsuperior(tau, data1.mu+h, Data::hyb_c, Data::beta)
         }
         // Adding value at tau=beta
         data2.matsubara_t_pos.slice(timeGrid)(0,0)=-1.0-data2.matsubara_t_pos.slice(0)(0,0);
         data2.matsubara_t_pos.slice(timeGrid)(1,1)=-1.0-data2.matsubara_t_pos.slice(0)(1,1);
         break;
     case plain_negative:
-    
+        for (unsigned int j=0; j<timeGrid; j++){
+            substractG_up.push_back( data1.matsubara_w.slice(j)(0,0) - 1.0/iwnArr_l[j] );// 1.0/( iwnArr_l[j] - h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(1.0-n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+            substractG_down.push_back( data1.matsubara_w.slice(j)(1,1) - 1.0/iwnArr_l[j] ); // 1.0/( iwnArr_l[j] + h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+        }
         for(size_t i=0; i<timeGrid; i++){
             F_decal_up[2*i]=substractG_up[i].real();
             F_decal_up[2*i+1]=-1.0*(substractG_up[i].imag()); // complex conjugate
@@ -380,15 +422,18 @@ void FFTtools::fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<dou
         gsl_fft_complex_radix2_forward(F_decal_down, 1, timeGrid);
         for(unsigned int i=0; i<timeGrid; i++){
             tau=i*Data::beta/(double)timeGrid;
-            data2.matsubara_t_neg.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -i*M_PI*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) + Hinferior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
-            data2.matsubara_t_neg.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -i*M_PI*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) + Hinferior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
+            data2.matsubara_t_neg.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -i*M_PI*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) + 0.5 ).real(); // + Hinferior(tau, data1.mu-h, Data::hyb_c, Data::beta)
+            data2.matsubara_t_neg.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -i*M_PI*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) + 0.5 ).real(); // + Hinferior(tau, data1.mu+h, Data::hyb_c, Data::beta)
         }
         // Adding value at tau=beta
         data2.matsubara_t_neg.slice(timeGrid)(0,0)=1.0-data2.matsubara_t_neg.slice(0)(0,0);
         data2.matsubara_t_neg.slice(timeGrid)(1,1)=1.0-data2.matsubara_t_neg.slice(0)(1,1);
         break;
     case dG_dtau_positive:
-
+        for (unsigned int j=0; j<timeGrid; j++){
+            substractG_up.push_back( data1.matsubara_w.slice(j)(0,0) - 1.0/( iwnArr_l[j] - h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(1.0-n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+            substractG_down.push_back( data1.matsubara_w.slice(j)(1,1) - 1.0/( iwnArr_l[j] - h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+        }
         for(size_t i=0; i<timeGrid; i++){
             F_decal_up[2*i]=(-1.0*data1.iwnArr[i]*substractG_up[i]).real();
             F_decal_up[2*i+1]=(-1.0*data1.iwnArr[i]*substractG_up[i]).imag();
@@ -399,14 +444,17 @@ void FFTtools::fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<dou
         gsl_fft_complex_radix2_forward(F_decal_down, 1, timeGrid);
         for(size_t i=0; i<timeGrid; i++){
             tau=i*Data::beta/(double)timeGrid;
-            data_dg_dtau_pos.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) + Hpsuperior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
-            data_dg_dtau_pos.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) + Hpsuperior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
+            data_dg_dtau_pos.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) + Hpsuperior(tau, data1.mu-h, Data::hyb_c, Data::beta)).real(); // 
+            data_dg_dtau_pos.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/((double)timeGrid)-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) + Hpsuperior(tau, data1.mu-h, Data::hyb_c, Data::beta)).real(); //
         }
-        data_dg_dtau_pos.slice(timeGrid)(0,0)= -data1.mu0 - data_dg_dtau_pos.slice(0)(0,0);
-        data_dg_dtau_pos.slice(timeGrid)(1,1)= -data1.mu0 - data_dg_dtau_pos.slice(0)(1,1);
+        data_dg_dtau_pos.slice(timeGrid)(0,0)= -(data1.mu-h) - data_dg_dtau_pos.slice(0)(0,0);
+        data_dg_dtau_pos.slice(timeGrid)(1,1)= -(data1.mu-h) - data_dg_dtau_pos.slice(0)(1,1);
         break;
     case dG_dtau_negative:
-
+        for (unsigned int j=0; j<timeGrid; j++){
+            substractG_up.push_back( data1.matsubara_w.slice(j)(0,0) - 1.0/( iwnArr_l[j] - h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(1.0-n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+            substractG_down.push_back( data1.matsubara_w.slice(j)(1,1) - 1.0/( iwnArr_l[j] - h + data1.mu - Data::hyb_c/iwnArr_l[j] ) ); //- get_Hyb_AFM(n_a_up,Data::U,data1.mu)/(iwnArr_l[j]*iwnArr_l[j]) ) ); // Meant for the WeissGreen
+        }
         for(size_t i=0; i<timeGrid; i++){
             F_decal_up[2*i]=(-1.0*data1.iwnArr[i].imag()*substractG_up[i]).imag();
             F_decal_up[2*i+1]=(-1.0*data1.iwnArr[i].imag()*substractG_up[i]).real();
@@ -417,15 +465,17 @@ void FFTtools::fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<dou
         gsl_fft_complex_radix2_forward(F_decal_down, 1, timeGrid);
         for(size_t i=0; i<timeGrid; i++){
             tau=i*Data::beta/(double)timeGrid;
-            data_dg_dtau_neg.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) + Hpinferior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
-            data_dg_dtau_neg.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) + Hpinferior(tau, data1.mu0, Data::hyb_c, Data::beta) ).real();
+            data_dg_dtau_neg.slice(i)(0,0) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_up[2*i]+im*F_decal_up[2*i+1]) + Hpinferior(tau, data1.mu-h, Data::hyb_c, Data::beta) ).real();
+            data_dg_dtau_neg.slice(i)(1,1) = ( (1./Data::beta) * std::exp( -M_PI*i*im*(1.0/(double)timeGrid-1.0) ) * (F_decal_down[2*i]+im*F_decal_down[2*i+1]) + Hpinferior(tau, data1.mu-h, Data::hyb_c, Data::beta) ).real();
         }
-        data_dg_dtau_neg.slice(timeGrid)(0,0)= -data1.mu0 - data_dg_dtau_neg.slice(0)(0,0);
-        data_dg_dtau_neg.slice(timeGrid)(1,1)= -data1.mu0 - data_dg_dtau_neg.slice(0)(1,1);
+        data_dg_dtau_neg.slice(timeGrid)(0,0)= -(data1.mu-h) - data_dg_dtau_neg.slice(0)(0,0);
+        data_dg_dtau_neg.slice(timeGrid)(1,1)= -(data1.mu-h) - data_dg_dtau_neg.slice(0)(1,1);
         break;
     }
 }
+#endif
 
+#ifndef AFM
 void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false){
     /* DMFT loop */
     const Integrals integralsObj;
@@ -501,7 +551,7 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
         if (iter>2){
             for (size_t j=0; j<iwnArr_l.size(); j++) G0_diff+=std::abs(WeissGreenTmpA.slice(j)(0,0)-sublatt1.WeissGreen.matsubara_w.slice(j)(0,0));
             std::cout << "G0_diff: " << G0_diff << std::endl;
-            if (G0_diff<0.0005 && std::abs(n-sublatt1.n)<ROOT_FINDING_TOL && std::abs(n0-sublatt1.n)<ROOT_FINDING_TOL) converged=true; 
+            if (G0_diff<0.0001 && std::abs(n-sublatt1.n)<ROOT_FINDING_TOL && std::abs(n0-sublatt1.n)<ROOT_FINDING_TOL) converged=true; 
         }
         if (iter>2){ // Assess the convergence process 
             for (size_t j=0; j<iwnArr_l.size(); j++){
@@ -511,149 +561,107 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
         saveEachIt(sublatt1,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW);
         std::cout << "new n0: " << sublatt1.density_mu0(G0_density_mu0_m) <<  " for mu0: " << sublatt1.WeissGreen.get_mu0() << "\n";
         std::cout << "new n: " << sublatt1.density_mu(G_density_mu_m) << " for mu: " << sublatt1.WeissGreen.get_mu() << "\n";
-        std::cout << "double occupancy: " << sublatt1.dbl_occupancy(iter) << "\n";
+        std::cout << "double occupancy: " << sublatt1.double_occupancy() << "\n";
         std::cout << "iteration #" << iter << "\n";
         iter++;
     }
     GreenStuff::reset_counter();
 }
-
-void DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector<std::ofstream*> vec_sub_2_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false){
+#else
+void DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false){
     /* DMFT loop */
     const Integrals integralsObj;
     unsigned int iter=1;
     double G0_diff_up, G0_diff_down;
     // Starting density values at half-filling
-    double nA_up=0.45,nB_up=0.55,nA_down=0.55,nB_down=0.45;
-    double n0A_up,n0B_up,n0A_down,n0B_down;
+    double nA_up,nA_down;
     bool converged=false;
-    arma::Cube< std::complex<double> > WeissGreenTmpA(2,2,iwnArr_l.size(),arma::fill::zeros);//, WeissGreenTmpB(2,2,iwnArr_l.size()); // Initialization of the hybridization function.
+    arma::Cube< std::complex<double> > WeissGreenTmpA(2,2,iwnArr_l.size(),arma::fill::zeros);
     arma::Cube< std::complex<double> > G0_density_mu0_m_A(2,2,iwnArr_l.size()), G_density_mu_m_A(2,2,iwnArr_l.size());
-    arma::Cube< std::complex<double> > G0_density_mu0_m_B(2,2,iwnArr_l.size()), G_density_mu_m_B(2,2,iwnArr_l.size());
-    std::function<double(double)> wrapped_density_mu, wrapped_density_mu0;
+    arma::Cube< std::complex<double> > LocalGreen_inverse(2,2,iwnArr_l.size());
+    // To contain the inverse matrix of the LocalGreen object.
     for (size_t i=0; i<iwnArr_l.size(); i++){
-        sublatt1.Hyb.matsubara_w.slice(i)(0,0) = GreenStuff::get_hyb_c()/iwnArr_l[i]-get_Hyb_AFM(nA_down,GreenStuff::get_U(),sublatt1.WeissGreen.get_mu())/(iwnArr_l[i]*iwnArr_l[i]); // up
-        sublatt1.Hyb.matsubara_w.slice(i)(1,1) = GreenStuff::get_hyb_c()/iwnArr_l[i]-get_Hyb_AFM(nA_up,GreenStuff::get_U(),sublatt1.WeissGreen.get_mu())/(iwnArr_l[i]*iwnArr_l[i]); // down
-        sublatt2.Hyb.matsubara_w.slice(i)(0,0) = GreenStuff::get_hyb_c()/iwnArr_l[i]-get_Hyb_AFM(nB_down,GreenStuff::get_U(),sublatt2.WeissGreen.get_mu())/(iwnArr_l[i]*iwnArr_l[i]); // up
-        sublatt2.Hyb.matsubara_w.slice(i)(1,1) = GreenStuff::get_hyb_c()/iwnArr_l[i]-get_Hyb_AFM(nB_up,GreenStuff::get_U(),sublatt2.WeissGreen.get_mu())/(iwnArr_l[i]*iwnArr_l[i]); // down
+        sublatt1.Hyb.matsubara_w.slice(i)(0,0) = GreenStuff::get_hyb_c()/iwnArr_l[i]; //-get_Hyb_AFM(nA_down,GreenStuff::get_U(),sublatt1.WeissGreen.get_mu())/(iwnArr_l[i]*iwnArr_l[i]); // up
+        sublatt1.Hyb.matsubara_w.slice(i)(1,1) = GreenStuff::get_hyb_c()/iwnArr_l[i]; //-get_Hyb_AFM(nA_up,GreenStuff::get_U(),sublatt1.WeissGreen.get_mu())/(iwnArr_l[i]*iwnArr_l[i]); // down
     }
+    double h=0.1; // Staggered magnetization
     while (iter<=N_it && !converged){ // Everything has been designed to accomodate a bipartite lattice.
+        if (iter>1) 
+            h=0.0;
         G0_diff_up=0.0; G0_diff_down=0.0; // resetting G0_diff
         vec_sub_1_ofstream[0]->open(vecStr[0]+"_A_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app); // Gloc
         vec_sub_1_ofstream[1]->open(vecStr[1]+"_A_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app); // SE
         vec_sub_1_ofstream[2]->open(vecStr[2]+"_A_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app); //GW
-        vec_sub_2_ofstream[0]->open(vecStr[0]+"_B_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app); // Gloc
-        vec_sub_2_ofstream[1]->open(vecStr[1]+"_B_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app); // SE
-        vec_sub_2_ofstream[2]->open(vecStr[2]+"_B_Nit_"+std::to_string(iter)+".dat", std::ios::out | std::ios::app); //GW
         for (size_t j=0; j<iwnArr_l.size(); j++){
-            sublatt1.WeissGreen.matsubara_w.slice(j)(0,0)=1.0/(iwnArr_l[j]+sublatt1.WeissGreen.get_mu0()-sublatt1.Hyb.matsubara_w.slice(j)(0,0));
-            sublatt1.WeissGreen.matsubara_w.slice(j)(1,1)=1.0/(iwnArr_l[j]+sublatt1.WeissGreen.get_mu0()-sublatt1.Hyb.matsubara_w.slice(j)(1,1));
-            sublatt2.WeissGreen.matsubara_w.slice(j)(0,0)=1.0/(iwnArr_l[j]+sublatt2.WeissGreen.get_mu0()-sublatt2.Hyb.matsubara_w.slice(j)(0,0));
-            sublatt2.WeissGreen.matsubara_w.slice(j)(1,1)=1.0/(iwnArr_l[j]+sublatt2.WeissGreen.get_mu0()-sublatt2.Hyb.matsubara_w.slice(j)(1,1));
+            sublatt1.WeissGreen.matsubara_w.slice(j)(0,0)=1.0/(iwnArr_l[j]-h+sublatt1.WeissGreen.get_mu()-sublatt1.Hyb.matsubara_w.slice(j)(0,0));
+            sublatt1.WeissGreen.matsubara_w.slice(j)(1,1)=1.0/(iwnArr_l[j]+h+sublatt1.WeissGreen.get_mu()-sublatt1.Hyb.matsubara_w.slice(j)(1,1));
         }
-        sublatt1.update_impurity_self_energy_AFM(nA_up); // Builds Sigma(iwn). To begin with, mu=U/2.0.
-        sublatt2.update_impurity_self_energy_AFM(nB_up);
-        for (size_t j=0; j<iwnArr_l.size(); j++){
-            G0_density_mu0_m_A.slice(j)(0,0)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(0,0);
-            G0_density_mu0_m_A.slice(j)(1,1)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(1,1);
-            G0_density_mu0_m_B.slice(j)(0,0)=iwnArr_l[j]-sublatt2.Hyb.matsubara_w.slice(j)(0,0);
-            G0_density_mu0_m_B.slice(j)(1,1)=iwnArr_l[j]-sublatt2.Hyb.matsubara_w.slice(j)(1,1);
-            G_density_mu_m_A.slice(j)(0,0)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(0,0)-sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0);
-            G_density_mu_m_A.slice(j)(1,1)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(1,1)-sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1);
-            G_density_mu_m_B.slice(j)(0,0)=iwnArr_l[j]-sublatt2.Hyb.matsubara_w.slice(j)(0,0)-sublatt2.SelfEnergy.matsubara_w.slice(j)(0,0);
-            G_density_mu_m_B.slice(j)(1,1)=iwnArr_l[j]-sublatt2.Hyb.matsubara_w.slice(j)(1,1)-sublatt2.SelfEnergy.matsubara_w.slice(j)(1,1);
-        }
-        // Compute the various chemical potentials to get n_target
-        auto n_up_down_A = sublatt1.density_mu_AFM(G_density_mu_m_A);
-        nA_up = std::get<0>(n_up_down_A); nA_down = std::get<1>(n_up_down_A);
-        auto n_up_down_B = sublatt2.density_mu_AFM(G_density_mu_m_B);
-        nB_up = std::get<0>(n_up_down_B); nB_down = std::get<1>(n_up_down_B);
-        auto n0_up_down_A = sublatt1.density_mu0_AFM(G0_density_mu0_m_A);
-        n0A_up = std::get<0>(n0_up_down_A); n0A_down = std::get<1>(n0_up_down_A);
-        auto n0_up_down_B = sublatt2.density_mu0_AFM(G0_density_mu0_m_B);
-        n0B_up = std::get<0>(n0_up_down_B); n0B_down = std::get<1>(n0_up_down_B);
 
-        if ( ( std::abs((nA_up+nA_down)/2.0-sublatt1.n)>ROOT_FINDING_TOL ) && iter>1 ){ // iter > 1 is important
-            try{
-                wrapped_density_mu = [&](double mu){ return sublatt1.density_mu(mu,G_density_mu_m_A)-sublatt1.n; };
-                double mu_new = integralsObj.falsePosMethod(wrapped_density_mu,-20.,20.);
-                std::cout << "mu_new A at iter " << iter << ": " << mu_new << std::endl;
-                sublatt1.WeissGreen.update_mu(mu_new); // Updates mu from instance.
-            }catch (const std::exception& err){
-                std::cerr << err.what() << "\n";
-            }
+        sublatt1.update_impurity_self_energy_AFM(h); // Builds Sigma(iwn). To begin with, mu=U/2.0.
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            G_density_mu_m_A.slice(j)(0,0)=1.0/(iwnArr_l[j]+sublatt1.WeissGreen.get_mu()-h-sublatt1.Hyb.matsubara_w.slice(j)(0,0)-sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0))-1.0/iwnArr_l[j];
+            G_density_mu_m_A.slice(j)(1,1)=1.0/(iwnArr_l[j]+sublatt1.WeissGreen.get_mu()+h-sublatt1.Hyb.matsubara_w.slice(j)(1,1)-sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1))-1.0/iwnArr_l[j];
         }
-        if ( ( std::abs((nB_up+nB_down)/2.0-sublatt2.n)>ROOT_FINDING_TOL ) && iter>1 ){ // iter > 1 is important
-            try{
-                wrapped_density_mu = [&](double mu){ return sublatt2.density_mu(mu,G_density_mu_m_B)-sublatt1.n; };
-                double mu_new = integralsObj.falsePosMethod(wrapped_density_mu,-20.,20.);
-                std::cout << "mu_new B at iter " << iter << ": " << mu_new << std::endl;
-                sublatt2.WeissGreen.update_mu(mu_new); // Updates mu from instance.
-            }catch (const std::exception& err){
-                std::cerr << err.what() << "\n";
-            }
-        }
-        if ( ( std::abs((n0A_up+n0A_down)/2.0-sublatt1.n)>ROOT_FINDING_TOL ) ){
-            try{
-                wrapped_density_mu0 = [&](double mu0){ return sublatt1.density_mu(mu0,G0_density_mu0_m_A)-sublatt1.n; };
-                double mu0_new = integralsObj.falsePosMethod(wrapped_density_mu0,-20.,20.);
-                std::cout << "mu0_new A at iter " << iter << ": " << mu0_new << std::endl;
-                sublatt1.WeissGreen.update_mu0(mu0_new); // Updates mu from instance, even though it is a static member variable.
-            }catch (const std::exception& err){
-                std::cerr << err.what() << "\n";
-            }
-        }
-        if ( ( std::abs((n0B_up+n0B_down)/2.0-sublatt2.n)>ROOT_FINDING_TOL ) ){
-            try{
-                wrapped_density_mu0 = [&](double mu0){ return sublatt2.density_mu(mu0,G0_density_mu0_m_B)-sublatt1.n; };
-                double mu0_new = integralsObj.falsePosMethod(wrapped_density_mu0,-20.,20.);
-                std::cout << "mu0_new B at iter " << iter << ": " << mu0_new << std::endl;
-                sublatt2.WeissGreen.update_mu0(mu0_new); // Updates mu from instance, even though it is a static member variable.
-            }catch (const std::exception& err){
-                std::cerr << err.what() << "\n";
-            }
-        }
+        FFTtools Gloc_tau_fft;
+        Gloc_tau_fft.fft_w2t(G_density_mu_m_A,sublatt1.LocalGreen.matsubara_t_pos);
+        Gloc_tau_fft.fft_w2t(G_density_mu_m_A,sublatt1.LocalGreen.matsubara_t_pos,1);
+        for (size_t j=0; j<=2*GreenStuff::N_tau; j++) sublatt1.LocalGreen.matsubara_t_pos.slice(j)(0,0) += -0.5;
+        for (size_t j=0; j<=2*GreenStuff::N_tau; j++) sublatt1.LocalGreen.matsubara_t_pos.slice(j)(1,1) += -0.5;
+        // Compute the various chemical potentials to get n_target
+        // auto n_up_down_A = sublatt1.density_mu_AFM(G_density_mu_m_A);
+        // nA_up = std::get<0>(n_up_down_A); nA_down = std::get<1>(n_up_down_A);
+        nA_up = -1.0*sublatt1.LocalGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(0,0); nA_down = -1.0*sublatt1.LocalGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(1,1);
+        std::cout << "nA_up: " << nA_up << " and nA_down: " << nA_down << " for mu: " << sublatt1.WeissGreen.get_mu() << "\n";
         // Determining G_loc
         for (size_t j=0; j<iwnArr_l.size(); j++){
+            //std::cout << j << "\n";
             #if DIM == 1
-            std::function<std::complex<double>(double,std::complex<double>)> G_latt_A_up = [&](double kx, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt1.WeissGreen.get_mu() - sublatt2.SelfEnergy.matsubara_w.slice(j)(0,0)) );
+            std::function<std::complex<double>(double,std::complex<double>)> G_latt_AA_up = [&](double kx, std::complex<double> iwn){
+                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1)) );
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(2.*M_PI)*integralsObj.I1D(G_latt_A_up,-M_PI,M_PI,iwnArr_l[j]);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(M_PI)*integralsObj.I1D(G_latt_AA_up,-M_PI/2.0,M_PI/2.0,iwnArr_l[j],0.000001,300);
             //
-            std::function<std::complex<double>(double,std::complex<double>)> G_latt_A_down = [&](double kx, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt1.WeissGreen.get_mu() - sublatt2.SelfEnergy.matsubara_w.slice(j)(1,1)) );
+            std::function<std::complex<double>(double,std::complex<double>)> G_latt_AA_down = [&](double kx, std::complex<double> iwn){
+                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0)) );
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(1,1)=1./(2.*M_PI)*integralsObj.I1D(G_latt_A_down,-M_PI,M_PI,iwnArr_l[j]);
-            //
-            std::function<std::complex<double>(double,std::complex<double>)> G_latt_B_up = [&](double kx, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt2.WeissGreen.get_mu() - sublatt2.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt2.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0)) );
+            sublatt1.LocalGreen.matsubara_w.slice(j)(1,1)=1./(M_PI)*integralsObj.I1D(G_latt_AA_down,-M_PI/2.0,M_PI/2.0,iwnArr_l[j],0.000001,300);
+            // Off-diagonal parts AB and BA, which are equal with nearest-neighbour hopping only
+            std::function<std::complex<double>(double,std::complex<double>)> G_latt_AB = [&](double kx, std::complex<double> iwn){
+                return epsilonk(kx)/( ( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) )*( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) ) - epsilonk(kx)*epsilonk(kx) );
             };
-            sublatt2.LocalGreen.matsubara_w.slice(j)(0,0)=1./(2.*M_PI)*integralsObj.I1D(G_latt_B_up,-M_PI,M_PI,iwnArr_l[j]);
-            //
-            std::function<std::complex<double>(double,std::complex<double>)> G_latt_B_down = [&](double kx, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt2.WeissGreen.get_mu() - sublatt2.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt2.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1)) );
-            };
-            sublatt2.LocalGreen.matsubara_w.slice(j)(1,1)=1./(2.*M_PI)*integralsObj.I1D(G_latt_B_down,-M_PI,M_PI,iwnArr_l[j]);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(1,0)=1./(M_PI)*integralsObj.I1D(G_latt_AB,-M_PI/2.0,M_PI/2.0,iwnArr_l[j],0.000001,300);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,1)=sublatt1.LocalGreen.matsubara_w.slice(j)(1,0);
+            LocalGreen_inverse.slice(j) = arma::inv(sublatt1.LocalGreen.matsubara_w.slice(j));
+            
             #elif DIM == 2
-            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt = [&](double kx, double ky, std::complex<double> iwn){
-                return 1.0/(iwn + sublatt1.WeissGreen.get_mu() - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt_AA_up = [&](double kx, double ky, std::complex<double> iwn){
+                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx,ky)*epsilonk(kx,ky)/( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) ) );
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.I2D(G_latt,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j]);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(M_PI*M_PI)*integralsObj.I2D(G_latt_AA_up,-M_PI/2.0,M_PI/2.0,-M_PI/2.0,M_PI/2.0,iwnArr_l[j],0.0001,15);
+            //
+            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt_AA_down = [&](double kx, double ky, std::complex<double> iwn){
+                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx,ky)*epsilonk(kx,ky)/( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) ) );
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(1,1)=1./(M_PI*M_PI)*integralsObj.I2D(G_latt_AA_down,-M_PI/2.0,M_PI/2.0,-M_PI/2.0,M_PI/2.0,iwnArr_l[j],0.0001,15);
+            //
+            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt_AB = [&](double kx, double ky, std::complex<double> iwn){
+                return epsilonk(kx,ky)/( ( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) )*( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) ) - epsilonk(kx,ky)*epsilonk(kx,ky) );
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(1,0)=1./(M_PI*M_PI)*integralsObj.I2D(G_latt_AB,-M_PI/2.0,M_PI/2.0,-M_PI/2.0,M_PI/2.0,iwnArr_l[j],0.0001,15);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,1)=sublatt1.LocalGreen.matsubara_w.slice(j)(1,0);
+            LocalGreen_inverse.slice(j) = arma::inv(sublatt1.LocalGreen.matsubara_w.slice(j));
             #endif
         }
         // Updating the hybridization function for next round.
         for (size_t j=0; j<iwnArr_l.size(); j++){
-            sublatt1.Hyb.matsubara_w.slice(j)(0,0) = iwnArr_l[j] + sublatt1.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - 1.0/sublatt1.LocalGreen.matsubara_w.slice(j)(0,0);
-            sublatt1.Hyb.matsubara_w.slice(j)(1,1) = iwnArr_l[j] + sublatt1.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - 1.0/sublatt1.LocalGreen.matsubara_w.slice(j)(1,1);
-            sublatt2.Hyb.matsubara_w.slice(j)(0,0) = iwnArr_l[j] + sublatt2.WeissGreen.get_mu() - sublatt2.SelfEnergy.matsubara_w.slice(j)(0,0) - 1.0/sublatt2.LocalGreen.matsubara_w.slice(j)(0,0);
-            sublatt2.Hyb.matsubara_w.slice(j)(1,1) = iwnArr_l[j] + sublatt2.WeissGreen.get_mu() - sublatt2.SelfEnergy.matsubara_w.slice(j)(1,1) - 1.0/sublatt2.LocalGreen.matsubara_w.slice(j)(1,1);
+            sublatt1.Hyb.matsubara_w.slice(j)(0,0) = (1.0-ALPHA)*(iwnArr_l[j] + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - LocalGreen_inverse.slice(j)(0,0)) + ALPHA*(sublatt1.Hyb.matsubara_w.slice(j)(0,0));
+            sublatt1.Hyb.matsubara_w.slice(j)(1,1) = (1.0-ALPHA)*(iwnArr_l[j] + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - LocalGreen_inverse.slice(j)(1,1)) + ALPHA*(sublatt1.Hyb.matsubara_w.slice(j)(1,1));
         }
         if (iter>2){
             for (size_t j=0; j<iwnArr_l.size(); j++) G0_diff_up+=std::abs(WeissGreenTmpA.slice(j)(0,0)-sublatt1.WeissGreen.matsubara_w.slice(j)(0,0));
             for (size_t j=0; j<iwnArr_l.size(); j++) G0_diff_down+=std::abs(WeissGreenTmpA.slice(j)(1,1)-sublatt1.WeissGreen.matsubara_w.slice(j)(1,1));
             std::cout << "G0_diff_up: " << G0_diff_up << " and G0_diff_down: " << G0_diff_down << std::endl;
-            if (G0_diff_up<0.0005 && G0_diff_down<0.0005 && std::abs((nA_up+nA_down)/2.0-sublatt1.n)<ROOT_FINDING_TOL && std::abs((n0A_up+n0A_down)/2.0-sublatt1.n)<ROOT_FINDING_TOL) converged=true; 
+            if (G0_diff_up<0.0001 && G0_diff_down<0.0001) converged=true; 
         }
         if (iter>2){ // Assess the convergence process 
             for (size_t j=0; j<iwnArr_l.size(); j++){
@@ -662,19 +670,14 @@ void DMFTloopAFM(IPT2::DMFTproc& sublatt1, IPT2::DMFTproc& sublatt2, std::vector
             }
         }
         saveEachIt_AFM(sublatt1,*vec_sub_1_ofstream[0],*vec_sub_1_ofstream[1],*vec_sub_1_ofstream[2]);
-        saveEachIt_AFM(sublatt2,*vec_sub_2_ofstream[0],*vec_sub_2_ofstream[1],*vec_sub_2_ofstream[2]);
-        std::cout << "new n0A: " << sublatt1.density_mu(G0_density_mu0_m_A) <<  " for mu0: " << sublatt1.WeissGreen.get_mu0() << "\n";
-        std::cout << "new nA: " << sublatt1.density_mu(G_density_mu_m_A) << " for mu: " << sublatt1.WeissGreen.get_mu() << "\n";
-        std::cout << "double occupancy A: " << sublatt1.dbl_occupancy(iter) << "\n";
-        std::cout << "new n0B: " << sublatt2.density_mu(G0_density_mu0_m_B) <<  " for mu0: " << sublatt2.WeissGreen.get_mu0() << "\n";
-        std::cout << "new nB: " << sublatt2.density_mu(G_density_mu_m_B) << " for mu: " << sublatt2.WeissGreen.get_mu() << "\n";
-        std::cout << "double occupancy B: " << sublatt2.dbl_occupancy(iter) << "\n";
-        std::cout << "iteration #" << iter << "\n";
+        std::cout << "iteration #" << iter << " with h: " << h << "\n";
         iter++;
     }
     GreenStuff::reset_counter();
 }
+#endif
 
+#ifndef AFM
 void saveEachIt(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept{
     for (size_t j=0; j<sublatt.LocalGreen.matsubara_w.n_slices; j++){
         if (j==0){ // The "/" is important when reading files.
@@ -710,13 +713,14 @@ void saveEachIt(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::ofstr
     ofSE.close();
     ofGW.close();
 }
-
-void saveEachIt_AFM(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGW) noexcept{
+#else
+void saveEachIt_AFM(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGloc_tau) noexcept{
     for (size_t j=0; j<sublatt.LocalGreen.matsubara_w.n_slices; j++){
         if (j==0){ // The "/" is important when reading files.
             ofGloc << "/iwn" << "\t\t" << "Re G_loc up iwn" << "\t\t" << "Im G_loc up iwn" << "\t\t" << "Re G_loc down iwn" << "\t\t" << "Im G_loc down iwn" << "\n";
             ofSE << "/iwn" << "\t\t" << "Re SE up iwn" << "\t\t" << "Im SE up iwn" << "\t\t" << "Re SE down iwn" << "\t\t" << "Im SE down iwn" << "\n";
-            ofGW << "/iwn" << "\t\t" << "Re G0 up iwn" << "\t\t" << "Im G0 up iwn" << "\t\t" << "Re G0 down iwn" << "\t\t" << "Im G0 down iwn" << "\n";
+            // ofGW << "/iwn" << "\t\t" << "Re G0 up iwn" << "\t\t" << "Im G0 up iwn" << "\t\t" << "Re G0 down iwn" << "\t\t" << "Im G0 down iwn" << "\n";
+            ofGloc_tau << "/tau" << "\t\t" << "G_loc tau up" << "\t\t" << "G_loc tau down" << "\n";
 
             ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
             ofGloc << sublatt.LocalGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // up
@@ -730,11 +734,15 @@ void saveEachIt_AFM(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::o
             ofSE << sublatt.SelfEnergy.matsubara_w.slice(j)(1,1).real() << "\t\t"; // down
             ofSE << sublatt.SelfEnergy.matsubara_w.slice(j)(1,1).imag() << "\n"; // down
             //
-            ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // up
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\t\t"; // up
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).real() << "\t\t"; // down
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).imag() << "\n"; // down
+            // ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // up
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\t\t"; // up
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).real() << "\t\t"; // down
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).imag() << "\n"; // down
+            //
+            ofGloc_tau << j*GreenStuff::get_beta()/sublatt.LocalGreen.matsubara_w.n_slices << "\t\t";
+            ofGloc_tau << sublatt.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t";
+            ofGloc_tau << sublatt.LocalGreen.matsubara_t_pos.slice(j)(1,1) << "\n";
         }
         else{
             ofGloc << iwnArr_l[j].imag() << "\t\t"; // AAup
@@ -747,42 +755,50 @@ void saveEachIt_AFM(const IPT2::DMFTproc& sublatt, std::ofstream& ofGloc, std::o
             ofSE << sublatt.SelfEnergy.matsubara_w.slice(j)(0,0).imag() << "\t\t"; // up
             ofSE << sublatt.SelfEnergy.matsubara_w.slice(j)(1,1).real() << "\t\t"; // down
             ofSE << sublatt.SelfEnergy.matsubara_w.slice(j)(1,1).imag() << "\n"; // down
-            ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // up
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\t\t"; // up
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).real() << "\t\t"; // down
-            ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).imag() << "\n"; // down
+            // ofGW << iwnArr_l[j].imag() << "\t\t"; // AAup
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).real() << "\t\t"; // up
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(0,0).imag() << "\t\t"; // up
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).real() << "\t\t"; // down
+            // ofGW << sublatt.WeissGreen.matsubara_w.slice(j)(1,1).imag() << "\n"; // down
+            ofGloc_tau << j*GreenStuff::get_beta()/sublatt.LocalGreen.matsubara_w.n_slices << "\t\t";
+            ofGloc_tau << sublatt.LocalGreen.matsubara_t_pos.slice(j)(0,0) << "\t\t"; // up
+            ofGloc_tau << sublatt.LocalGreen.matsubara_t_pos.slice(j)(1,1) << "\n"; // down
         }
     }
+    ofGloc_tau << GreenStuff::get_beta() << "\t\t";
+    ofGloc_tau << sublatt.LocalGreen.matsubara_t_pos.slice(sublatt.LocalGreen.matsubara_w.n_slices)(0,0) << "\t\t"; // up
+    ofGloc_tau << sublatt.LocalGreen.matsubara_t_pos.slice(sublatt.LocalGreen.matsubara_w.n_slices)(1,1) << "\n"; // down
     ofGloc.close();
     ofSE.close();
-    ofGW.close();
+    // ofGW.close();
+    ofGloc_tau.close();
 }
+#endif
 
 double Hsuperior(double tau, double mu, double c, double beta){
     double z1(-0.5*mu + 0.5*sqrt(mu*mu+4*c));
-    double z2(-0.5*mu-0.5*sqrt(mu*mu+4*c));
+    double z2(-0.5*mu - 0.5*sqrt(mu*mu+4*c));
     
     return -z1/(z1-z2)*1./(exp(z1*(tau-beta))+exp(z1*tau)) - z2/(z2-z1)*1./(exp(z2*(tau-beta))+exp(z2*tau));
 }
 
 double Hpsuperior(double tau, double mu, double c, double beta){
     double z1(-0.5*mu + 0.5*sqrt(mu*mu+4*c));
-    double z2(-0.5*mu-0.5*sqrt(mu*mu+4*c));
+    double z2(-0.5*mu - 0.5*sqrt(mu*mu+4*c));
 
     return z1*z1/(z1-z2)*1./(exp(z1*(tau-beta))+exp(z1*tau)) + z2*z2/(z2-z1)*1./(exp(z2*(tau-beta))+exp(z2*tau));
 }
 
 double Hinferior(double tau, double mu, double c, double beta){
     double z1(-0.5*mu + 0.5*sqrt(mu*mu+4*c));
-    double z2(-0.5*mu-0.5*sqrt(mu*mu+4*c));
+    double z2(-0.5*mu - 0.5*sqrt(mu*mu+4*c));
     
     return z1/(z1-z2)*1.0/(exp(z1*(beta-tau))+exp(-z1*tau)) + z2/(z2-z1)*1./(exp(z2*(beta-tau))+exp(-z2*tau));
 }
 
 double Hpinferior(double tau, double mu, double c, double beta){
     double z1(-0.5*mu + 0.5*sqrt(mu*mu+4*c));
-    double z2(-0.5*mu-0.5*sqrt(mu*mu+4*c));
+    double z2(-0.5*mu - 0.5*sqrt(mu*mu+4*c));
     
     return z1*z1/(z1-z2)*1.0/(exp(z1*(beta-tau))+exp(-z1*tau))  + z2*z2/(z2-z1)*1./(exp(z2*(beta-tau))+exp(-z2*tau));
 }

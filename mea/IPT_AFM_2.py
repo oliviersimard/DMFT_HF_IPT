@@ -67,8 +67,8 @@ def get_iwn_to_tau(G_iwn, beta : float, type_of="positive"):
 
 if __name__ == "__main__":
     ##################################### parameters ############################################
-    type_spline = "linear" # can either be linear or cubic
-    dim=1 # Can be one or two
+    type_spline = "cubic" # can either be linear or cubic
+    dim=2 # Can be one or two
     #beta=2.0
     #U=2.0
     Ntau=1024  # Must be even, due to mirroring of the Matsubara frequencies. In 2d, set at least 512
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     #Sigma_Hartree_2nd = np.ndarray((2*Ntau+1,2,2,),dtype=float) # self-energy second-order Hartree
     
     for U in np.arange(3.0,3.1,2.0):
-        for beta in np.arange(25.0,25.1,1.0):
+        for beta in np.arange(30.0,30.1,1.0):
             print("U: ", U, " and beta: ", beta)
             it=0 # DMFT iteration initialization
             is_converged = False
