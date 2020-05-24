@@ -123,11 +123,11 @@ void DMFTproc::update_impurity_self_energy_AFM(double h){ // Returns the full pa
     double n0_up = -1.0*WeissGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(0,0), n0_down = -1.0*WeissGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(1,1);
     std::cout << "n0A_up: " << n0_up << " and n0A_down: " << n0_down << " for mu0: " << WeissGreen.get_mu0() << "\n";
     for (size_t i=0; i<=2*GreenStuff::N_tau; i++){
-        sigma_Hartree_2nd_up += GreenStuff::beta/(2.0*GreenStuff::N_tau)*WeissGreen.matsubara_t_pos.slice(i)(1,1)*WeissGreen.matsubara_t_neg.slice(i)(1,1);
-        sigma_Hartree_2nd_down += GreenStuff::beta/(2.0*GreenStuff::N_tau)*WeissGreen.matsubara_t_pos.slice(i)(0,0)*WeissGreen.matsubara_t_neg.slice(i)(0,0);
+        sigma_Hartree_2nd_up += 1.0*GreenStuff::beta/(2.0*GreenStuff::N_tau)*WeissGreen.matsubara_t_pos.slice(i)(1,1)*WeissGreen.matsubara_t_neg.slice(i)(1,1);
+        sigma_Hartree_2nd_down += 1.0*GreenStuff::beta/(2.0*GreenStuff::N_tau)*WeissGreen.matsubara_t_pos.slice(i)(0,0)*WeissGreen.matsubara_t_neg.slice(i)(0,0);
     }
-    sigma_Hartree_2nd_up *= GreenStuff::U*GreenStuff::U*(n0_up-0.5);
-    sigma_Hartree_2nd_down *= GreenStuff::U*GreenStuff::U*(n0_down-0.5);
+    sigma_Hartree_2nd_up *= GreenStuff::U*GreenStuff::U*(n0_up-0.5); // -0.5
+    sigma_Hartree_2nd_down *= GreenStuff::U*GreenStuff::U*(n0_down-0.5); // -0.5
     for (size_t i=0; i<2*GreenStuff::N_tau; i++){
         SelfEnergy.matsubara_w.slice(i)(0,0) = GreenStuff::U*(n0_down-0.5) + sigma_Hartree_2nd_up - SelfEnergy.matsubara_w.slice(i)(0,0);
         SelfEnergy.matsubara_w.slice(i)(1,1) = GreenStuff::U*(n0_up-0.5) + sigma_Hartree_2nd_down - SelfEnergy.matsubara_w.slice(i)(1,1);

@@ -6,6 +6,7 @@ from re import findall
 from shutil import copy2
 from glob import glob
 from time import sleep
+from optparse import OptionParser
 
 plt.rc('font', family='serif')
 plt.rc('text', usetex=True)
@@ -48,19 +49,21 @@ def get_params_with_many_Ntau(Us : list, betas : list, dict_params : dict) -> di
     return dict_params
 
 
-def extract_largest_int(list_str : list) -> tuple:
+def extract_largest_int(list_str : list, cond_to_select_file : str = "") -> tuple:
     """
         This function extracts the highest number associated with the iteration number from a set of files.
+        It does so for a subset of the files matching the condition imposed to files (cond_to_select_file).
     """
     integ_num = -1
     file_largest_int=""
     for el in list_str:
-        if any(char.isdigit() for char in el):
-            el_tmp=el.replace('.dat','')
-            tail_int = int(el_tmp.split("_")[-1])
-            if tail_int > integ_num and tail_int < MAXVAL:
-                integ_num=tail_int
-                file_largest_int=el
+        if el.count(cond_to_select_file) > 1:
+            if any(char.isdigit() for char in el):
+                el_tmp=el.replace('.dat','')
+                tail_int = int(el_tmp.split("_")[-1])
+                if tail_int > integ_num and tail_int < MAXVAL:
+                    integ_num=tail_int
+                    file_largest_int=el
     return integ_num, file_largest_int
 
 def rearrange_files_into_dir(path_to_root : str) -> None:
@@ -124,11 +127,11 @@ def get_according_to_condition(path : str, funct) -> list:
     Us = []
     betas = []
     # navigating through the directory containing the data
-    for root, dirs, files in os.walk(u"./data_test_IPT"):
+    for root, dirs, files in os.walk(path):
         path = root.split(os.sep) # os.sep is equivalent to "/"
         print( (len(path)-1)*'---', os.path.basename(root) )
         if files != []:
-            largest_int, file_largest_int = extract_largest_int(files)
+            largest_int, file_largest_int = extract_largest_int(files,"tau")
             Ntau = int(findall(r"(?<=N_tau_)(\d+)",file_largest_int)[0])
             beta = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",file_largest_int)[0])
             U = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",file_largest_int)[0])
@@ -164,7 +167,13 @@ def get_according_to_condition(path : str, funct) -> list:
 
 if __name__=="__main__":
 
-    path = u"./data_test_IPT"
+    parser = OptionParser()
+
+    parser.add_option("--data", dest="path", default=u"./data_test_IPT")
+    (options, args) = parser.parse_args()
+
+    path = str(options.path)
+
     # if the files are all scattered in the target directory, the files are rearranged. Otherwise, it is passed.
     rearrange_files_into_dir(path)
 

@@ -48,9 +48,9 @@ int main(int argc, char** argv){
     // HDF5 business
     H5::H5File* file = nullptr;
     #ifdef INFINITE
-    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_q)+"_isjj_"+std::to_string(is_jj)+"_infinite_ladder_sum.hdf5");
+    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_isjj_"+std::to_string(is_jj)+"_infinite_ladder_sum.hdf5");
     #else
-    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_q)+"_isjj_"+std::to_string(is_jj)+"_single_ladder_sum.hdf5");
+    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_isjj_"+std::to_string(is_jj)+"_single_ladder_sum.hdf5");
     #endif
     const H5std_string FILE_NAME( filename );
     const unsigned int DATA_SET_DIM = Ntau;
