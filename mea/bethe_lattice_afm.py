@@ -63,8 +63,8 @@ if __name__ == "__main__":
     SE_tau = np.ndarray((2*Ntau+1,2,2,),dtype=float) # self-energy (tau)
     #Sigma_Hartree_2nd = np.ndarray((2*Ntau+1,2,2,),dtype=float) # self-energy second-order Hartree
     e_arr = np.array([de*(e-Ne) for e in range(1,2*Ne)],dtype=float)
-    for U in np.arange(6.0,8.1,1.0):
-        for beta in np.arange(5.0,50.1,3.0):
+    for U in np.arange(4.0,8.1,1.0):
+        for beta in np.arange(20.0,50.1,3.0):
             print("U: ", U, " and beta: ", beta)
             it=0 # DMFT iteration initialization
             is_converged = False
@@ -191,13 +191,13 @@ if __name__ == "__main__":
                     for j,e in enumerate(e_arr):
                         GAA_latt_up_e[j] = DOS(e)/( iwn + mu - h - SE[i,0,0] - e**2/( iwn + mu + h - SE[i,1,1] ) )
                         GAA_latt_down_e[j] = DOS(e)/( iwn + mu + h - SE[i,1,1] - e**2/( iwn + mu - h - SE[i,0,0] ) )
-                        GAB_latt_up_e[j] = DOS(e)*e/( ( iwn + mu - h - SE[i,0,0] )*( iwn + mu + h - SE[i,1,1] ) - e**2 )
+                        # GAB_latt_up_e[j] = DOS(e)*e/( ( iwn + mu - h - SE[i,0,0] )*( iwn + mu + h - SE[i,1,1] ) - e**2 )
                     GAA_up_loc = de*np.sum(GAA_latt_up_e) #np.trapz(GAA_latt_up_e,e_arr) #up
                     GAA_down_loc = de*np.sum(GAA_latt_down_e) #np.trapz(GAA_latt_down_e,e_arr) #down
-                    GAB_up_loc = de*np.sum(GAB_latt_up_e) #np.trapz(GAB_latt_up_e,e_arr) # off-diagonal terms
+                    # GAB_up_loc = de*np.sum(GAB_latt_up_e) #np.trapz(GAB_latt_up_e,e_arr) # off-diagonal terms
                     # solving for inverse Gloc up and down
-                    G_alpha_beta[0,0]=GAA_up_loc; G_alpha_beta[0,1]=GAB_up_loc
-                    G_alpha_beta[1,0]=GAB_up_loc; G_alpha_beta[1,1]=GAA_down_loc
+                    G_alpha_beta[0,0]=GAA_up_loc; G_alpha_beta[0,1]=0.0 # GAB_up_loc
+                    G_alpha_beta[1,0]=0.0; G_alpha_beta[1,1]=GAA_down_loc
                     G_alpha_beta_mat[i,:,:] = G_alpha_beta # np.linalg.inv(G_alpha_beta)
             
                 # update the hybdridisation function and set Weiss Green's function for the next iteration
@@ -206,11 +206,11 @@ if __name__ == "__main__":
                     G0[i,0,0] = (1.0-alpha)*( 1.0/( iwn + mu - G_alpha_beta_mat[i,1,1] ) ) + alpha*( G0[i,0,0] ) # up Have to search for mu away from half-filling
                     G0[i,1,1] = (1.0-alpha)*( 1.0/( iwn + mu - G_alpha_beta_mat[i,0,0] ) ) + alpha*( G0[i,1,1] ) # down
                 
-                with open("output.dat","w") as f:
-                    for i in range(len(iwn_array)):
-                        f.write("{0:.6f}  {1:.6f}  {2:.6}\n".format(iwn_array[i].imag,G0[i,0,0].imag,G0[i,1,1].imag))
-                f.close()
-                exit(0)
+                # with open("output.dat","w") as f:
+                #     for i in range(len(iwn_array)):
+                #         f.write("{0:.6f}  {1:.6f}  {2:.6}\n".format(iwn_array[i].imag,G0[i,0,0].imag,G0[i,1,1].imag))
+                # f.close()
+                # exit(0)
                 # plt.figure(5)
                 # plt.plot(list(map(lambda x: x.imag,iwn_array)),list(map(lambda x: x.imag,G0[:,0,0])),marker='x',ms=2.5,c="red")
                 # plt.plot(list(map(lambda x: x.imag,iwn_array)),list(map(lambda x: x.imag,G0[:,1,1])),marker='x',ms=2.5,c="green")

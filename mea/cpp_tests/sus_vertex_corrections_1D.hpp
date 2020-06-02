@@ -17,7 +17,7 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 //static bool slaves_can_write_in_file = false; // This prevents that the slave processes
 static int root_process = 0;
 
-// #define INFINITE
+#define INFINITE
 
 typedef struct{
     size_t k_tilde;

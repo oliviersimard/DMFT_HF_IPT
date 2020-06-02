@@ -201,7 +201,7 @@ std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,st
 
         result = 0.5*dk*funct(k0,iwn)+0.5*dk*funct(kf,iwn)+dk*resultSumNk;
 
-        is_converged = (std::abs(prevResult-result)>tol) ? false : true;
+        is_converged = (std::abs(prevResult-result)>tol && iter>1) ? false : true;
 
         if (is_converged)
             break;

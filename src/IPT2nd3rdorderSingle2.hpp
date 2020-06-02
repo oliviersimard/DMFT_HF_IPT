@@ -13,7 +13,7 @@
 #include "integral_utils.hpp"
 
 #define TOL 0.000000001
-#define ALPHA 0.1 // Parameter to mix the Hybridisation function between the different iterations (current and previous ones)
+#define ALPHA 0.05 // Parameter to mix the Hybridisation function between the different iterations (current and previous ones)
 
 //namespace IPT2{ class DMFTproc; };
 struct GreenStuff;

@@ -16,7 +16,7 @@ extern "C" {
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
 #define MULT_N_TAU 2 // Has to be an even number
-#define AFM
+//#define AFM
 
 // Some declarations
 namespace IPT2{ class DMFTproc; };

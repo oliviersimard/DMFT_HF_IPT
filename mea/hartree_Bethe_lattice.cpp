@@ -8,7 +8,7 @@
 #include <functional>
 #include <assert.h>
 
-#define MAXITER 50
+#define MAXITER 100
 #define MAX_ITER_INTEGRAL 40
 #define MINTOL 1e-4
 
@@ -25,15 +25,14 @@ struct stat info = {0};
 
 int main(int argc, char ** argv){
  
-	double U,beta,ek,n0_up,n0_down,G_0_up_diff,G_0_down_diff;
-    const double beta_max=40.0, beta_min=5.0, beta_step=1.0;
-    const double U_max=7.0, U_min=6.0, U_step=1.0;
+	double U,beta,ek,n0_up,n0_down,G_0_up_diff,G_0_down_diff,h;
+    const double beta_max=50.0, beta_min=5.0, beta_step=1.0;
+    const double U_max=10.0, U_min=1.0, U_step=1.0;
 	const unsigned int Nomega=2048;
     const unsigned int N_e=1000; // Energy discretization
-    const double e_max=2.0, alpha=0.1;
+    const double e_max=2.0, alpha=0.05;
     const double de=e_max/(double)N_e;
     double mu=0.0;
-    double h=0.1;
     std::vector< std::complex<double> > G0_up(2*Nomega,0), G0_down(2*Nomega,0), G0_tmp_up(2*Nomega,0), G0_tmp_down(2*Nomega,0);
     std::vector< std::complex<double> > SE_up(2*Nomega,0), SE_down(2*Nomega,0); 
     std::vector< std::complex<double> > Gloc_up(2*Nomega,0), Gloc_down(2*Nomega,0);
@@ -42,14 +41,15 @@ int main(int argc, char ** argv){
     std::vector<double> G0_tau_up(2*Nomega+1,0), G0_tau_down(2*Nomega+1,0);
     std::vector<double> SE_tau_up(2*Nomega+1,0), SE_tau_down(2*Nomega+1,0);
     std::vector<double> Gloc_tau_up(2*Nomega+1,0), Gloc_tau_down(2*Nomega+1,0);
-    std::vector<double> e_arr;
-    for (int e=1; e<2*N_e; e++){
-        e_arr.push_back( de*(e-(double)N_e) );
-    }
+    // std::vector<double> e_arr;
+    // for (int e=1; e<2*N_e; e++){
+    //     e_arr.push_back( de*(e-(double)N_e) );
+    // }
   
     for (beta=beta_min; beta<=beta_max; beta+=beta_step){
         double delta_tau = beta/(2.0*Nomega);
         // Initializing arrays
+        iwn_array.clear();
         for (signed int i=-(signed int)Nomega; i<(signed int)Nomega; i++){
             iwn_array.push_back( std::complex<double>( 0.0, (2.0*i+1.0)*M_PI/beta ) );
         }
@@ -58,6 +58,9 @@ int main(int argc, char ** argv){
             std::cout << "\n\n" << "beta: " << beta << " U: " << U << "\n\n";
             bool is_converged=false;
             unsigned int iter=0;
+            h=0.2;
+            std::fill(G0_up.begin(),G0_up.end(),0);
+            std::fill(G0_down.begin(),G0_down.end(),0);
 
             // Initialize the weiss Green's function with semicircular DOS. (Bethe lattice)
             for (size_t i=0; i<2*Nomega; i++){
@@ -146,15 +149,16 @@ int main(int argc, char ** argv){
                         return DOS(e)/( iwn_array[i] + mu - h - SE_up[i] - e*e/( iwn_array[i] + mu + h - SE_down[i] ) );
                     };
                     auto GAA_up_integrated = I1D(GAA_up,-2.0,2.0);
-                    Gimp_up[i] = GAA_up_integrated;
+                    
                     // AA down
-                    // GAA_down_integrated += DOS(e_arr[ener])/( iwn_array[i] + mu + h - SE_down[i] - e_arr[ener]*e_arr[ener]/( iwn_array[i] + mu - h - SE_up[i] ) );
+                        // GAA_down_integrated += DOS(e_arr[ener])/( iwn_array[i] + mu + h - SE_down[i] - e_arr[ener]*e_arr[ener]/( iwn_array[i] + mu - h - SE_up[i] ) );
                     std::function<std::complex<double>(double)> GAA_down = [&](double e){
                         return DOS(e)/( iwn_array[i] + mu + h - SE_down[i] - e*e/( iwn_array[i] + mu - h - SE_up[i] ) );
                     };
                     auto GAA_down_integrated = I1D(GAA_down,-2.0,2.0);
-                    Gimp_down[i] = GAA_down_integrated;
                     // }
+                    Gimp_up[i] = GAA_up_integrated;
+                    Gimp_down[i] = GAA_down_integrated;
                     // AB
                 }
                 for (size_t i=0; i<2*Nomega; i++){
@@ -205,9 +209,7 @@ int main(int argc, char ** argv){
                     outputG0tau << i*delta_tau << "\t\t" << G0_tau_up[i] << "\t\t" << G0_tau_down[i] << "\n";
                 }
                 outputG0tau.close();
-                // std::fill(G0_tau_up.begin(),G0_tau_up.end(),0);
-                // std::fill(G0_tau_down.begin(),G0_tau_down.end(),0);
-
+                
                 std::string filenameSE = full_path+"/Self_energy_Bethe_lattice_AFM_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_N_tau_"+std::to_string(Nomega)+"_h_"+std::to_string(h)+"_Nit_"+std::to_string(iter)+".dat";
                 std::ofstream outputSE(filenameSE,std::ios::out);
                 for (size_t i=0; i<2*Nomega; i++){

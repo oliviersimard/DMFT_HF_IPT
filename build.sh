@@ -1,5 +1,6 @@
 #!/bin/bash
 
+buildDir="build3"
 dir="${PWD}/obj"   #This directory will contain the objects of the different translation units
 dirTest="${PWD}/test/obj" #This directory will also contain the object files, but the ones of the test.cpp main translation unit.
 dirData="${PWD}/data" #This directory will store the different results produced by the program. As for the obj directories, this directory should remain in place after creation.
@@ -9,37 +10,37 @@ read -p "dimension: 1 or 2?: " DIM
 read -p "parallelized calculations? (y or n): " PRLL
 
 # Creating the important directories...
-if [ ! -d $dir ]; then
-        mkdir ${dir}
-else
-        echo -e "Directory $dir already exists."
-fi
-if [ ! -d $dirTest ]; then
-        mkdir ${dirTest}
-else
-        echo -e "Directory $dirTest already exists."
-fi
-if [ ! -d $dirData ]; then
-        mkdir ${dirData}
-else
-        echo -e "Directory $dirData already exists."
-fi
+# if [ ! -d $dir ]; then
+#         mkdir ${dir}
+# else
+#         echo -e "Directory $dir already exists."
+# fi
+# if [ ! -d $dirTest ]; then
+#         mkdir ${dirTest}
+# else
+#         echo -e "Directory $dirTest already exists."
+# fi
+# if [ ! -d $dirData ]; then
+#         mkdir ${dirData}
+# else
+#         echo -e "Directory $dirData already exists."
+# fi
 
 
 # Which compiler's instructions to launch...
 if [[ ${OPT} == "clang" ]]; then # Makefile are mainly for debugging with VSCode.
         if [[ "$DIM" -eq "1" ]]; then
                 if [[ ${PRLL} == "y" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
                         else
-                                rm -rf build && mkdir build && cd build && cmake -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
+                                rm -rf ${buildDir} && mkdir ${buildDir} && cd build && cmake -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
                         fi
                 elif [[ ${PRLL} == "n" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DDIM:STRING="oneD" .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DDIM:STRING="oneD" .. && make -j 2
                         else
-                                rm -rf build && mkdir build && cd build && cmake -DDIM:STRING="oneD" .. && make -j 2
+                                rm -rf ${buildDir} && mkdir ${buildDir} && cd build && cmake -DDIM:STRING="oneD" .. && make -j 2
                         fi
                 else
                         echo -e "ERROR: You must choose between yes (y) or no (n).\n"
@@ -47,16 +48,16 @@ if [[ ${OPT} == "clang" ]]; then # Makefile are mainly for debugging with VSCode
                 fi
         elif [[ "$DIM" -eq "2" ]]; then
                 if [[ ${PRLL} == "y" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
                         else
-                                rm -rf build && mkdir build && cd build && cmake -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
+                                rm -rf ${buildDir} && mkdir ${buildDir} && cd build && cmake -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
                         fi
                 elif [[ ${PRLL} == "n" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DDIM:STRING="twoD" .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DDIM:STRING="twoD" .. && make -j 2
                         else
-                                rm -rf build && mkdir build && cd build && cmake -DDIM:STRING="twoD" .. && make -j 2
+                                rm -rf ${buildDir} && mkdir ${buildDir} && cd build && cmake -DDIM:STRING="twoD" .. && make -j 2
                         fi
                 else
                         echo -e "ERROR: You must choose between yes (y) or no (n).\n"
@@ -70,16 +71,16 @@ if [[ ${OPT} == "clang" ]]; then # Makefile are mainly for debugging with VSCode
 elif [[ ${OPT} == "gcc" ]]; then
         if [[ "$DIM" -eq "1" ]]; then
                 if [[ ${PRLL} == "y" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
                         else
-                                rm -rf build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
+                                rm -rf ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" -DPRLL:BOOL=ON .. && make -j 2
                         fi
                 elif [[ ${PRLL} == "n" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" .. && make -j 2
                         else
-                                rm -rf build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" .. && make -j 2
+                                rm -rf ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="oneD" .. && make -j 2
                         fi
                 else
                         echo -e "ERROR: You must choose between yes (y) or no (n).\n"
@@ -87,16 +88,16 @@ elif [[ ${OPT} == "gcc" ]]; then
                 fi
         elif [[ "$DIM" -eq "2" ]]; then
                 if [[ ${PRLL} == "y" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
                         else
-                                rm -rf build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
+                                rm -rf ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" -DPRLL:BOOL=ON .. && make -j 2
                         fi
                 elif [[ ${PRLL} == "n" ]]; then
-                        if [ ! -d "./build" ]; then
-                                mkdir build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" .. && make -j 2
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" .. && make -j 2
                         else
-                                rm -rf build && cd build && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" .. && make -j 2
+                                rm -rf ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="twoD" .. && make -j 2
                         fi
                 else
                         echo -e "ERROR: You must choose between yes (y) or no (n).\n"

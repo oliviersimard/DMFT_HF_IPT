@@ -7,6 +7,7 @@ from shutil import copy2
 from glob import glob
 from time import sleep
 from optparse import OptionParser
+import operator
 
 plt.rc('font', family='serif')
 plt.rc('text', usetex=True)
@@ -115,10 +116,10 @@ def AFM_phase_boundary_condition(filename : str, delimiter='\t\t', col_num=(1,2)
     if np.isclose(magnetization,0.0,rtol=tol,atol=tol):
         bool_cond = True
 
-    return bool_cond
+    return bool_cond, magnetization
 
 
-def get_according_to_condition(path : str, funct) -> list:
+def get_according_to_condition(path : str, funct) -> tuple:
     """
         The function funct passed as parameter has to return a boolean value to determine if it has passed. It has to 
         have filename as parameter only as well.
@@ -126,10 +127,13 @@ def get_according_to_condition(path : str, funct) -> list:
     dict_to_store_passing_cond_files = {}
     Us = []
     betas = []
+    dim_int = 0
     # navigating through the directory containing the data
     for root, dirs, files in os.walk(path):
         path = root.split(os.sep) # os.sep is equivalent to "/"
         print( (len(path)-1)*'---', os.path.basename(root) )
+        if any(char.isdigit() for char in os.path.basename(root)):
+            dim_int = int(*findall(r'^\d+',os.path.basename(root))) # All files have dimension mentionned in their name, so any file fits.
         if files != []:
             largest_int, file_largest_int = extract_largest_int(files,"tau")
             Ntau = int(findall(r"(?<=N_tau_)(\d+)",file_largest_int)[0])
@@ -140,10 +144,10 @@ def get_according_to_condition(path : str, funct) -> list:
             dict_to_store_passing_cond_files[(Ntau,beta,U)] = container
             put_element_in_list_if_different(Us,U)
             put_element_in_list_if_different(betas,beta)
-    
     # Keeping the data with the highest Ntau for parameter sets having smae beta and U
     get_params_with_many_Ntau(Us,betas,dict_to_store_passing_cond_files)
     params_respecting_condiction = []
+    dict_to_store_magnetization_for_Us_as_function_beta = {} # container for magnetization as function of betas and Us
     for U in Us:
         print("U:", U)
         max_beta = 0.0
@@ -155,14 +159,18 @@ def get_according_to_condition(path : str, funct) -> list:
                     print("largest int file: ", f)
                     #sleep(2)
                     fconcat = os.path.join(dict_to_store_passing_cond_files[key]._root,f)
-                    cond = funct(fconcat)
-                    if cond and dict_to_store_passing_cond_files[key]._largest_num_iter<MAXVAL:
+                    cond,*rest = funct(fconcat) # packing rest of outputs, in this case the magnetization, into an array
+                    dict_to_store_magnetization_for_Us_as_function_beta[(U,beta)] = rest # rest holds magnetization in this case
+                    if cond and dict_to_store_passing_cond_files[key]._largest_num_iter<MAXVAL: # condition to consider phase delimitation. Needs to have converged in AFM.
+                        if beta>max_beta:
+                            max_beta=beta
+                    elif rest[0]>0.1 and dict_to_store_passing_cond_files[key]._largest_num_iter>=MAXVAL:
                         if beta>max_beta:
                             max_beta=beta
             print("max_beta: ", max_beta)
         put_element_in_list_if_different(params_respecting_condiction,(max_beta,U))
-
-    return params_respecting_condiction
+    
+    return params_respecting_condiction, dim_int, dict_to_store_magnetization_for_Us_as_function_beta, Us, betas
 
 
 if __name__=="__main__":
@@ -177,21 +185,49 @@ if __name__=="__main__":
     # if the files are all scattered in the target directory, the files are rearranged. Otherwise, it is passed.
     rearrange_files_into_dir(path)
 
-    params_respecting_condiction = get_according_to_condition(path,AFM_phase_boundary_condition)
+    params_respecting_condiction, dim_int, dict_to_store_magnetization_for_Us_as_function_beta, Us, betas = get_according_to_condition(path,AFM_phase_boundary_condition)
 
-    fig, ax = plt.subplots(nrows=1,ncols=1)
-    ax.grid()
+    # sorting the dictionary according to U and beta (ascending order first)
+    list_magnetization_for_Us_as_function_beta = sorted(dict_to_store_magnetization_for_Us_as_function_beta.items(),key=operator.itemgetter(0,1))
+    
+    # The top panel plot shows the phase boundary
+    fig, axs = plt.subplots(nrows=1,ncols=2,sharey=True)
+    fig.subplots_adjust(wspace=0.05)
+    axs[0].grid()
 
     T_arr = list( map( lambda x: 1.0/x[0], params_respecting_condiction ) )
     U_arr = list( map( lambda x: x[1], params_respecting_condiction ) )
 
-    ax.set_title(r"AFM-PM phase boundary in 1D")
-    ax.scatter(U_arr,T_arr,marker='v',c="red",s=10.0)
-    ax.set_xlabel(r"$U$")
-    ax.set_ylabel(r"$T (1/\beta)$")
+    if dim_int==0:
+        axs[0].set_title(r"AFM-PM phase boundary in infinite dimension")
+    else:
+        axs[0].set_title(r"AFM-PM phase boundary in {0:d}D".format(dim_int))
+    axs[0].scatter(U_arr,T_arr,marker='o',c="red",s=10.0)
+    axs[0].set_xlabel(r"$U$")
+    axs[0].set_ylabel(r"$T (1/\beta)$")
+    axs[0].set_xlim(left=0.0,right=16.0)
 
-    ax.text(0.25,0.15,"AFM",transform=ax.transAxes,size=20,weight=20)
-    ax.text(0.55,0.75,"PM",transform=ax.transAxes,size=20,weight=20)
+    axs[0].text(0.25,0.15,"AFM",transform=axs[0].transAxes,size=20,weight=20)
+    axs[0].text(0.55,0.75,"PM",transform=axs[0].transAxes,size=20,weight=20)
+
+    # The lower panel shows the evolution of the magntization as a function of temperature for different values of U
+    axs[1].grid()
+    axs[1].tick_params(axis='y',left=False)
+    axs[1].set_xlabel(r"$n_{\uparrow}-n_{\downarrow}$")
+    if dim_int==0:
+        axs[1].set_title(r"Magnetization vs T in infinite dimension")
+    else:
+        axs[1].set_title(r"Magnetization vs T in {0:d}D".format(dim_int))
+    n=len(Us)
+    color = iter(plt.cm.rainbow(np.linspace(0,1,n)))
+    # extracting U arrays before plotting
+    magnetization_vs_beta_for_Us = {}
+    for U in sorted(Us):
+        magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+        T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+        axs[1].plot(magnetization_arr,T_arr,ms=2.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+    
+    axs[1].legend()
 
     plt.show()
 
