@@ -9,19 +9,20 @@
 #include <assert.h>
 #include <armadillo>
 
-#define MAXITER 100
+#define MAXITER 150
 #define MAX_ITER_INTEGRAL 40
 #define MINTOL 1e-4
 #define FINITEDIM 0
 
 typedef std::tuple<std::vector<double>,std::vector<double>> FileData;
 
+double double_occupancy(const std::vector< std::complex<double> >& SelfEnergy, const std::vector< std::complex<double> >& LocalGreen, const std::vector< std::complex<double> >& iwn, double beta, double U, double n=0.5);
 FileData get_data(const std::string& strName, const unsigned int Ntau, std::string delimiter="  ") noexcept(false);
 void fft_w2t(const std::vector<std::complex<double> >& data1, std::vector<double>& data2, double beta);
 std::vector< std::complex<double> > partial_DFT(const std::vector< std::complex<double> >& input);
 std::vector< std::complex<double> > linear_spline_Sigma_tau_to_iwn(const std::vector<double>& SE_tau, const std::vector< std::complex<double> >& iwn_array, double beta, double delta_tau);
 std::vector< std::complex<double> > linear_spline_tau_to_iwn(const std::vector<double>& G_tau, const std::vector< std::complex<double> >& iwn_array, double beta, double delta_tau);
-std::complex<double> I1D(std::function<std::complex<double>(double)> funct,double k0,double kf,double tol=1e-5,unsigned int maxDelta=30);
+std::complex<double> I1D(std::function<std::complex<double>(double)> funct,double k0,double kf,double tol=1e-6,unsigned int maxDelta=30);
 double I2D(std::function<double(double,double)> funct,double x0,double xf,double y0,double yf,const double tol,unsigned int maxVal,bool is_converged);
 template<typename T, typename U> T I1D(std::vector<T>& vecfunct,std::vector<U>& delta_taus);
 template<typename T, typename U> T I1D(std::vector<T>& vecfunct,std::vector<U>&& delta_taus);
@@ -29,6 +30,7 @@ double DOS(double e);
 std::string exec(std::string command);
 inline bool sortbysec(const std::tuple<double, double>& a,  
                const std::tuple<double, double>& b);
+double Hyb_moments(double tau, double beta, double mu);
 
 enum spin : short { up, down };
 
@@ -37,11 +39,11 @@ struct stat info = {0};
 int main(int argc, char ** argv){
  
 	double U,beta,ek,n0_up,n0_down,G_0_up_diff,G_0_down_diff,h;
-    const double beta_max=50.0, beta_min=3.0, beta_step=1.0;
-    const double U_max=15.0, U_min=1.0, U_step=1.0;
-	const unsigned int Nomega=1024;
-    const unsigned int N_e=1001; // Energy discretization
-    const double e_max=2.0, alpha=0.05;
+    const double beta_max=70.0, beta_min=50.0, beta_step=1.0;
+    const double U_max=10.0, U_min=7.0, U_step=1.0;
+	const unsigned int Nomega=4096;
+    const unsigned int N_e=2001; // Energy discretization
+    const double e_max=2.0, alpha=0.10;
     const double de=e_max/(double)N_e;
     double mu=0.0;
     std::vector< std::complex<double> > G0_up(2*Nomega,0), G0_down(2*Nomega,0), G0_tmp_up(2*Nomega,0), G0_tmp_down(2*Nomega,0);
@@ -81,7 +83,7 @@ int main(int argc, char ** argv){
     // outpdos.close();
     // exit(0);
     #endif
-  
+    double tau;
     for (beta=beta_min; beta<=beta_max; beta+=beta_step){
         double delta_tau = beta/(2.0*Nomega);
         // Initializing arrays
@@ -140,24 +142,25 @@ int main(int argc, char ** argv){
 
                 // FFT iwn --> tau Weiss Green's functions
                 for (size_t i=0; i<2*Nomega; i++){
-                    G0_up[i] -= 1.0/iwn_array[i];
-                    G0_down[i] -= 1.0/iwn_array[i];
+                    G0_up[i] -= 1.0/iwn_array[i] + (1.0)/iwn_array[i]/iwn_array[i]/iwn_array[i]; //- 1.0/( iwn_array[i] + mu - 1.0/iwn_array[i] );
+                    G0_down[i] -= 1.0/iwn_array[i] + (1.0)/iwn_array[i]/iwn_array[i]/iwn_array[i]; //- 1.0/( iwn_array[i] + mu - 1.0/iwn_array[i] );
                 }
                 fft_w2t(G0_up,G0_tau_up,beta);
                 fft_w2t(G0_down,G0_tau_down,beta);
                 for (size_t j=0; j<=2*Nomega; j++){
-                    G0_tau_up[j] += -0.5;
-                    G0_tau_down[j] += -0.5;
+                    tau = j*delta_tau;
+                    G0_tau_up[j] += -0.5 + 0.25*tau*(beta-tau); //+ Hyb_moments(tau,beta,mu);
+                    G0_tau_down[j] += -0.5 + 0.25*tau*(beta-tau); //+ Hyb_moments(tau,beta,mu);
                 }
-                std::ofstream outp2("test_integral_dos_tau_G0.dat",std::ios::out);
+
+                std::ofstream outp2("test_integral_dos_tau_G0_Niter_"+std::to_string(iter)+".dat",std::ios::out);
                 for (size_t i=0; i<=2*Nomega; i++){
                     outp2 << i*delta_tau << "  " << G0_tau_up[i] << "  " << G0_tau_down[i] << "\n";
                 }
                 outp2.close();
-                
                 for (size_t i=0; i<2*Nomega; i++){
-                    G0_up[i] += 1.0/iwn_array[i];
-                    G0_down[i] += 1.0/iwn_array[i];
+                    G0_up[i] += 1.0/iwn_array[i] + (1.0)/iwn_array[i]/iwn_array[i]/iwn_array[i]; //+ 1.0/( iwn_array[i] + mu - 1.0/iwn_array[i] );
+                    G0_down[i] += 1.0/iwn_array[i] + (1.0)/iwn_array[i]/iwn_array[i]/iwn_array[i]; //+ 1.0/( iwn_array[i] + mu - 1.0/iwn_array[i] );
                 }
                 
                 n0_up = -1.0*G0_tau_up[2*Nomega]; n0_down = -1.0*G0_tau_down[2*Nomega];
@@ -189,20 +192,22 @@ int main(int argc, char ** argv){
                 
                 // computing local density 
                 for (size_t i=0; i<2*Nomega; i++){
-                    Gloc_up[i] = 1.0/( 1.0/G0_up[i] - SE_up[i] ) - 1.0/iwn_array[i];
-                    Gloc_down[i] = 1.0/( 1.0/G0_down[i] - SE_down[i] ) - 1.0/iwn_array[i];
+                    Gloc_up[i] = 1.0/( 1.0/G0_up[i] - SE_up[i] ) - 1.0/iwn_array[i] - (1.0+0.25*U*U)/iwn_array[i]/iwn_array[i]/iwn_array[i];
+                    Gloc_down[i] = 1.0/( 1.0/G0_down[i] - SE_down[i] ) - 1.0/iwn_array[i] - (1.0+0.25*U*U)/iwn_array[i]/iwn_array[i]/iwn_array[i];
                 }
                 fft_w2t(Gloc_up,Gloc_tau_up,beta);
                 fft_w2t(Gloc_down,Gloc_tau_down,beta);
+                
                 for (size_t j=0; j<=2*Nomega; j++){
-                    Gloc_tau_up[j] += -0.5;
-                    Gloc_tau_down[j] += -0.5;
+                    tau = j*delta_tau;
+                    Gloc_tau_up[j] += -0.5 + 0.25*(1.0+0.25*U*U)*tau*(beta-tau);
+                    Gloc_tau_down[j] += -0.5 + 0.25*(1.0+0.25*U*U)*tau*(beta-tau);
                 }
                 std::cout << "n_up: " << -1.0*Gloc_tau_up[2*Nomega] << " n_down: " << -1.0*Gloc_tau_down[2*Nomega] << "\n";
 
                 for (size_t i=0; i<2*Nomega; i++){
-                    Gloc_up[i] += 1.0/iwn_array[i];
-                    Gloc_down[i] += 1.0/iwn_array[i];
+                    Gloc_up[i] += 1.0/iwn_array[i] + (1.0+0.25*U*U)/iwn_array[i]/iwn_array[i]/iwn_array[i];
+                    Gloc_down[i] += 1.0/iwn_array[i] + (1.0+0.25*U*U)/iwn_array[i]/iwn_array[i]/iwn_array[i];
                 }
                 // updating the local Green's function by integrating over semi-circular DOS
                 for (size_t i=0; i<2*Nomega; i++){
@@ -252,11 +257,18 @@ int main(int argc, char ** argv){
                     
                 }
                 for (size_t i=0; i<2*Nomega; i++){
-                    Hyb_up[i] = (1.0)*( iwn_array[i] + mu - h - SE_up[i] - Gimp.slice(i)(up,up) ); //+ alpha*( G0_up[i] );
-                    Hyb_down[i] = (1.0)*( iwn_array[i] + mu + h - SE_down[i] - Gimp.slice(i)(down,down) ); //+ alpha*( G0_down[i] );
-                    G0_up[i] = 1.0/( iwn_array[i] + mu - h - Hyb_up[i] ); //+ alpha*( G0_up[i] );
-                    G0_down[i] = 1.0/( iwn_array[i] + mu + h - Hyb_down[i] ); //+ alpha*( G0_down[i] );
+                    if (iter>0){
+                        Hyb_up[i] = (1.0-alpha)*( iwn_array[i] + mu - h - SE_up[i] - Gimp.slice(i)(up,up) ) + alpha*( Hyb_up[i] );
+                        Hyb_down[i] = (1.0-alpha)*( iwn_array[i] + mu + h - SE_down[i] - Gimp.slice(i)(down,down) ) + alpha*( Hyb_down[i] );
+                    }
+                    else{
+                        Hyb_up[i] = ( iwn_array[i] + mu - h - SE_up[i] - Gimp.slice(i)(up,up) );
+                        Hyb_down[i] = ( iwn_array[i] + mu + h - SE_down[i] - Gimp.slice(i)(down,down) );
+                    }
+                    G0_up[i] = 1.0/( iwn_array[i] + mu - h - Hyb_up[i] );
+                    G0_down[i] = 1.0/( iwn_array[i] + mu + h - Hyb_down[i] );
                 }
+
                 // std::ofstream output("output.dat",std::ios::out);
                 // for (size_t i=0; i<2*Nomega; i++){
                 //     output << iwn_array[i].imag() << "  " << G0_up[i].imag() << "  " << G0_down[i].imag() << "\n";
@@ -279,7 +291,7 @@ int main(int argc, char ** argv){
 
                 // Saving files at each iteration
                 std::string directory_container = "Bethe_lattice_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(0.5)+"_Ntau_"+std::to_string(Nomega);
-                std::string full_path = "./data_Bethe_test_IPT/"+directory_container;
+                std::string full_path = "./data_Bethe_test_IPT_damping_0.1_Ne_2001_more_moments/"+directory_container;
                 if (stat(full_path.c_str(), &info) == -1){
                     mkdir(full_path.c_str(), 0700);
                 }
@@ -293,14 +305,14 @@ int main(int argc, char ** argv){
                 }
                 outputGloc.close();
 
-                std::string filenameG0tau = full_path+"/Green_Weiss_tau_Bethe_lattice_AFM_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_N_tau_"+std::to_string(Nomega)+"_h_"+std::to_string(h)+"_Nit_"+std::to_string(iter)+".dat";
-                std::ofstream outputG0tau(filenameG0tau,std::ios::out);
+                std::string filenameGloctau = full_path+"/Green_loc_tau_Bethe_lattice_AFM_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_N_tau_"+std::to_string(Nomega)+"_h_"+std::to_string(h)+"_Nit_"+std::to_string(iter)+".dat";
+                std::ofstream outputGloctau(filenameGloctau,std::ios::out);
                 for (size_t i=0; i<=2*Nomega; i++){
                     if (i==0)
-                        outputG0tau << "tau\t\tGloc up\t\tGloc down\n";
-                    outputG0tau << i*delta_tau << "\t\t" << G0_tau_up[i] << "\t\t" << G0_tau_down[i] << "\n";
+                        outputGloctau << "tau\t\tGloc up\t\tGloc down\n";
+                    outputGloctau << i*delta_tau << "\t\t" << Gloc_tau_up[i] << "\t\t" << Gloc_tau_down[i] << "\n";
                 }
-                outputG0tau.close();
+                outputGloctau.close();
                 
                 std::string filenameSE = full_path+"/Self_energy_Bethe_lattice_AFM_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_N_tau_"+std::to_string(Nomega)+"_h_"+std::to_string(h)+"_Nit_"+std::to_string(iter)+".dat";
                 std::ofstream outputSE(filenameSE,std::ios::out);
@@ -313,9 +325,21 @@ int main(int argc, char ** argv){
 
                 iter++;
             }
+            auto DD = double_occupancy(SE_up,Gloc_up,iwn_array,beta,U);
+            // std::ofstream outputD("outputD_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Nomega)+".dat",std::ios::out | std::ios::app);
+            // outputD << U << "  " << DD << "\n";
+            // outputD.close();
+            std::cout << "D: " << DD << "\n";
         }
     }
   return 0;
+}
+
+double Hyb_moments(double tau, double beta, double mu){
+    double z1(-0.5*mu + 0.5*std::sqrt(mu*mu+4.0));
+    double z2(-0.5*mu - 0.5*std::sqrt(mu*mu+4.0));
+
+    return -1.0*z1/(z1-z2)*1.0/(std::exp(z1*tau)+std::exp((tau-beta)*z1)) - 1.0*z2/(z2-z1)*1.0/(std::exp(z2*tau)+std::exp((tau-beta)*z2));
 }
 
 double DOS(double e){
@@ -349,10 +373,20 @@ T I1D(std::vector<T>& vecfunct,std::vector<U>&& delta_taus){
     return result;
 }
 
+double double_occupancy(const std::vector< std::complex<double> >& SelfEnergy, const std::vector< std::complex<double> >& LocalGreen, const std::vector< std::complex<double> >& iwn, double beta, double U, double n){
+    double D=0.0;
+    for (size_t j=0; j<iwn.size(); j++){ //static_cast<size_t>(iwnArr_l.size()/2)
+        D += ( ( SelfEnergy[j] - U*n ) * LocalGreen[j] ).real();
+    }
+    D*=1./(beta*U);
+    D+=n*n;
+    return D;
+}
+
 std::complex<double> I1D(std::function<std::complex<double>(double)> funct,double k0,double kf,double tol,unsigned int maxDelta){
     double dk;
     std::complex<double> result(0.0,0.0), prevResult(0.0,0.0), resultSumNk;
-    unsigned int iter=1;
+    unsigned int iter=0;
     bool is_converged=false;
     while(!is_converged && iter<MAX_ITER_INTEGRAL){
         resultSumNk = std::complex<double>(0.0,0.0);
@@ -364,7 +398,8 @@ std::complex<double> I1D(std::function<std::complex<double>(double)> funct,doubl
 
         result = 0.5*dk*funct(k0)+0.5*dk*funct(kf)+dk*resultSumNk;
 
-        is_converged = (std::abs(prevResult-result)>tol) ? false : true;
+        if (iter>0)
+            is_converged = (std::abs(prevResult-result)>tol) ? false : true;
 
         if (is_converged)
             break;

@@ -229,5 +229,6 @@ while i<len(keys_list):
 		axs[i].legend()
 	i+=1
 
+plt.savefig("Figure_A_w_U_{0:.2f}_beta_{1:.2f}_wmax_{2:.2f}.pdf".format(U,beta,wmax))
 plt.show()
 

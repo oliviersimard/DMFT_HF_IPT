@@ -16,7 +16,7 @@ template<typename T, typename... Ts> inline T eps(T,Ts...);
 
 int main(void){
     
-    std::string inputFilename("../../build3/data/2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_1024/Self_energy_2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_1024_Nit_18.dat");
+    std::string inputFilename("../../data/1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_1024/Self_energy_1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_1024_Nit_25.dat");
     // Choose whether current-current or spin-spin correlation function is computed.
     std::vector<std::string> results;
     std::vector<std::string> fetches = {"U", "beta", "N_tau"};
@@ -24,8 +24,8 @@ int main(void){
     results = get_info_from_filename(inputFilename,fetches);
     const bool is_jj = false; 
     const unsigned int Ntau = 2*(unsigned int)atof(results[2].c_str());
-    const unsigned int N_k = 101;
-    const unsigned int N_q = 3;
+    const unsigned int N_k = 501;
+    const unsigned int N_q = 21;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
@@ -54,8 +54,9 @@ int main(void){
     const unsigned int DATA_SET_DIM = Ntau;
     H5::H5File* file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     // Getting the data
-    FileData dataFromFile = get_data(inputFilename,Ntau);
-
+    FileData dataFromFile;
+    dataFromFile = get_data(inputFilename,Ntau);
+    
     std::vector<double> wn = dataFromFile.iwn;
     std::vector<double> re = dataFromFile.re;
     std::vector<double> im = dataFromFile.im;
@@ -92,7 +93,8 @@ int main(void){
     #endif
 
     #if DIM == 1
-    arma::Mat<double> dG_dtau_m_FFT = get_derivative_FFT(G_k_iwn,iwn,k_array,beta_array,U,mu,0.0,std::string("negative"));
+    arma::Mat<double> dG_dtau_m_FFT;
+    dG_dtau_m_FFT = get_derivative_FFT(G_k_iwn,iwn,k_array,beta_array,U,mu,0.0,std::string("negative"));
 
     /* TEST dG(-tau)/dtau */
     std::ofstream test1("test_1_fewer_moments.dat", std::ios::out);
@@ -118,7 +120,7 @@ int main(void){
     #if DIM == 1
     for (size_t l=0; l<k_array.size(); l++){
         for (size_t j=0; j<iwn.size(); j++){
-            G_k_iwn(l,j) -= 1.0/(iwn[j]); //+ epsilonk(k_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+            G_k_iwn(l,j) -= 1.0/(iwn[j]) + epsilonk(k_array[l])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]) )/iwn[j]/iwn[j]/iwn[j];
         }
     }
     #elif DIM == 2
@@ -139,11 +141,13 @@ int main(void){
         std::vector< std::complex<double> > G_iwn_k_slice(G_k_iwn(l,arma::span::all).begin(),G_k_iwn(l,arma::span::all).end());
         FFT_k_tau = get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
         for (size_t i=0; i<beta_array.size(); i++){
-            G_k_tau(l,i) = FFT_k_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]));
+            G_k_tau(l,i) = FFT_k_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(k_array[l])*epsilonk(k_array[l]));
         }
         sum_rule_iqn_0(-1.0*G_k_tau(l,Ntau),k_array[l],sum_rule_val,N_k);
     }
-    std::cout << "The sum rule gives: " << sum_rule_val << "\n";
+
+    if (is_jj)
+        std::cout << "The sum rule gives: " << sum_rule_val << "\n";
 
     /* TEST G(-tau) */
     std::ofstream test2("test_2_fewer_moments.dat", std::ios::out);
@@ -193,12 +197,13 @@ int main(void){
             }
         }
 
-        arma::Mat<double> dG_dtau_FFT_q = get_derivative_FFT(G_k_q_iwn,iwn,k_array,beta_array,U,mu,q_array[em]);
+        arma::Mat<double> dG_dtau_FFT_q;
+        dG_dtau_FFT_q = get_derivative_FFT(G_k_q_iwn,iwn,k_array,beta_array,U,mu,q_array[em]);
 
         // Substracting the tail of the Green's function
         for (size_t l=0; l<k_array.size(); l++){
             for (size_t j=0; j<iwn.size(); j++){
-                G_k_q_iwn(l,j) -= 1.0/(iwn[j]); //+ epsilonk(k_array[l]+q_array[em])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) )/iwn[j]/iwn[j]/iwn[j];
+                G_k_q_iwn(l,j) -= 1.0/(iwn[j]) + epsilonk(k_array[l]+q_array[em])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) )/iwn[j]/iwn[j]/iwn[j];
             }
         }
         // FFT of G(iwn) --> G(tau)
@@ -206,7 +211,7 @@ int main(void){
             std::vector< std::complex<double> > G_iwn_k_q_slice(G_k_q_iwn(l,arma::span::all).begin(),G_k_q_iwn(l,arma::span::all).end());
             FFT_k_q_tau = get_iwn_to_tau(G_iwn_k_q_slice,beta); // beta_arr.back() is beta
             for (size_t i=0; i<beta_array.size(); i++){
-                G_k_q_tau(l,i) = FFT_k_q_tau[i] - 0.5; //- 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]+q_array[em]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) );
+                G_k_q_tau(l,i) = FFT_k_q_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]+q_array[em]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) );
             }
         }
 
@@ -231,7 +236,7 @@ int main(void){
             splObj_GG.set_boundary(spline<double>::bd_type::first_deriv,left_der_GG,spline<double>::bd_type::first_deriv,right_der_GG);
             splObj_GG.set_points(beta_array,GG_tau_for_k);
 
-            std::vector< std::complex<double> > cub_spl_GG = splObj_GG.bosonic_corr(iqn,beta);
+            std::vector< std::complex<double> > cub_spl_GG(splObj_GG.bosonic_corr(iqn,beta)); //move ctor
             for (size_t i=0; i<cub_spl_GG.size(); i++){
                 cubic_spline_GG_iqn_k(i,l) = cub_spl_GG[i];
             }
@@ -242,7 +247,7 @@ int main(void){
         const double delta = 2.0*M_PI/(double)(N_k-1);
         for (size_t j=0; j<iqn.size(); j++){
             std::vector< std::complex<double> > GG_iqn_k_tmp(cubic_spline_GG_iqn_k(j,arma::span::all).begin(),cubic_spline_GG_iqn_k(j,arma::span::all).end());
-            GG_iqn_q[j] = 1.0/(2.0*M_PI)*integralsObj.I1D_CPLX(GG_iqn_k_tmp,delta);
+            GG_iqn_q[j] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_k_tmp),delta,"simpson");
         }
 
         std::string DATASET_NAME("q_"+std::to_string(q_array[em]));

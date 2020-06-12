@@ -11,12 +11,13 @@ extern "C" {
 #include<fftw3.h>
 }
 //#include <type_traits> // for use of std::is_same in static_assert
+#include "wrapper_utils.hpp"
 
-#define DIM 2 // 1 or 2
+#define DIM 1 // 1 or 2
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
 #define MULT_N_TAU 2 // Has to be an even number
-//#define AFM
+#define AFM
 
 // Some declarations
 namespace IPT2{ class DMFTproc; };

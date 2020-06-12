@@ -90,27 +90,43 @@ std::complex<double> Integrals::integrate_simps(std::function< std::complex<doub
     return simps(funct,a,b,iwn,tol,1);
 }
 
-std::complex<double> Integrals::I2D(std::function<std::complex<double>(double,double,std::complex<double>)> funct,double x0,double xf,double y0,double yf,std::complex<double> iwn,const double tol,unsigned int maxVal,bool is_converged) const{
+std::complex<double> Integrals::I2D(std::function<std::complex<double>(double,double,std::complex<double>)> funct,double x0,double xf,double y0,double yf,std::complex<double> iwn,std::string rule,double tol,unsigned int maxVal,bool is_converged) const noexcept(false){
     double dx=(xf-x0)/(double)maxVal, dy=(yf-y0)/(double)maxVal;
     std::complex<double> result, prevResult(0.0,0.0), resultSumNyorNx, resultSumNxNy;
-    unsigned int iter=1;
+    unsigned int iter=0;
     while (!is_converged && iter<MAX_ITER_INTEGRAL){
         resultSumNyorNx=std::complex<double>(0.0,0.0), resultSumNxNy=std::complex<double>(0.0,0.0);
         dx=(xf-x0)/(double)maxVal;
         dy=(yf-y0)/(double)maxVal;
         prevResult=result;
-        for (unsigned int i=1; i<maxVal; i++){
-            resultSumNyorNx+=funct(x0+i*dx,y0,iwn)+funct(x0+i*dx,yf,iwn)+funct(x0,y0+i*dy,iwn)+funct(xf,y0+i*dy,iwn);
-        }
-        for (unsigned int i=1; i<maxVal; i++){
-            for (unsigned int j=1; j<maxVal; j++){
-                resultSumNxNy+=funct(x0+i*dx,y0+j*dy,iwn);
-            }
-        }
-    
-        result=0.25*dx*dy*(funct(x0,y0,iwn)+funct(xf,y0,iwn)+funct(x0,yf,iwn)+funct(xf,yf,iwn))+0.5*dx*dy*resultSumNyorNx+dx*dy*resultSumNxNy;
 
-        is_converged = ( ( (std::abs(prevResult-result))>tol ) ) ? false : true;
+        if (rule.compare("trapezoidal")==0){
+            for (unsigned int i=1; i<maxVal; i++){
+                resultSumNyorNx+=funct(x0+i*dx,y0,iwn)+funct(x0+i*dx,yf,iwn)+funct(x0,y0+i*dy,iwn)+funct(xf,y0+i*dy,iwn);
+            }
+            for (unsigned int i=1; i<maxVal; i++){
+                for (unsigned int j=1; j<maxVal; j++){
+                    resultSumNxNy+=funct(x0+i*dx,y0+j*dy,iwn);
+                }
+            }
+        
+            result=0.25*dx*dy*(funct(x0,y0,iwn)+funct(xf,y0,iwn)+funct(x0,yf,iwn)+funct(xf,yf,iwn))+0.5*dx*dy*resultSumNyorNx+dx*dy*resultSumNxNy;
+        } else if (rule.compare("simpson")==0){
+            for (unsigned int i=1; i<maxVal; i+=2){
+                for (unsigned int j=1; j<maxVal; j+=2){
+                    resultSumNxNy+=funct(x0+(i-1)*dx,y0+(j-1)*dy,iwn)+4.0*funct(x0+i*dx,y0+(j-1)*dy,iwn)+funct(x0+(i+1)*dx,y0+(j-1)*dy,iwn)+
+                    4.0*funct(x0+(i-1)*dx,y0+j*dy,iwn)+16.0*funct(x0+i*dx,y0+j*dy,iwn)+4.0*funct(x0+(i+1)*dx,y0+j*dy,iwn)+
+                    funct(x0+(i-1)*dx,y0+(j+1)*dy,iwn)+4.0*funct(x0+i*dx,y0+(j+1)*dy,iwn)+funct(x0+(i+1)*dx,y0+(j+1)*dy,iwn);
+                }
+            }
+
+            result=1.0/9.0*dx*dy*resultSumNxNy;
+        } else{
+            throw std::invalid_argument("Unhandled rule chosen in integrals 2D. Choices are \"trapezoidal\" and \"simpson\"");
+        }
+        
+        if (iter>0)
+            is_converged = ( ( (std::abs(prevResult-result))>tol ) ) ? false : true;
 
         if (is_converged){
             break;
@@ -122,27 +138,43 @@ std::complex<double> Integrals::I2D(std::function<std::complex<double>(double,do
     return result;
 }
 
-double Integrals::I2D(std::function<double(double,double)> funct,double x0,double xf,double y0,double yf,const double tol,unsigned int maxVal,bool is_converged) const{
+double Integrals::I2D(std::function<double(double,double)> funct,double x0,double xf,double y0,double yf,std::string rule,double tol,unsigned int maxVal,bool is_converged) const noexcept(false){
     double dx=(xf-x0)/(double)maxVal, dy=(yf-y0)/(double)maxVal;
     double resultSumNyorNx=0.0, resultSumNxNy=0.0, result, prevResult=0.0;
-    unsigned int iter=1;
+    unsigned int iter=0;
     while (!is_converged){
         resultSumNxNy=resultSumNyorNx=0.0;
         dx=(xf-x0)/(double)maxVal;
         dy=(yf-y0)/(double)maxVal;
         prevResult=result;
-        for (unsigned int i=1; i<maxVal; i++){
-            resultSumNyorNx+=funct(x0+i*dx,y0)+funct(x0+i*dx,yf)+funct(x0,y0+i*dy)+funct(xf,y0+i*dy);
-        }
-        for (unsigned int i=1; i<maxVal; i++){
-            for (unsigned int j=1; j<maxVal; j++){
-                resultSumNxNy+=funct(x0+i*dx,y0+j*dy);
+
+        if (rule.compare("trapezoidal")==0){
+            for (unsigned int i=1; i<maxVal; i++){
+                resultSumNyorNx+=funct(x0+i*dx,y0)+funct(x0+i*dx,yf)+funct(x0,y0+i*dy)+funct(xf,y0+i*dy);
             }
+            for (unsigned int i=1; i<maxVal; i++){
+                for (unsigned int j=1; j<maxVal; j++){
+                    resultSumNxNy+=funct(x0+i*dx,y0+j*dy);
+                }
+            }
+
+            result=0.25*dx*dy*(funct(x0,y0)+funct(xf,y0)+funct(x0,yf)+funct(xf,yf))+0.5*dx*dy*resultSumNyorNx+dx*dy*resultSumNxNy;
+        } else if (rule.compare("simpson")==0){
+            for (unsigned int i=1; i<maxVal; i+=2){
+                for (unsigned int j=1; j<maxVal; j+=2){
+                    resultSumNxNy+=funct(x0+(i-1)*dx,y0+(j-1)*dy)+4.0*funct(x0+i*dx,y0+(j-1)*dy)+funct(x0+(i+1)*dx,y0+(j-1)*dy)+
+                    4.0*funct(x0+(i-1)*dx,y0+j*dy)+16.0*funct(x0+i*dx,y0+j*dy)+4.0*funct(x0+(i+1)*dx,y0+j*dy)+
+                    funct(x0+(i-1)*dx,y0+(j+1)*dy)+4.0*funct(x0+i*dx,y0+(j+1)*dy)+funct(x0+(i+1)*dx,y0+(j+1)*dy);
+                }
+            }
+
+            result=1.0/9.0*dx*dy*resultSumNxNy;
+        } else{
+            throw std::invalid_argument("Unhandled rule chosen in integrals 2D. Choices are \"trapezoidal\" and \"simpson\"");
         }
 
-        result=0.25*dx*dy*(funct(x0,y0)+funct(xf,y0)+funct(x0,yf)+funct(xf,yf))+0.5*dx*dy*resultSumNyorNx+dx*dy*resultSumNxNy;
-
-        is_converged = (std::abs(prevResult-result)<tol) ? true : false;
+        if (iter>0)
+            is_converged = (std::abs(prevResult-result)<tol) ? true : false;
         
         if (iter>MAX_ITER_INTEGRAL || is_converged){
             break;
@@ -186,22 +218,33 @@ double Integrals::falsePosMethod(std::function<double(double)> funct, double a, 
     return c;
 }
 
-std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,double tol,unsigned int maxDelta) const{
+std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,std::string rule,double tol,unsigned int maxDelta) const noexcept(false){
     double dk;
     std::complex<double> result(0.0,0.0), prevResult(0.0,0.0), resultSumNk;
-    unsigned int iter=1;
+    unsigned int iter=0;
     bool is_converged=false;
     while(!is_converged && iter<MAX_ITER_INTEGRAL){
         resultSumNk = std::complex<double>(0.0,0.0);
         prevResult = result;
         dk=(kf-k0)/(double)maxDelta;
-        for (unsigned int i=1; i<maxDelta; i++){
-            resultSumNk+=funct(k0+i*dk,iwn);
+
+        if (rule.compare("trapezoidal")==0){
+            for (unsigned int i=1; i<maxDelta; i++){
+                resultSumNk+=funct(k0+i*dk,iwn);
+            }
+            result = 0.5*dk*funct(k0,iwn)+0.5*dk*funct(kf,iwn)+dk*resultSumNk;
+        } else if (rule.compare("simpson")==0){
+            assert(maxDelta%2==0); // The interval has to be devided into an even number of intervals for this to work in this scheme
+            for (unsigned int i=1; i<maxDelta; i+=2){
+                resultSumNk += funct(k0+(i-1)*dk,iwn) + 4.0*funct(k0+i*dk,iwn) + funct(k0+(i+1)*dk,iwn);
+            }
+            result = dk/3.0*resultSumNk;
+        } else{
+            throw std::invalid_argument("Unhandled rule chosen in integrals 1D. Choices are \"trapezoidal\" and \"simpson\"");
         }
 
-        result = 0.5*dk*funct(k0,iwn)+0.5*dk*funct(kf,iwn)+dk*resultSumNk;
-
-        is_converged = (std::abs(prevResult-result)>tol && iter>1) ? false : true;
+        if (iter>0)
+            is_converged = (std::abs(prevResult-result)>tol && iter>1) ? false : true;
 
         if (is_converged)
             break;
@@ -213,22 +256,33 @@ std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,st
     return result;
 }
 
-double Integrals::I1D(std::function<double(double)> funct,double k0,double kf,double tol,unsigned int maxDelta) const{
+double Integrals::I1D(std::function<double(double)> funct,double k0,double kf,std::string rule,double tol,unsigned int maxDelta) const noexcept(false){
     double dk=(kf-k0)/(double)maxDelta;
     double result = 0.0, prevResult = 0.0, resultSumNk;
-    unsigned int iter=1;
+    unsigned int iter=0;
     bool is_converged=false;
     while(!is_converged && iter<MAX_ITER_INTEGRAL){
         resultSumNk = 0.0;
         prevResult = result;
         dk=(kf-k0)/(double)maxDelta;
-        for (unsigned int i=1; i<maxDelta; i++){
-            resultSumNk+=funct(k0+i*dk);
+
+        if (rule.compare("trapezoidal")==0){
+            for (unsigned int i=1; i<maxDelta; i++){
+                resultSumNk+=funct(k0+i*dk);
+            }
+            result = 0.5*dk*funct(k0)+0.5*dk*funct(kf)+dk*resultSumNk;
+        } else if (rule.compare("simpson")==0){
+            assert(maxDelta%2==0); // The interval has to be devided into an even number of intervals for this to work in this scheme
+            for (unsigned int i=1; i<maxDelta; i+=2){
+                resultSumNk += funct(k0+(i-1)*dk) + 4.0*funct(k0+i*dk) + funct(k0+(i+1)*dk);
+            }
+            result = dk/3.0*resultSumNk;
+        } else{
+            throw std::invalid_argument("Unhandled rule chosen in integrals 1D. Choices are \"trapezoidal\" and \"simpson\"");
         }
 
-        result = 0.5*dk*funct(k0)+0.5*dk*funct(kf)+dk*resultSumNk;
-
-        is_converged = (std::abs(prevResult-result)>tol) ? false : true;
+        if (iter>0)
+            is_converged = (std::abs(prevResult-result)>tol) ? false : true;
 
         if (is_converged)
             break;
@@ -240,27 +294,16 @@ double Integrals::I1D(std::function<double(double)> funct,double k0,double kf,do
     return result;
 }
 
-double Integrals::I1D(std::vector<double>& vecfunct,double delta_tau) const{
-    double result, resultSumNk = 0.0;
+// double Integrals::I1D(std::vector<double>& vecfunct,double delta_tau) const{
+//     double result, resultSumNk = 0.0;
 
-    for (unsigned int i=1; i<vecfunct.size()-1; i++){
-        resultSumNk+=vecfunct[i];
-    }
-    result = 0.5*delta_tau*vecfunct[0]+0.5*delta_tau*vecfunct.back()+delta_tau*resultSumNk;
+//     for (unsigned int i=1; i<vecfunct.size()-1; i++){
+//         resultSumNk+=vecfunct[i];
+//     }
+//     result = 0.5*delta_tau*vecfunct[0]+0.5*delta_tau*vecfunct.back()+delta_tau*resultSumNk;
     
-    return result;
-}
-
-std::complex<double> Integrals::I1D_CPLX(std::vector< std::complex<double> >& vecfunct,double delta) const{
-    std::complex<double> result, resultSumNk(0.0,0.0);
-
-    for (unsigned int i=1; i<vecfunct.size()-1; i++){
-        resultSumNk+=vecfunct[i];
-    }
-    result = 0.5*delta*vecfunct[0]+0.5*delta*vecfunct.back()+delta*resultSumNk;
-    
-    return result;
-}
+//     return result;
+// }
 
 std::complex<double> cbrt(std::complex<double> num){
     // computing the cubic root of a complex number using exponential representation of complex number

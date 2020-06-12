@@ -66,7 +66,7 @@ class DMFTproc{
         void update_parametrized_self_energy_AFM(FFTtools,double h);
         double density_mu(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu(const arma::Cube< std::complex<double> >&) const;
-        std::tuple<double,double> density_mu_AFM(const arma::Cube< std::complex<double> >& G) const;
+        tuple<double,double> density_mu_AFM(const arma::Cube< std::complex<double> >& G) const;
         double density_mu0(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu0(const arma::Cube< std::complex<double> >&) const;
         std::tuple<double,double> density_mu0_AFM(const arma::Cube< std::complex<double> >& G0_1) const;
@@ -189,33 +189,17 @@ inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std
         if (tempNum>largestNum)
             largestNum=tempNum;
     }
-    unsigned int num = 0; // num must start at 0
     arma::Cube< std::complex<double> > inputFunct(2,2,2*_N_tau_size);
     std::cout << "Size of loaded self-energy array: " << 2*_N_tau_size << "\n";
     std::string finalFile=filename+"_Nit_"+std::to_string(largestNum)+".dat";
-    infile.open(finalFile);// file containing numbers in 3 columns
     std::cout << "The file from which the spline is done: "+finalFile << "\n";
-    if(infile.fail()){ // checks to see if file opended 
-        std::cerr << "error" << "\n"; 
-        throw std::ios_base::failure("File not Found in SplineInline!!"); // no point continuing if the file didn't open...
-    }
-    while(!infile.eof()){ // reads file to end of *file*, not line
-        if (num==0 && firstline==""){ 
-        getline(infile,firstline);
-        //std::cout << firstline << std::endl;
-        if (firstline[0]!='/'){
-            std::cerr << "Gotta remove first line of: "+finalFile << "\n";
-            throw std::invalid_argument("The files loaded should have the marker \"/\" in front of the lines commented.");
-        }
-        }else{
-	        infile >> _iwn[num]; // Spoiled by the last two arrays
-            infile >> _iwn_re[num];
-            infile >> _iwn_im[num];
 
-            ++num;
-        }
-    }
-    infile.close();
+    FileData dataFromFile;
+    dataFromFile = get_data(finalFile,2*_N_tau_size);
+    _iwn = static_cast<std::vector<double>&&>(dataFromFile.iwn);
+    _iwn_re = static_cast<std::vector<double>&&>(dataFromFile.re);
+    _iwn_im = static_cast<std::vector<double>&&>(dataFromFile.im);
+    
     for (size_t i=0; i<2*_N_tau_size; i++){
         inputFunct.slice(i)(0,0)=std::complex<double>(_iwn_re[i],_iwn_im[i]);
         _iwn_cplx.push_back(std::complex<double>(_iwn_re[i],_iwn_im[i])); // For the linear spline..

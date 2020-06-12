@@ -23,21 +23,24 @@ std::vector<std::string> glob(const std::string& pattern) noexcept(false){
         stringstream ss;
         if (VERBOSE > 0) {
             ss << "glob() failed with return_value " << return_value << " for "+pattern+"; pattern was not found." << "\n";
-            std::cerr << ss.str() << "\n";
+            cerr << ss.str() << "\n";
         } else { // Mainly for testing 
             ss << GLOB_NOMATCH;
-            std::cerr << ss.str() << "\n";
+            cerr << ss.str() << "\n";
         }
     } else if (return_value == 0){
         if (VERBOSE > 0)
-            std::cerr << "The file "+pattern+" was found!!" << "\n";
+            cerr << "The file "+pattern+" was found!!" << "\n";
     } else{
-        throw std::runtime_error("Glob issued an error: "+std::to_string(return_value));
+        throw runtime_error("Glob issued an error: "+to_string(return_value));
     }
     // collect all the filenames into a std::vector<std::string>
     vector<string> filenames;
     for(size_t i = 0; i < glob_result.gl_pathc; ++i) {
-        filenames.push_back(string(glob_result.gl_pathv[i]));
+        auto tmp_str = string(glob_result.gl_pathv[i]);
+        if ( !( tmp_str.find(string("AFM")) != string::npos ) ){ // to avoid mixing the AFM and PM data in data/
+            filenames.push_back(tmp_str);
+        }
     }
     // cleanup
     globfree(&glob_result);
@@ -172,8 +175,7 @@ FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept
     
     inputFile.close();
 
-    FileData fileDataObj={iwn,re,im};
-    return fileDataObj;
+    return FileData(iwn,re,im);
 }
 
 std::vector<std::string> get_info_from_filename(const std::string& strName,const std::vector<std::string>& fetches,const char* separation_char) noexcept(false){

@@ -20,35 +20,6 @@ struct cubic_roots{ // Hosting the roots of cubic equation
 std::complex<double> cbrt(std::complex<double> num);
 cubic_roots get_cubic_roots(double a, double b, double c, double d);
 
-/* Template structure to call functions in classes. */
-template<typename T, typename C, typename Q>
-struct functorStruct{
-    //using matCplx = arma::Mat< std::complex<double> >;
-    using funct_init_t = arma::Mat< std::complex<double> > (C::*)(Q model, T kk, T qq, int n, int l);
-    using funct_con_t = arma::Mat< std::complex<double> > (C::*)(Q model, T kk, T qq, int n, int l, arma::Mat< std::complex<double> > SE);
-
-    functorStruct(funct_init_t initFunct, funct_con_t conFunct);
-    arma::Mat< std::complex<double> > callInitFunct(C& obj, Q model, T kk, T qq, int n, int l);
-    arma::Mat< std::complex<double> > callConFunct(C& obj, Q model, T kk, T qq, int n, int l, arma::Mat< std::complex<double> > SE);
-
-    private:
-        funct_init_t _initFunct;
-        funct_con_t _conFunct;
-};
-
-template<typename T, typename C, typename Q>
-functorStruct<T,C,Q>::functorStruct(funct_init_t initFunct, funct_con_t conFunct) : _initFunct(initFunct), _conFunct(conFunct){};
-
-template<typename T, typename C, typename Q>
-arma::Mat< std::complex<double> > functorStruct<T,C,Q>::callInitFunct(C& obj, Q model, T kk, T qq, int n, int l){
-    return (obj.*_initFunct)(model, kk, qq, n, l);
-}
-
-template<typename T, typename C, typename Q>
-arma::Mat< std::complex<double> > functorStruct<T,C,Q>::callConFunct(C& obj, Q model, T kk, T qq, int n, int l, arma::Mat< std::complex<double> > SE){
-    return (obj.*_conFunct)(model, kk, qq, n, l, SE);
-}
-
 class Integrals{
     public:
         double coarse_app(std::function< double(double) >,double,double) const;
@@ -68,12 +39,13 @@ class Integrals{
         
         // D. Keffer, ChE 505 ,University of Tennessee, September, 1999
         //double I2DRec(std::function<double(double,double)>,double,double,double,double,unsigned int,double tol=0.001,unsigned int maxVal=10,bool is_converged=false,double prevResult=0.0) const;
-        double I2D(std::function<double(double,double)>,double,double,double,double,const double tol=0.0001,unsigned int maxVal=40,bool is_converged=false) const;
-        std::complex<double> I2D(std::function<std::complex<double>(double,double,std::complex<double>)>,double,double,double,double,std::complex<double>,const double tol=0.0001,unsigned int maxVal=40,bool is_converged=false) const;
-        std::complex<double> I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,double tol=0.000001,unsigned int maxDelta=100) const;
-        double I1D(std::function<double(double)> funct,double k0,double kf,double tol=0.000001,unsigned int maxDelta=100) const;
-        double I1D(std::vector<double>& vecfunct,double delta_tau) const;
-        std::complex<double> I1D_CPLX(std::vector< std::complex<double> >& vecfunct,double delta) const;
+        double I2D(std::function<double(double,double)>,double,double,double,double,std::string rule="trapezoidal",double tol=1e-4,unsigned int maxVal=40,bool is_converged=false) const noexcept(false);
+        std::complex<double> I2D(std::function<std::complex<double>(double,double,std::complex<double>)>,double,double,double,double,std::complex<double>,std::string rule="trapezoidal",double tol=1e-4,unsigned int maxVal=40,bool is_converged=false) const noexcept(false);
+        std::complex<double> I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,std::string rule="trapezoidal",double tol=1e-5,unsigned int maxDelta=100) const noexcept(false);
+        double I1D(std::function<double(double)> funct,double k0,double kf,std::string rule="trapezoidal",double tol=1e-5,unsigned int maxDelta=100) const noexcept(false);
+        // double I1D(std::vector<double>& vecfunct,double delta_tau) const;
+        template<typename T> T I1D_VEC(std::vector< T >& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
+        template<typename T> T I1D_VEC(std::vector< T >&& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
         // MonteCarlo integral
         template<typename T, typename U> double integral_functional_3d(std::function<U(T,T)> f, T xmin, T xmax, T ymin, T ymax, U zmin, U zmax, bool(*y_cond)(T x,T y)) const;
         // template<typename T, typename U> inline typename std::enable_if< std::is_same< U,std::complex<double> >::value >::type integral_functional_3d(std::function<std::complex<double>(T,T)> f, T xmin, T xmax, T ymin, T ymax, std::complex<double> zmin, std::complex<double> zmax, bool(*y_cond)(T x,T y)) const;
@@ -226,6 +198,51 @@ U Integrals::I2D_constrained(std::function<U(T,T)> funct,std::function<bool(T,T)
 
     return result;
 }
+
+template<typename T>
+T Integrals::I1D_VEC(std::vector< T >& vecfunct,double delta,std::string rule) const noexcept(false){
+    T result, resultSumNk{0.0};
+
+    if (rule.compare("trapezoidal")==0){
+        for (unsigned int i=1; i<vecfunct.size()-1; i++){
+            resultSumNk+=vecfunct[i];
+        }
+        result = 0.5*delta*vecfunct[0]+0.5*delta*vecfunct.back()+delta*resultSumNk;
+    } else if (rule.compare("simpson")==0){
+        assert(vecfunct.size()%2==1); // simpson's rule work when the size of the array is odd...
+        for (unsigned int i=1; i<vecfunct.size()-1; i+=2){
+            resultSumNk += vecfunct[i-1] + 4.0*vecfunct[i] + vecfunct[i+1];
+        }
+        result = delta/3.0*resultSumNk;   
+    } else{
+        throw std::invalid_argument("Unhandeled rule chosen in integrals. Choices are \"trapezoidal\" and \"simpson\"");
+    }
+    
+    return result;
+}
+
+template<typename T>
+T Integrals::I1D_VEC(std::vector< T >&& vecfunct,double delta,std::string rule) const noexcept(false){
+    T result, resultSumNk{0.0};
+
+    if (rule.compare("trapezoidal")==0){
+        for (unsigned int i=1; i<vecfunct.size()-1; i++){
+            resultSumNk+=vecfunct[i];
+        }
+        result = 0.5*delta*vecfunct[0]+0.5*delta*vecfunct.back()+delta*resultSumNk;
+    } else if (rule.compare("simpson")==0){
+        assert(vecfunct.size()%2==1); // simpson's rule work when the size of the array is odd...
+        for (unsigned int i=1; i<vecfunct.size()-1; i+=2){
+            resultSumNk += vecfunct[i-1] + 4.0*vecfunct[i] + vecfunct[i+1];
+        }
+        result = delta/3.0*resultSumNk;   
+    } else{
+        throw std::invalid_argument("Unhandeled rule chosen in integrals. Choices are \"trapezoidal\" and \"simpson\"");
+    }
+    
+    return result;
+}
+
 
 // template<typename T, typename U>
 // inline typename std::enable_if< std::is_same< U,std::complex<double> >::value >::type Integrals::integral_functional_3d(std::function<std::complex<double>(T,T)> f

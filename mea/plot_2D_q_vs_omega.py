@@ -13,10 +13,10 @@ def get_derivative(p1 : float, p2 : float, p3 : float, p4 : float, delta_x : flo
 
 if __name__=="__main__":
 
-    range_plot = 0.8 # Range of q values to be plotted
+    range_plot = 1.05*np.pi # Range of q values to be plotted
     center_plot = 0.0 # Center around which the q values are plotted
 
-    filename = "cpp_tests/bb_1D_U_10.000000_beta_8.000000_Ntau_8192_Nk_601_isjj_1.hdf5.pade_wmax_20.0"
+    filename = "cpp_tests/susceptibilities/bb_1D_U_9.000000_beta_8.500000_Ntau_4096_Nk_501_isjj_0.hdf5.pade_wmax_20.0"
 
     wmax = float(findall(r"(?<=wmax_)(\d*\.\d+|\d+)",filename)[0])
     Ntau = int(findall(r"(?<=Ntau_)(\d+)",filename)[0])
@@ -26,21 +26,36 @@ if __name__=="__main__":
     tmp_q_omega_re_sigma = np.empty((len(omega),),dtype=float)
 
     plt.figure(0)
-    colors = iter(plt.cm.rainbow(np.linspace(0,1,10)))
+    colors = iter(plt.cm.rainbow(np.linspace(0,1,25)))
     hf = h5py.File(filename,"r")
     for i,q_val in enumerate(hf.keys()):
-        q = float(str(q_val).split("_")[-1])
-        print("q: ", q)
-        tmp_q_omega = np.array(hf.get(q_val))
-        tmp_q_omega = np.array(list(map(lambda x: x.imag,tmp_q_omega)))
-        for j,om in enumerate(omega):
-            if om==0.0:
-                tmp_q_omega_re_sigma[j] = get_derivative(tmp_q_omega[j-2],tmp_q_omega[j-1],tmp_q_omega[j+1],tmp_q_omega[j+2],2.0*wmax/1000)
-                print("der: ", tmp_q_omega_re_sigma[j])
-            else:
-                tmp_q_omega_re_sigma[j] = tmp_q_omega[j]/om
-        if (center_plot-range_plot) <= q <= (center_plot+range_plot):
-            plt.plot(omega,tmp_q_omega_re_sigma,marker="*",c=next(colors),label="%s" % (str(q_val)))
+        if "_1D_" in filename:
+            q = float(str(q_val).split("_")[-1])
+            print("q: ", q)
+            tmp_q_omega = np.array(hf.get(q_val))
+            tmp_q_omega = np.array(list(map(lambda x: x.imag,tmp_q_omega)))
+            for j,om in enumerate(omega):
+                if om==0.0:
+                    tmp_q_omega_re_sigma[j] = get_derivative(tmp_q_omega[j-2],tmp_q_omega[j-1],tmp_q_omega[j+1],tmp_q_omega[j+2],2.0*wmax/1000)
+                    print("der: ", tmp_q_omega_re_sigma[j])
+                else:
+                    tmp_q_omega_re_sigma[j] = tmp_q_omega[j]/om
+            if (center_plot-range_plot) <= q <= (center_plot+range_plot):
+                plt.plot(omega,tmp_q_omega_re_sigma,marker="*",c=next(colors),label="%s" % (str(q_val)))
+        elif "_2D_" in filename:
+            qx = float(str(q_val).split("_")[1])
+            qy = float(str(q_val).split("_")[3])
+            print("qx: ", qx, " qy: ", qy)
+            tmp_q_omega = np.array(hf.get(q_val))
+            tmp_q_omega = np.array(list(map(lambda x: x.imag,tmp_q_omega)))
+            for j,om in enumerate(omega):
+                if om==0.0:
+                    tmp_q_omega_re_sigma[j] = get_derivative(tmp_q_omega[j-2],tmp_q_omega[j-1],tmp_q_omega[j+1],tmp_q_omega[j+2],2.0*wmax/1000)
+                    print("der: ", tmp_q_omega_re_sigma[j])
+                else:
+                    tmp_q_omega_re_sigma[j] = tmp_q_omega[j]/om
+            if (center_plot-range_plot) <= qx <= (center_plot+range_plot) and (center_plot-range_plot) <= qy <= (center_plot+range_plot):
+                plt.plot(omega,tmp_q_omega_re_sigma,marker="*",c=next(colors),label="%s" % (str(q_val)))
     
     hf.close()
     

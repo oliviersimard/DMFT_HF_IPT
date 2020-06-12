@@ -8,13 +8,15 @@ from glob import glob
 from time import sleep
 from optparse import OptionParser
 import operator
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
+                               AutoMinorLocator)
 
 plt.rc('font', family='serif')
 plt.rc('text', usetex=True)
 plt.rcParams['text.latex.preamble']=[r"\usepackage[charter]{mathdesign}\usepackage{amsmath}"]
 
 # maximum number of DMFT iterations
-MAXVAL = 100-1
+MAXVAL = 150-1
 
 class Files_for_params(object):
     def __init__(self, largest_num_iteration : int, root : str, largest_int_file_for_params : str):
@@ -164,7 +166,7 @@ def get_according_to_condition(path : str, funct) -> tuple:
                     if cond and dict_to_store_passing_cond_files[key]._largest_num_iter<MAXVAL: # condition to consider phase delimitation. Needs to have converged in AFM.
                         if beta>max_beta:
                             max_beta=beta
-                    elif rest[0]>0.1 and dict_to_store_passing_cond_files[key]._largest_num_iter>=MAXVAL:
+                    elif rest[0]>0.14 and dict_to_store_passing_cond_files[key]._largest_num_iter>=MAXVAL: # rest[0] might change threshold, depending on hybridisation mixing
                         if beta>max_beta:
                             max_beta=beta
             print("max_beta: ", max_beta)
@@ -190,46 +192,108 @@ if __name__=="__main__":
     # sorting the dictionary according to U and beta (ascending order first)
     list_magnetization_for_Us_as_function_beta = sorted(dict_to_store_magnetization_for_Us_as_function_beta.items(),key=operator.itemgetter(0,1))
     
+    ######################### plotting ##########################
+
     # The top panel plot shows the phase boundary
-    fig, axs = plt.subplots(nrows=1,ncols=2,sharey=True)
-    fig.subplots_adjust(wspace=0.05)
+    fig, axs = plt.subplots(nrows=1,ncols=2,sharey=False)
+    fig.subplots_adjust(wspace=0.25)
     axs[0].grid()
 
     T_arr = list( map( lambda x: 1.0/x[0], params_respecting_condiction ) )
     U_arr = list( map( lambda x: x[1], params_respecting_condiction ) )
 
     if dim_int==0:
-        axs[0].set_title(r"AFM-PM phase boundary in infinite dimension")
+        axs[0].set_title(r"AFM-PM phase boundary in $\infty$ dimension")
     else:
         axs[0].set_title(r"AFM-PM phase boundary in {0:d}D".format(dim_int))
     axs[0].scatter(U_arr,T_arr,marker='o',c="red",s=10.0)
     axs[0].set_xlabel(r"$U$")
     axs[0].set_ylabel(r"$T (1/\beta)$")
-    axs[0].set_xlim(left=0.0,right=16.0)
+    axs[0].set_xlim(left=0.0,right=max(Us)+1.0)
 
     axs[0].text(0.25,0.15,"AFM",transform=axs[0].transAxes,size=20,weight=20)
     axs[0].text(0.55,0.75,"PM",transform=axs[0].transAxes,size=20,weight=20)
 
     # The lower panel shows the evolution of the magntization as a function of temperature for different values of U
     axs[1].grid()
-    axs[1].tick_params(axis='y',left=False)
-    axs[1].set_xlabel(r"$n_{\uparrow}-n_{\downarrow}$")
+    #axs[1].tick_params(axis='y',left=False)
+    axs[1].set_ylabel(r"$n_{\uparrow}-n_{\downarrow}$")
+    axs[1].set_xlabel(r"$T (1/\beta)$")
+    axs[1].set_xlim(0.0,0.3)
+    axs[1].set_ylim(0.0,1.0)
+
+    axs[1].yaxis.set_minor_locator(AutoMinorLocator())
+    axs[1].yaxis.set_major_locator(MultipleLocator(0.1))
+    axs[1].xaxis.set_minor_locator(AutoMinorLocator())
+    #axs[1].xaxis.set_major_locator(MultipleLocator(0.025))
+    axs[1].tick_params(axis='both', which='major', direction='out', length=3.5, width=1.0)
+    axs[1].tick_params(axis='y', which='minor', direction='in', length=2.0, width=1.0)
     if dim_int==0:
-        axs[1].set_title(r"Magnetization vs T in infinite dimension")
+        axs[1].set_title(r"Magnetization vs T in $\infty$ dimension")
     else:
         axs[1].set_title(r"Magnetization vs T in {0:d}D".format(dim_int))
-    n=len(Us)
-    color = iter(plt.cm.rainbow(np.linspace(0,1,n)))
+    U_thres = 8.0
+    color = iter(plt.cm.rainbow(np.linspace(0,1,11)))#U_thres+1
     # extracting U arrays before plotting
-    magnetization_vs_beta_for_Us = {}
     for U in sorted(Us):
-        magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-        T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-        axs[1].plot(magnetization_arr,T_arr,ms=2.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+        if U<=U_thres:
+            magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+            T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+            axs[1].plot(T_arr,magnetization_arr,ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+        elif U>U_thres and U<=10.0:
+            magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+            T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+            axs[1].plot(T_arr[:29],magnetization_arr[:29],ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
     
     axs[1].legend()
 
-    plt.show()
+    fig.set_size_inches(17/2.54,12/2.54)
+    if dim_int==0:
+        fig.savefig("Figure_phase_diagram_infinite_dimension.pdf")
+    else:
+        fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D.pdf")
+    plt.clf()
+
+    ####################### 2nd fig #######################
+
+    fig2, ax = plt.subplots()
+    ax.grid()
+
+    if dim_int==0:
+        ax.set_title(r"Magnetization vs T in $\infty$ dimension")
+    else:
+        ax.set_title(r"Magnetization vs T in {0:d}D".format(dim_int))
+
+    ax.set_ylabel(r"$n_{\uparrow}-n_{\downarrow}$")
+    ax.set_xlabel(r"$T (1/\beta)$")
+    ax.set_xlim(0.0,0.3)
+    ax.set_ylim(0.0,1.0)
+
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_major_locator(MultipleLocator(0.1))
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    
+    ax.tick_params(axis='both', which='major', direction='out', length=3.5, width=1.0)
+    ax.tick_params(axis='y', which='minor', direction='in', length=2.0, width=1.0)
+
+    U_thres = 8.0
+    color = iter(plt.cm.rainbow(np.linspace(0,1,U_thres+1)))#
+    # extracting U arrays before plotting
+    for U in sorted(Us):
+        if U<=U_thres:
+            magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+            T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+            ax.plot(T_arr,magnetization_arr,ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+    
+    ax.legend()
+    my_dpi=128
+    fig2.set_size_inches(848/my_dpi,495/my_dpi)
+    if dim_int==0:
+        fig2.savefig("Figure_magnetization_infinite_dimension.pdf",dpi=my_dpi)
+    else:
+        fig2.savefig("Figure_magnetization_{0:d}".format(dim_int)+"D.pdf",dpi=my_dpi)
+    
+    #plt.show()
 
     
 
