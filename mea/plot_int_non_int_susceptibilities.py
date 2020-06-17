@@ -21,7 +21,7 @@ if __name__=="__main__":
 
     # filenames whose data we want to combine. They have to have the same U, same temperature and dimensionnality.
     filename_bare = "cpp_tests/susceptibilities/bb_1D_U_8.000000_beta_7.000000_Ntau_2048_Nk_501_isjj_0.hdf5.pade_wmax_20.0"
-    filename_corr = "cpp_tests/susceptibilities/bb_1D_U_8.000000_beta_7.000000_Ntau_256_Nq_51_Nk_29_isjj_0_single_ladder_sum.hdf5.pade_wmax_20.0"
+    filename_corr = "cpp_tests/susceptibilities/bb_1D_U_8.000000_beta_7.000000_Ntau_256_Nq_21_Nk_29_isjj_0_single_ladder_sum_1.hdf5.pade_wmax_20.0"
 
     wmax_bare = float(findall(r"(?<=wmax_)(\d*\.\d+|\d+)",filename_bare)[0]); wmax_corr = float(findall(r"(?<=wmax_)(\d*\.\d+|\d+)",filename_corr)[0])
     Ntau_bare = int(findall(r"(?<=Ntau_)(\d+)",filename_bare)[0]); Ntau_corr = int(findall(r"(?<=Ntau_)(\d+)",filename_corr)[0])

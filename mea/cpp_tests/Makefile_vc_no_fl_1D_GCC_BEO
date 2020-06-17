@@ -1,0 +1,33 @@
+SRC=$(PWD)/../../src
+OBJ=$(PWD)/obj
+
+CXX=~/bin/mpicc -std=c++11 -Wall -fpermissive -O3 
+INC=${HOME}/gsl/include -I${HOME}/include #-I${HOME}/install/CMake-hdf5-1.12.0/HDF_Group/HDF5/1.12.0/include
+LIB=${HOME}/gsl/lib -L${HOME}/lib -L${HOME}/lib64 -L${HOME}/install/usr/lib64 #-L${HOME}/install/CMake-hdf5-1.12.0/HDF_Group/HDF5/1.12.0/lib
+
+CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -lstdc++ -lhdf5 -lhdf5_hl -lhdf5_cpp #-lgtest -lgmock -lpthread
+
+PROG=CPP-TESTS
+
+all: $(PROG)
+
+$(PROG): $(OBJ)/green_utils.o $(OBJ)/file_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/sus_corr_1D.o
+	$(CXX) $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/sus_corr_1D.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/file_utils.o $(CXXFLAGS) -o spl_vc_not_fl_1D.out
+
+$(OBJ)/green_utils.o: $(SRC)/green_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/green_utils.cpp -o $(OBJ)/green_utils.o
+
+$(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/file_utils.cpp -o $(OBJ)/file_utils.o
+
+$(OBJ)/IPT2nd3rdorderSingle2.o: $(SRC)/IPT2nd3rdorderSingle2.cpp
+	$(CXX) -c -I$(INC) $(SRC)/IPT2nd3rdorderSingle2.cpp -o $(OBJ)/IPT2nd3rdorderSingle2.o
+
+$(OBJ)/sus_corr_1D.o: $(PWD)/sus_vertex_corrections_1D_not_flattened.cpp
+	$(CXX) -c -I$(INC) $(PWD)/sus_vertex_corrections_1D_not_flattened.cpp -o $(OBJ)/sus_corr_1D.o
+
+$(OBJ)/integral_utils.o: $(SRC)/integral_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/integral_utils.cpp -o $(OBJ)/integral_utils.o
+
+clean:
+	rm -f $(OBJ)/* $(PWD)/spl_vc_not_fl_1D.out

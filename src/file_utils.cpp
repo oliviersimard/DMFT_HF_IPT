@@ -215,7 +215,7 @@ std::vector<std::string> get_info_from_filename(const std::string& strName,const
 
 }
 
-void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false){
+void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q_jj, std::vector< std::complex<double> >& GG_iqn_q_szsz, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false){
     /*  This method writes in an HDF5 file the data passed in the first entry "GG_iqn_q". The data has to be complex-typed. This function hinges on the
     the existence of a custom complex structure "cplx_t" to parse in the data:
     
@@ -239,15 +239,24 @@ void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* 
     const H5std_string MEMBER1( "RE" );
     const H5std_string MEMBER2( "IM" );
     const int RANK = 1;
+    H5::CompType mCmplx_type( sizeof(cplx_t) );
+    mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
+    mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
     try{
         H5::Exception::dontPrint();
         // Casting all the real values into the following array to get around the custom type design. Also easier to read out using Python.
-        std::vector<cplx_t> custom_cplx_GG_iqn_q(DATA_SET_DIM);
-        std::transform(GG_iqn_q.begin(),GG_iqn_q.end(),custom_cplx_GG_iqn_q.begin(),[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
+        std::vector<cplx_t> custom_cplx_GG_iqn_q_jj(DATA_SET_DIM), custom_cplx_GG_iqn_q_szsz(DATA_SET_DIM);
+        std::transform(GG_iqn_q_jj.begin(),GG_iqn_q_jj.end(),custom_cplx_GG_iqn_q_jj.begin(),[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
+        std::transform(GG_iqn_q_szsz.begin(),GG_iqn_q_szsz.end(),custom_cplx_GG_iqn_q_szsz.begin(),[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
 
         hsize_t dimsf[1];
         dimsf[0] = DATA_SET_DIM;
         H5::DataSpace dataspace( RANK, dimsf );
+
+        /*
+        * Create a group in the file
+        */
+        H5::Group* group = new H5::Group( file->createGroup( "/"+DATASET_NAME ) );
 
         // H5::CompType std_cmplx_type( sizeof(std::complex<double>) );
         // H5::FloatType datatype( H5::PredType::NATIVE_DOUBLE );
@@ -257,37 +266,42 @@ void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* 
         // std_cmplx_type.insertMember( MEMBER1, size_real_cmplx, H5::PredType::NATIVE_DOUBLE);
         // std_cmplx_type.insertMember( MEMBER2, size_imag_cmplx, H5::PredType::NATIVE_DOUBLE);
 
-        H5::CompType mCmplx_type( sizeof(cplx_t) );
-        mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
-        mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
-
-        // Create the dataset.
-        H5::DataSet* dataset;
+        // Create the dataset for jj.
+        H5::DataSet* datasetjj;
         // dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, std_cmplx_type, dataspace));
-        dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, mCmplx_type, dataspace));
+        datasetjj = new H5::DataSet(group->createDataSet("/"+DATASET_NAME+"/"+"jj", mCmplx_type, dataspace));
         // Write data to dataset
-        dataset->write( custom_cplx_GG_iqn_q.data(), mCmplx_type );
+        datasetjj->write( custom_cplx_GG_iqn_q_jj.data(), mCmplx_type );
+        delete datasetjj;
 
-        delete dataset;
+        // Create the dataset for szsz.
+        H5::DataSet* datasetszsz;
+        // dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, std_cmplx_type, dataspace));
+        datasetszsz = new H5::DataSet(group->createDataSet("/"+DATASET_NAME+"/"+"szsz", mCmplx_type, dataspace));
+        // Write data to dataset
+        datasetszsz->write( custom_cplx_GG_iqn_q_szsz.data(), mCmplx_type );
+        delete datasetszsz;
 
-    } catch( H5::FileIException err ){
-        err.printErrorStack();
-        throw std::runtime_error("H5::FileIException thrown!");
+        delete group;
+
+    } catch( H5::FileIException error ){
+        //err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown in writeInHDF5File!");
     }
     // catch failure caused by the DataSet operations
     catch( H5::DataSetIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSetIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException thrown in writeInHDF5File!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataSpaceIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSpaceIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException thrown in writeInHDF5File!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataTypeIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataTypeIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException thrown in writeInHDF5File!");
     }
 
 }
@@ -342,28 +356,28 @@ void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, d
 
         delete dataset;
     } catch( H5::FileIException err ){
-        err.printErrorStack();
-        throw std::runtime_error("H5::FileIException thrown!");
+        //err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown in save_matrix_in_HDF5!");
     }
     // catch failure caused by the DataSet operations
     catch( H5::DataSetIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSetIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException thrown in save_matrix_in_HDF5!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataSpaceIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSpaceIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException thrown in save_matrix_in_HDF5!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataTypeIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataTypeIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException thrown in save_matrix_in_HDF5!");
     }
 
 }
 
-void save_matrix_in_HDF5(std::complex<double>* mat_to_save, double k_bar, double k_tilde, H5::H5File* file, size_t NX, size_t NY) noexcept(false){
+void save_matrix_in_HDF5(const arma::Cube< std::complex<double> >& cube_to_save, const std::vector< std::complex<double> >& iqn, H5std_string DATASET_NAME, H5::H5File* file) noexcept(false){
     /* This method saves the denominator of the single ladder contribution inside an HDF5 file for later use - especially in the
     case where one wants to compute the infinite ladder contribution.
         
@@ -374,63 +388,161 @@ void save_matrix_in_HDF5(std::complex<double>* mat_to_save, double k_bar, double
             (double): current vertex.
 
     */
-    const H5std_string MEMBER1 = std::string( "RE" );
-    const H5std_string MEMBER2 = std::string( "IM" );
-    const H5std_string  DATASET_NAME( std::string("kbar_")+std::to_string(k_bar)+std::string("ktilde_")+std::to_string(k_tilde) );
+    const size_t NX = cube_to_save.n_cols;
+    const size_t NY = cube_to_save.n_rows;
+    const size_t NZ = cube_to_save.n_slices;
+    const H5std_string  MEMBER1 = std::string( "RE" );
+    const H5std_string  MEMBER2 = std::string( "IM" );
+    // const H5std_string  DATASET_NAME( std::string("ktilde_m_bar_")+std::to_string(k_tilde_m_bar) );
     const int RANK = 2;
+    
     try{
-        cplx_t cplx_mat_to_save[NY][NX];
-        // casting data into custom complex struct..
-        for (size_t i=0; i<NY; i++){
-            std::transform(&(mat_to_save[i*NX]),&(mat_to_save[i*NX+NX]),cplx_mat_to_save[i],[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
-        }
-        /*
-        * Turn off the auto-printing when failure occurs so that we can
-        * handle the errors appropriately
-        */
-        H5::Exception::dontPrint();
         /*
         * Define the size of the array and create the data space for fixed
         * size dataset.
         */
         hsize_t dimsf[2];              // dataset dimensions
-        dimsf[0] = NX;
-        dimsf[1] = NY;
+        dimsf[0] = NY;
+        dimsf[1] = NX;
         H5::DataSpace dataspace( RANK, dimsf );
         H5::CompType mCmplx_type( sizeof(cplx_t) );
         mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
         mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
 
-        // Create the dataset.
-        H5::DataSet* dataset;
-        dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, mCmplx_type, dataspace));
-        // Write data to dataset
-        dataset->write( cplx_mat_to_save, mCmplx_type );
+        /*
+        * Create a group in the file
+        */
+        H5::Group* group = new H5::Group( file->createGroup( "/"+DATASET_NAME ) );
 
-        // delete[] cplx_mat_to_save[0];
-        // delete[] cplx_mat_to_save;
-        delete dataset;
+        // Attributes 
+        hsize_t dimatt[1]={1};
+        H5::DataSpace attr_dataspace = H5::DataSpace(1, dimatt);
+
+        /*
+        * Turn off the auto-printing when failure occurs so that we can
+        * handle the errors appropriately
+        */
+        H5::Exception::dontPrint();
+
+        cplx_t cplx_mat_to_save[NY][NX];
+        for (size_t k=0; k<NZ; k++){
+            H5std_string  ATTR_NAME( std::string("iqn") );
+            // casting data into custom complex struct..
+            for (size_t i=0; i<NY; i++){
+                for (size_t j=0; j<NX; j++){
+                    cplx_mat_to_save[i][j] = cplx_t{cube_to_save.slice(k)(i,j).real(),cube_to_save.slice(k)(i,j).imag()};
+                }
+            }
+
+            // Create the dataset.
+            H5::DataSet dataset;
+            dataset = H5::DataSet(group->createDataSet("/"+DATASET_NAME+"/"+ATTR_NAME+"_"+std::to_string(iqn[k].imag()), mCmplx_type, dataspace));
+
+            // Write data to dataset
+            dataset.write( cplx_mat_to_save, mCmplx_type );
+            
+            // Create a dataset attribute. 
+            H5::Attribute attribute = dataset.createAttribute( ATTR_NAME, H5::PredType::NATIVE_DOUBLE, 
+                                                attr_dataspace);
+        
+            // Write the attribute data.
+            double attr_data[1] = { iqn[k].imag() };
+            attribute.write(H5::PredType::NATIVE_DOUBLE, attr_data);
+
+        }
+        
+        delete group;
+
     } catch( H5::FileIException err ){
-        err.printErrorStack();
-        throw std::runtime_error("H5::FileIException thrown!");
+        //err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown in save_matrix_in_HDF5 2!");
     }
     // catch failure caused by the DataSet operations
     catch( H5::DataSetIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSetIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException thrown in save_matrix_in_HDF5 2!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataSpaceIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSpaceIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException thrown in save_matrix_in_HDF5 2!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataTypeIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataTypeIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException thrown in save_matrix_in_HDF5 2!");
     }
 
 }
+
+// void save_matrix_in_HDF5(std::complex<double>* mat_to_save, double k_bar, double k_tilde, H5::H5File* file, size_t NX, size_t NY) noexcept(false){
+//     /* This method saves the denominator of the single ladder contribution inside an HDF5 file for later use - especially in the
+//     case where one wants to compute the infinite ladder contribution.
+        
+//         Parameters:
+//             k (double): k-point.
+
+//         Returns:
+//             (double): current vertex.
+
+//     */
+//     const H5std_string MEMBER1 = std::string( "RE" );
+//     const H5std_string MEMBER2 = std::string( "IM" );
+//     const H5std_string  DATASET_NAME( std::string("kbar_")+std::to_string(k_bar)+std::string("ktilde_")+std::to_string(k_tilde) );
+//     const int RANK = 2;
+//     try{
+//         cplx_t cplx_mat_to_save[NY][NX];
+//         // casting data into custom complex struct..
+//         for (size_t i=0; i<NY; i++){
+//             std::transform(&(mat_to_save[i*NX]),&(mat_to_save[i*NX+NX]),cplx_mat_to_save[i],[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
+//         }
+//         /*
+//         * Turn off the auto-printing when failure occurs so that we can
+//         * handle the errors appropriately
+//         */
+//         H5::Exception::dontPrint();
+//         /*
+//         * Define the size of the array and create the data space for fixed
+//         * size dataset.
+//         */
+//         hsize_t dimsf[2];              // dataset dimensions
+//         dimsf[0] = NX;
+//         dimsf[1] = NY;
+//         H5::DataSpace dataspace( RANK, dimsf );
+//         H5::CompType mCmplx_type( sizeof(cplx_t) );
+//         mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
+//         mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
+
+//         // Create the dataset.
+//         H5::DataSet* dataset;
+//         dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, mCmplx_type, dataspace));
+//         // Write data to dataset
+//         dataset->write( cplx_mat_to_save, mCmplx_type );
+
+//         // delete[] cplx_mat_to_save[0];
+//         // delete[] cplx_mat_to_save;
+//         delete dataset;
+//     } catch( H5::FileIException err ){
+//         //err.printErrorStack();
+//         throw std::runtime_error("H5::FileIException thrown!");
+//     }
+//     // catch failure caused by the DataSet operations
+//     catch( H5::DataSetIException error ){
+//         //error.printErrorStack();
+//         throw std::runtime_error("H5::DataSetIException!");
+//     }
+//     // catch failure caused by the DataSpace operations
+//     catch( H5::DataSpaceIException error ){
+//         //error.printErrorStack();
+//         throw std::runtime_error("H5::DataSpaceIException!");
+//     }
+//     // catch failure caused by the DataSpace operations
+//     catch( H5::DataTypeIException error ){
+//         //error.printErrorStack();
+//         throw std::runtime_error("H5::DataTypeIException!");
+//     }
+
+// }
 
 arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::string& DATASET_NAME) noexcept(false){
 
@@ -477,23 +589,97 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         // }
 
     } catch( H5::FileIException err ){
-        err.printErrorStack();
-        throw std::runtime_error("H5::FileIException thrown!");
+        //err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown in readFromHDF5File!");
     }
     // catch failure caused by the DataSet operations
     catch( H5::DataSetIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSetIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException thrown in readFromHDF5File!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataSpaceIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataSpaceIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException thrown in readFromHDF5File!");
     }
     // catch failure caused by the DataSpace operations
     catch( H5::DataTypeIException error ){
-        error.printErrorStack();
-        throw std::runtime_error("H5::DataTypeIException!");
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException thrown in readFromHDF5File!");
+    }
+
+    return ret_mat;
+
+}
+
+arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const std::string& DATASET_NAME, std::complex<double> iqn) noexcept(false){
+
+    const H5std_string MEMBER1( "RE" );
+    const H5std_string MEMBER2( "IM" );
+    H5::CompType custom_cplx( sizeof(cplx_t) );
+    custom_cplx.insertMember( MEMBER1, HOFFSET(cplx_t,re), H5::PredType::NATIVE_DOUBLE );
+    custom_cplx.insertMember( MEMBER2, HOFFSET(cplx_t,im), H5::PredType::NATIVE_DOUBLE );
+    const int RANK_OUT = 2;
+    /*
+    * Open the specified file and the specified dataset in the file.
+    */
+    H5::DataSet dataset_open;
+
+    // std::cout << "Group fetched: " << "iqn_"+std::to_string(iqn.imag()) << std::endl;
+    H5::Group* group = new H5::Group(file->openGroup(DATASET_NAME));
+    try {  // to determine if the dataset exists in the group
+        dataset_open = H5::DataSet( group->openDataSet( "iqn_"+std::to_string(iqn.imag()) ) );
+    } catch( H5::GroupIException not_found_error ) {
+        std::cerr << " Dataset is not found." << "\n";
+    }
+    /*
+    * Get dataspace of the dataset.
+    */
+    H5::DataSpace dataspace_open = dataset_open.getSpace();
+    hsize_t dims_out[2];
+    int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
+    const size_t NY = dims_out[0];
+    const size_t NX = dims_out[1];
+    arma::Mat< std::complex<double> > ret_mat(NY,NX);
+    try{
+        /*
+        * Get the class of the datatype that is used by the dataset.
+        */
+        H5T_class_t type_class = dataset_open.getTypeClass();
+        
+        cplx_t data_out[NY][NX];
+        H5::DataSpace memspace_out( RANK_OUT, dims_out );
+        dataset_open.read(data_out, custom_cplx, memspace_out);
+        for (size_t i=0; i<NY; i++){
+            for (size_t j=0; j<NX; j++){
+                ret_mat(i,j) = std::complex<double>( data_out[i][j].re,data_out[i][j].im );
+            }
+        }
+        // for (size_t j=0; j<NX; j++){
+        //     std::cout << ret_mat_ptr->at(0,j) << std::endl;
+        // }
+        // for (size_t j=0; j<NX; j++){
+        //     std::cout << data_out[0][j].re << " " << data_out[0][j].im << std::endl;
+        // }
+        delete group;
+    } catch( H5::FileIException err ){
+        //err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown in readFromHDF5FileCube!");
+    }
+    // catch failure caused by the DataSet operations
+    catch( H5::DataSetIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException thrown in readFromHDF5FileCube!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataSpaceIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException thrown in readFromHDF5FileCube!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataTypeIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException thrown in readFromHDF5FileCube!");
     }
 
     return ret_mat;

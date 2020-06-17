@@ -1,6 +1,5 @@
 #include "../../src/IPT2nd3rdorderSingle2.hpp"
 #include <ctime>
-#include <mpi.h>
 /*
 Info HDF5:
 https://support.hdfgroup.org/HDF5/doc/cpplus_RM/compound_8cpp-example.html
@@ -17,11 +16,10 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 //static bool slaves_can_write_in_file = false; // This prevents that the slave processes
 static int root_process = 0;
 
-//#define INFINITE
+// #define INFINITE
 
 typedef struct{
-    size_t k_tilde;
-    size_t k_bar;
+    size_t k_tilde_m_bar;
     std::complex<double> cplx_data;
 } MPIData;
 
@@ -29,8 +27,6 @@ struct MPIDataReceive{
     MPIData* data_struct;
     size_t size;
 };
-
-inline std::tuple<int,int> inverse_Cantor_pairing(int number);
 
 // Adding methods to IPT2 namespace for this particular translation unit
 namespace IPT2{
@@ -48,7 +44,7 @@ namespace IPT2{
         public:
             OneLadder& operator=(const OneLadder&) = delete;
             OneLadder(const OneLadder&) = delete;
-            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed=false, void* arma_ptr=nullptr, double qq=0.0) const noexcept(false);
+            std::vector< MPIData > operator()(size_t n_k_tilde_m_bar, bool is_jj, bool is_single_ladder_precomputed=false, void* arma_ptr=nullptr, double qq=0.0) const noexcept(false);
             OneLadder()=default;
             explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn(iqn), _k_t_b(k_arr), _iqn_tilde(iqn_tilde){
                 this->_mu = mu;
@@ -64,7 +60,7 @@ namespace IPT2{
             const std::vector<double>& _k_t_b;
             double _mu {0.0}, _U {0.0}, _beta {0.0};
             inline T getGreen(double k, T iwn) const noexcept;
-            T Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_tilde) const noexcept(false);
+            T Gamma(double k_tilde_m_bar, T ikn_bar, T ikn_tilde, double qq, T iqn) const noexcept(false);
 
         private:
             const std::vector< T >& _iqn_tilde;
@@ -84,117 +80,20 @@ namespace IPT2{
             explicit InfiniteLadders(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : OneLadder< T >(splInlineobj,iqn,k_arr,iqn_tilde,mu,U,beta){
                 std::cout << "InfiniteLadder U: " << OneLadder< T >::_U << " and InfiniteLadder beta: " << OneLadder< T >::_beta << std::endl;
             }
-            std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_simple_ladder_precomputed=false, double qq=0.0) const noexcept(false);
+            std::vector< MPIData > operator()(size_t n_k_tilde_m_bar, bool is_jj, bool is_simple_ladder_precomputed=false, double qq=0.0) const noexcept(false);
             static std::string _FILE_NAME;
 
         private:
             using OneLadder< T >::getGreen;
             using OneLadder< T >::Gamma;
-            T Gamma_correction_denominator(double k_bar, double kpp, T ikn_bar, T ikppn) const noexcept(false);
-            arma::Mat< T > Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq) const noexcept(false);
+            T Gamma_correction_denominator(double k_bar, double kpp, double qq, T ikn_bar, T ikppn, T iqn) const noexcept(false);
+            arma::Mat< T > Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq, T iqn) const noexcept(false);
             T Gamma_merged_corr(arma::Mat< T >& denom_corr, T iqn, double qq) const noexcept(false);
             
     };
 
     template< class T > std::string InfiniteLadders< T >::_FILE_NAME = std::string("");
 
-}
-
-template< class T >
-class ArmaMPI{
-    /* This specific class sends T-typed Armadillo matrices across MPI processes */
-    friend class IPT2::OneLadder< T >;
-    public:
-        explicit ArmaMPI(size_t n_rows, size_t n_cols);
-        ~ArmaMPI();
-        void send_Arma_mat_MPI(arma::Mat< T >& mat,int dest, int tag) const noexcept;
-        arma::Mat< T > recv_Arma_mat_MPI(int tag, int src) const noexcept;
-        void fill_TArr(arma::Mat< T >& mat) const noexcept;
-
-    private:
-        T** _TArr;
-        T* _Tmemptr;
-        size_t _n_rows;
-        size_t _n_cols;
-        //MPI_Datatype _cplx_custom_t;
-};
-
-template< class T >
-ArmaMPI< T >::ArmaMPI(size_t n_rows, size_t n_cols) : _n_rows(n_rows),_n_cols(n_cols){
-    T* data = new T[_n_rows*_n_cols];
-    _TArr = new T*[_n_rows];
-    for (size_t i=0; i<_n_rows; i++){
-        _TArr[i] = &data[i*_n_cols];
-    }
-    // constructing the MPI datatype, even if not needed..
-    //IPT2::create_mpi_data_struct_cplx(_cplx_custom_t);
-    _Tmemptr = new T[_n_rows*_n_cols];
-}
-
-template< class T >
-ArmaMPI< T >::~ArmaMPI(){
-    delete[] _TArr[0]; // Effectively deletes data*
-    delete[] _TArr;
-    delete[] _Tmemptr;
-    //MPI_Type_free(&_cplx_custom_t);
-}
-
-template< class T >
-void ArmaMPI< T >::send_Arma_mat_MPI(arma::Mat< T >& mat,int dest,int tag) const noexcept{
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            _TArr[i][j] = mat(i,j);
-        }
-    }
-    // Contiguous memory
-    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,dest,tag,MPI_COMM_WORLD);
-}
-
-template<>
-inline void ArmaMPI< std::complex<double> >::send_Arma_mat_MPI(arma::Mat< std::complex<double> >& mat,int dest,int tag) const noexcept{
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            _TArr[i][j] = mat(i,j);
-        }
-    }
-    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,dest,tag,MPI_COMM_WORLD);
-}
-
-template< class T >
-arma::Mat< T > ArmaMPI< T >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
-    arma::Mat< T > returned_mat(_n_rows,_n_cols);
-    MPI_Recv(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            returned_mat(i,j) = _TArr[i][j];
-        }
-    }
-
-    return returned_mat;
-}
-
-template<>
-inline arma::Mat< std::complex<double> > ArmaMPI< std::complex<double> >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
-    arma::Mat< std::complex<double> > returned_mat(_n_rows,_n_cols);
-    MPI_Recv(_Tmemptr,_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            returned_mat(i,j) = _Tmemptr[i*_n_cols+j];
-        }
-    }
-
-    return returned_mat;
-}
-
-template< class T >
-inline void ArmaMPI< T >::fill_TArr(arma::Mat< T >& mat) const noexcept{
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            _TArr[i][j] = mat(i,j);
-        }
-    }
 }
 
 template< class T >
@@ -212,7 +111,7 @@ inline T IPT2::OneLadder< T >::getGreen(double k, T iwn) const noexcept{
 }
 
 template< class T >
-T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_tilde) const noexcept(false){
+T IPT2::OneLadder< T >::Gamma(double k_tilde_m_bar, T ikn_bar, T ikn_tilde, double qq, T iqn) const noexcept(false){
     /*  This method computes the current-vertex correction for the single ladder diagram. It uses the dressed Green's
     functions computed in the paramagnetic state. 
         
@@ -229,12 +128,13 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_til
     */
     T lower_val{0.0};
     const Integrals intObj;
+    assert(_splInlineobj._k_array.size()>2);
     const double delta = 2.0*M_PI/(double)(_splInlineobj._k_array.size()-1);
     std::vector< T > tmp_container_integral_k(_splInlineobj._k_array.size());
     std::vector< T > tmp_container_sum_iqn(_iqn_tilde.size());
     for (size_t j=0; j<_iqn_tilde.size(); j++){
         for (size_t l=0; l<_splInlineobj._k_array.size(); l++){
-            tmp_container_integral_k[l] = getGreen(k_bar-_splInlineobj._k_array[l],ikn_bar-_iqn_tilde[j])*getGreen(k_tilde-_splInlineobj._k_array[l],ikn_tilde-_iqn_tilde[j]);
+            tmp_container_integral_k[l] = getGreen(_splInlineobj._k_array[l]-qq+k_tilde_m_bar,ikn_tilde-_iqn_tilde[j])*getGreen(_splInlineobj._k_array[l],ikn_tilde-_iqn_tilde[j]+iqn);
         }
         tmp_container_sum_iqn[j] = 1.0/(2.0*M_PI)*intObj.I1D_VEC(tmp_container_integral_k,delta,"simpson");
     }
@@ -243,12 +143,12 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, T ikn_bar, T ikn_til
     lower_val *= _U/_beta;
     lower_val += 1.0;
     lower_val = _U/lower_val;
-
+    
     return lower_val;
 }
 
 template< class T >
-std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed, void* arma_ptr, double qq) const noexcept(false){
+std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_m_bar, bool is_jj, bool is_single_ladder_precomputed, void* arma_ptr, double qq) const noexcept(false){
     /*  This method computes the susceptibility given the current-vertex correction for the single ladder diagram. It does so for a set
     of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
         
@@ -266,49 +166,74 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
     std::vector< MPIData > GG_iqn;
     // Computing Gamma
     const size_t NI = _splInlineobj._iwn_array.size();
-    arma::Mat< T > Gamma_n_bar_n_tilde(NI,NI); // Doesn't depend on iq_n
-    for (size_t n_bar=0; n_bar<NI; n_bar++){
-        // clock_t begin = clock();
-        for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
-            Gamma_n_bar_n_tilde(n_bar,n_tilde) = Gamma(_k_t_b[n_k_bar],_k_t_b[n_k_tilde],_splInlineobj._iwn_array[n_bar],_splInlineobj._iwn_array[n_tilde]);
+    arma::Cube< T > Gamma_n_tilde_n_bar(NI,NI,_iqn.size()); // Doesn't depend on iq_n
+    const Integrals intObj;
+    const double delta = 2.0*M_PI/(_k_t_b.size()-1);
+    for (size_t n_em=0; n_em<_iqn.size(); n_em++){
+        clock_t begin = clock();
+        for (size_t n_bar=0; n_bar<NI; n_bar++){
+            // clock_t begin = clock();
+            for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
+                Gamma_n_tilde_n_bar(n_tilde,n_bar,n_em) = Gamma(_k_t_b[n_k_tilde_m_bar],_splInlineobj._iwn_array[n_bar],_splInlineobj._iwn_array[n_tilde],qq,_iqn[n_em]);
+            }
+            // clock_t end = clock();
+            // double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+            // std::cout << "outer loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
         }
-        // clock_t end = clock();
-        // double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        // std::cout << "outer loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
+        clock_t end = clock();
+        double elapsed_secs = double(end-begin) / CLOCKS_PER_SEC;
+        std::cout << "loop em " << n_em << " took " << elapsed_secs << " secs.." << "\n";
     }
     if (is_single_ladder_precomputed){
         // Come up with UNIQUE way to attribute the tags to different Gamma matrices using Cantor pairing function
-        int tag = (int)( ((n_k_bar+n_k_tilde)*(n_k_bar+n_k_tilde+1))/2 ) + (int)n_k_tilde;
+        int tag = (int)( n_k_tilde_m_bar );
         std::cout << "tag: " << tag << std::endl;
         tag_vec.push_back(tag);
-        *( static_cast< arma::Mat< T >* >(arma_ptr) ) = Gamma_n_bar_n_tilde;
+        *( static_cast< arma::Cube< T >* >(arma_ptr) ) = Gamma_n_tilde_n_bar;
+        
         // for (size_t i=0; i<_splInlineobj._iwn_array.size(); i++){
-        //     std::cout << "el after: " << sl_vec[0][3*_splInlineobj._iwn_array.size()+i] << std::endl;
+        //     std::cout << "el after: " << static_cast< arma::Cube< T >* >(arma_ptr)->slice(0)(i,i) << std::endl;
         // }
+        // exit(0);
     }
-
-    arma::Mat< T > GG_n_bar_n_tilde(NI,NI);
-    for (size_t em=0; em<_iqn.size(); em++){
-        for (size_t n_bar=0; n_bar<NI; n_bar++){
-            for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
-                // This part remains to be done....
-                GG_n_bar_n_tilde(n_bar,n_tilde) = getGreen(_k_t_b[n_k_tilde],_splInlineobj._iwn_array[n_tilde])*getGreen(_k_t_b[n_k_tilde]+qq,_splInlineobj._iwn_array[n_tilde]+_iqn[em])*Gamma_n_bar_n_tilde(n_bar,n_tilde)*getGreen(_k_t_b[n_k_bar],_splInlineobj._iwn_array[n_bar])*getGreen(_k_t_b[n_k_bar]+qq,_splInlineobj._iwn_array[n_bar]+_iqn[em]);
+    
+    arma::Mat< T > GG_n_tilde_n_bar(NI,NI);
+    std::vector< T > tmp_integral_k(_splInlineobj._k_array.size());
+    T int_result;
+    for (size_t n_em=0; n_em<_iqn.size(); n_em++){
+        
+        if (is_jj){
+            for (size_t n_bar=0; n_bar<NI; n_bar++){
+                for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
+                    for (size_t n_k_tilde=0; n_k_tilde<tmp_integral_k.size(); n_k_tilde++){
+                        tmp_integral_k[n_k_tilde] = -1.0*velocity(_k_t_b[n_k_tilde])*velocity(_k_t_b[n_k_tilde_m_bar])*getGreen(_k_t_b[n_k_tilde],_splInlineobj._iwn_array[n_tilde])*getGreen(_k_t_b[n_k_tilde]-qq,_splInlineobj._iwn_array[n_tilde]-_iqn[n_em])*getGreen(_k_t_b[n_k_tilde_m_bar],_splInlineobj._iwn_array[n_bar])*getGreen(_k_t_b[n_k_tilde_m_bar]+qq,_splInlineobj._iwn_array[n_bar]+_iqn[n_em]);
+                    }
+                    int_result = 1.0/(2.0*M_PI)*intObj.I1D_VEC(tmp_integral_k,delta,"simpson");
+                    // The Cube (vertex) doesn't depend on k_tilde, but only on k_tilde_m_bar...
+                    GG_n_tilde_n_bar(n_tilde,n_bar) = int_result*Gamma_n_tilde_n_bar(n_tilde,n_bar,n_em);
+                }
+            }
+        } else{ // ADDED A FACTOR OF 2 FOR THE SPIN BELOW
+            for (size_t n_bar=0; n_bar<NI; n_bar++){
+                for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
+                    for (size_t n_k_tilde=0; n_k_tilde<tmp_integral_k.size(); n_k_tilde++){
+                        tmp_integral_k[n_k_tilde] = getGreen(_k_t_b[n_k_tilde],_splInlineobj._iwn_array[n_tilde])*getGreen(_k_t_b[n_k_tilde]-qq,_splInlineobj._iwn_array[n_tilde]-_iqn[n_em])*getGreen(_k_t_b[n_k_tilde_m_bar],_splInlineobj._iwn_array[n_bar])*getGreen(_k_t_b[n_k_tilde_m_bar]+qq,_splInlineobj._iwn_array[n_bar]+_iqn[n_em]);
+                    }
+                    int_result = 1.0/(2.0*M_PI)*intObj.I1D_VEC(tmp_integral_k,delta,"simpson");
+                    // The Cube (vertex) doesn't depend on k_tilde, but only on k_tilde_m_bar...
+                    GG_n_tilde_n_bar(n_tilde,n_bar) = int_result*Gamma_n_tilde_n_bar(n_tilde,n_bar,n_em);
+                }
             }
         }
-        if (is_jj){
-            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, -1.0*velocity(_k_t_b[n_k_tilde])*velocity(_k_t_b[n_k_bar])*(2.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
-            GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
-        } else{ // ADDED A FACTOR OF 2 FOR THE SPIN BELOW
-            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, (2.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
-            GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
-        }
+        MPIData mpi_data_tmp { n_k_tilde_m_bar, (2.0/_beta/_beta)*arma::accu(GG_n_tilde_n_bar) }; // summing over the internal ikn_tilde and ikn_bar
+        GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
     }
     
     return GG_iqn;
 }
 
 template< class T >
-T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double kpp, T ikn_bar, T ikppn) const noexcept(false){
+T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double kpp, double qq, T ikn_bar, T ikppn, T iqn) const noexcept(false){
     /*  This method computes the (q,iqn)-independent part of the correction to the current-vertex for the single ladder diagram. 
     It corresponds to the denominator of the correction term. This correction to the single ladder diagrams depends solely on the 
     following incoming tuple (k_bar,ikn_bar). It uses the dressed Green's functions computed in the paramagnetic state. 
@@ -331,7 +256,7 @@ T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double 
     const size_t NI = OneLadder< T >::_splInlineobj._iwn_array.size();
     for (size_t n_ppp=0; n_ppp<NI; n_ppp++){
         for (size_t n_k_ppp=0; n_k_ppp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_ppp++){
-            tmp_container_integral_k[n_k_ppp] = getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_ppp]+kpp-k_bar,OneLadder< T >::_splInlineobj._iwn_array[n_ppp]+ikppn-ikn_bar)*getGreen(OneLadder< T >::_splInlineobj._k_array[n_k_ppp],OneLadder< T >::_splInlineobj._iwn_array[n_ppp]);
+            tmp_container_integral_k[n_k_ppp] = getGreen(k_bar+qq-OneLadder< T >::_splInlineobj._k_array[n_k_ppp],ikn_bar+iqn-OneLadder< T >::_splInlineobj._iwn_array[n_ppp])*getGreen(kpp+qq-OneLadder< T >::_splInlineobj._k_array[n_k_ppp],ikppn+iqn-OneLadder< T >::_splInlineobj._iwn_array[n_ppp]);
         }
         tmp_container_sum_iwn[n_ppp] = intObj.I1D_VEC(tmp_container_integral_k,delta,"simpson");
     }
@@ -343,7 +268,7 @@ T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double 
 }
 
 template< class T >
-arma::Mat< T > IPT2::InfiniteLadders< T >::Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq) const noexcept(false){
+arma::Mat< T > IPT2::InfiniteLadders< T >::Gamma_to_merge_corr(double k_bar, T ikn_bar, double qq, T iqn) const noexcept(false){
     /*  This method computes the matrix containing the correction term to the single ladder as a function of the local
     momentum k_pp and the local fermionic Matsubara frequency ikn_bar. This method mainly produces data container fit to be used
     to sum over the local overall variables (k_pp,ikppn) defining the correction to the single ladder contribution.
@@ -360,13 +285,13 @@ arma::Mat< T > IPT2::InfiniteLadders< T >::Gamma_to_merge_corr(double k_bar, T i
     // compute the denominator of correction term in bunch (doesn't depend on iqn)
     arma::Mat< T > denom_corr(OneLadder< T >::_splInlineobj._k_array.size(),OneLadder< T >::_splInlineobj._iwn_array.size());
     for (size_t n_k_pp=0; n_k_pp<OneLadder< T >::_splInlineobj._k_array.size(); n_k_pp++){
-        clock_t begin = clock();
+        // clock_t begin = clock();
         for (size_t n_pp=0; n_pp<OneLadder< T >::_splInlineobj._iwn_array.size(); n_pp++){
-            denom_corr(n_k_pp,n_pp) = Gamma_correction_denominator(k_bar,OneLadder< T >::_splInlineobj._k_array[n_k_pp],ikn_bar,OneLadder< T >::_splInlineobj._iwn_array[n_pp]);
+            denom_corr(n_k_pp,n_pp) = Gamma_correction_denominator(k_bar,OneLadder< T >::_splInlineobj._k_array[n_k_pp],qq,ikn_bar,OneLadder< T >::_splInlineobj._iwn_array[n_pp],iqn);
         }
-        clock_t end = clock();
-        double elapsed_secs = double(end-begin) / CLOCKS_PER_SEC;
-        std::cout << "infinite ladder loop n_k_pp: " << n_k_pp << elapsed_secs << "secs.." << "\n";
+        // clock_t end = clock();
+        // double elapsed_secs = double(end-begin) / CLOCKS_PER_SEC;
+        // std::cout << "infinite ladder loop n_k_pp: " << n_k_pp << elapsed_secs << "secs.." << "\n";
     }
 
     return denom_corr;
@@ -407,7 +332,7 @@ T IPT2::InfiniteLadders< T >::Gamma_merged_corr(arma::Mat< T >& denom_corr, T iq
 }
 
 template< class T >
-std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, bool is_jj, bool is_single_ladder_precomputed, double qq) const noexcept(false){
+std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_tilde_m_bar, bool is_jj, bool is_single_ladder_precomputed, double qq) const noexcept(false){
     /*  This method computes the susceptibility given the current-vertex correction for the infinite ladder diagram. It does so for a set
     of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
         
@@ -428,67 +353,95 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     // Computing Gamma
     // Here should have the choice the load the precomputed single ladder denominator or not to save time...
     const size_t NI = OneLadder< T >::_splInlineobj._iwn_array.size();
+    const double delta = 2.0*M_PI/(OneLadder< T >::_k_t_b.size()-1);
+    const Integrals intObj;
     arma::Mat< T > Gamma_n_bar_n_tilde(NI,NI); // Doesn't depend on iq_n
-    if (is_single_ladder_precomputed){
-        // Should load the data saved previously saved in the simpler simgle ladder calculation..
-        const H5std_string DATASET_NAME_OPEN("kbar_"+std::to_string(OneLadder<T>::_k_t_b[n_k_bar])+"ktilde_"+std::to_string(OneLadder<T>::_k_t_b[n_k_tilde]));
-        std::cout << "_FILE_NAME: " << _FILE_NAME << std::endl;
-        H5::H5File* file_open = new H5::H5File(_FILE_NAME,H5F_ACC_RDONLY);
+    for (size_t n_em=0; n_em<OneLadder< T >::_iqn.size(); n_em++){
+        if (is_single_ladder_precomputed){
+            // Should load the data saved previously saved in the simpler simgle ladder calculation..
+            const H5std_string DATASET_NAME_OPEN( "ktilde_m_bar_"+std::to_string(OneLadder< T >::_k_t_b[n_k_tilde_m_bar]) );
+            std::cout << "_FILE_NAME: " << _FILE_NAME << std::endl;
+            H5::H5File* file_open = new H5::H5File(_FILE_NAME,H5F_ACC_RDONLY);
 
-        if ( std::is_same< T,std::complex<double> >::value ){
-            try{
-                Gamma_n_bar_n_tilde = readFromHDF5File(file_open,DATASET_NAME_OPEN);
-            } catch(std::runtime_error& err){
-                std::cerr << err.what() << "\n";
-                exit(0);
+            if ( std::is_same< T,std::complex<double> >::value ){
+                try{
+                    Gamma_n_bar_n_tilde = std::move(readFromHDF5FileCube(file_open,DATASET_NAME_OPEN,OneLadder< T >::_iqn[n_em]));
+                } catch(std::runtime_error& err){
+                    std::cerr << err.what() << "\n";
+                    exit(0);
+                }
+            } else{
+                throw std::logic_error("Problem specializing IPT2::InfiniteLadders< T >: must be complex<double>!!");
+                exit(1);
+            }
+            
+            delete file_open;
+        } else{
+            for (size_t n_bar=0; n_bar<NI; n_bar++){
+                clock_t begin = clock();
+                for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
+                    Gamma_n_bar_n_tilde(n_bar,n_tilde) = OneLadder< T >::_U/Gamma(OneLadder< T >::_k_t_b[n_k_tilde_m_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar],OneLadder< T >::_splInlineobj._iwn_array[n_tilde],qq,OneLadder< T >::_iqn[n_em]);
+                }
+                clock_t end = clock();
+                double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+                std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
             }
         }
-        
-        delete file_open;
-    } else{
+    
+        // ikn_bar-diagonal summation over the correction term degrees of freedom
+        arma::Cube< T > denom_corr(OneLadder< T >::_splInlineobj._k_array.size(),NI,NI);  // layout as follows: kpp, ikppn, ikn_bar
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             clock_t begin = clock();
-            for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
-                Gamma_n_bar_n_tilde(n_bar,n_tilde) = OneLadder< T >::_U/Gamma(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_k_t_b[n_k_tilde],OneLadder< T >::_splInlineobj._iwn_array[n_bar],OneLadder< T >::_splInlineobj._iwn_array[n_tilde]);
-            }
+            // below n_k_bar has been replaced for n_k_tilde_m_bar, due to periodicity of the Green's function...
+            denom_corr.slice(n_bar) = Gamma_to_merge_corr(OneLadder< T >::_k_t_b[n_k_tilde_m_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar],qq,OneLadder< T >::_iqn[n_em]);
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
         }
-    }
-
-    // ikn_bar-diagonal summation over the correction term degrees of freedom
-    arma::Cube< T > denom_corr(OneLadder< T >::_splInlineobj._k_array.size(),NI,NI);  // layout as follows: kpp, ikppn, ikn_bar
-    for (size_t n_bar=0; n_bar<NI; n_bar++){
-        clock_t begin = clock();
-        denom_corr.slice(n_bar) = Gamma_to_merge_corr(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar],qq);
-        clock_t end = clock();
-        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
-    }
     
-    arma::Mat< T > tmp_ikn_bar_corr;
-    for (size_t em=0; em<OneLadder< T >::_iqn.size(); em++){
+        arma::Mat< T > tmp_ikn_bar_corr;
+    
         // Now, for each ikn_bar value, one has to complete the summation over kpp and ikppn by calling Gamma_merged_corr
         std::vector< T > ikn_bar_corr(NI);
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             tmp_ikn_bar_corr = denom_corr.slice(n_bar);
-            ikn_bar_corr[n_bar] = Gamma_merged_corr(tmp_ikn_bar_corr,OneLadder< T >::_iqn[em],qq);
+            ikn_bar_corr[n_bar] = Gamma_merged_corr(tmp_ikn_bar_corr,OneLadder< T >::_iqn[n_em],qq);
         }
         // Now considering both the single ladder and its corrections
-        arma::Mat< T > GG_n_bar_n_tilde(NI,NI);
-        for (size_t n_bar=0; n_bar<NI; n_bar++){
-            for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
-                GG_n_bar_n_tilde(n_bar,n_tilde) = getGreen(OneLadder< T >::_k_t_b[n_k_tilde],OneLadder< T >::_splInlineobj._iwn_array[n_tilde])*getGreen(OneLadder< T >::_k_t_b[n_k_tilde]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_tilde]+OneLadder< T >::_iqn[em]) * ( 
-                    1.0 / ( Gamma_n_bar_n_tilde(n_bar,n_tilde) - ikn_bar_corr[n_bar] ) 
-                    ) * getGreen(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar])*getGreen(OneLadder< T >::_k_t_b[n_k_bar]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_iqn[em]);
-            }
-        }
+        std::vector< T > tmp_integral_k(OneLadder< T >::_splInlineobj._k_array.size());
+        T int_result;
+        arma::Mat< T > GG_n_tilde_n_bar(NI,NI);
         if (is_jj){
-            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, -1.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+            for (size_t n_bar=0; n_bar<NI; n_bar++){
+                for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
+                    for (size_t n_k_tilde=0; n_k_tilde<tmp_integral_k.size(); n_k_tilde++){
+                        tmp_integral_k[n_k_tilde] = -1.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_tilde_m_bar]
+                        )*getGreen(OneLadder< T >::_k_t_b[n_k_tilde],OneLadder< T >::_splInlineobj._iwn_array[n_tilde]
+                        )*getGreen(OneLadder< T >::_k_t_b[n_k_tilde]-qq,OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em]
+                        )*getGreen(OneLadder< T >::_k_t_b[n_k_tilde_m_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar]
+                        )*getGreen(OneLadder< T >::_k_t_b[n_k_tilde_m_bar]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_iqn[n_em]);
+                    }
+                    int_result = 1.0/(2.0*M_PI)*intObj.I1D_VEC(tmp_integral_k,delta,"simpson");
+                    // The Cube (vertex) doesn't depend on k_tilde, but only on k_tilde_m_bar...
+                    GG_n_tilde_n_bar(n_tilde,n_bar) =  int_result*( 1.0 / ( Gamma_n_bar_n_tilde(n_bar,n_tilde) - ikn_bar_corr[n_bar] ) );
+                }
+            }
+            MPIData mpi_data_tmp { n_k_tilde_m_bar, (2.0*OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar) }; // summing over the internal ikn_tilde and ikn_bar
             GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
         } else{
-            MPIData mpi_data_tmp { n_k_tilde, n_k_bar, (OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+            for (size_t n_bar=0; n_bar<NI; n_bar++){
+                for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
+                    for (size_t n_k_tilde=0; n_k_tilde<tmp_integral_k.size(); n_k_tilde++){
+                        tmp_integral_k[n_k_tilde] = getGreen(OneLadder< T >::_k_t_b[n_k_tilde],OneLadder< T >::_splInlineobj._iwn_array[n_tilde]
+                        )*getGreen(OneLadder< T >::_k_t_b[n_k_tilde]-qq,OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em]
+                        )*getGreen(OneLadder< T >::_k_t_b[n_k_tilde_m_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar]
+                        )*getGreen(OneLadder< T >::_k_t_b[n_k_tilde_m_bar]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_iqn[n_em]);
+                    }
+                    int_result = 1.0/(2.0*M_PI)*intObj.I1D_VEC(tmp_integral_k,delta,"simpson");
+                    GG_n_tilde_n_bar(n_tilde,n_bar) = ( 1.0 / ( Gamma_n_bar_n_tilde(n_bar,n_tilde) - ikn_bar_corr[n_bar] ) );
+                }
+            }
+            MPIData mpi_data_tmp { n_k_tilde_m_bar, (2.0*OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar) }; // summing over the internal ikn_tilde and ikn_bar
             GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
         }
     }
@@ -586,11 +539,9 @@ namespace IPT2{
             Returns:
                 (void): fills up vec_to_processes with the MPIData instances.
         */
-        for (size_t k_t=0; k_t<N_q; k_t++){
-            for (size_t k_b=0; k_b<N_q; k_b++){
-                MPIData mpi_data{ k_t, k_b, std::complex<double>(0.0,0.0) };
-                vec_to_processes->push_back(static_cast<MPIData&&>(mpi_data));
-            }
+        for (size_t k_t_m_b=0; k_t_m_b<N_q; k_t_m_b++){
+            MPIData mpi_data{ k_t_m_b, std::complex<double>(0.0,0.0) };
+            vec_to_processes->push_back(static_cast<MPIData&&>(mpi_data));
         }
     }
 
@@ -604,10 +555,10 @@ namespace IPT2{
             Returns:
                 (void): committed MPI datatype.
         */
-        int lengths[3]={ 1, 1, 1 };
-        MPI_Aint offsets[3]={ offsetof(MPIData,k_tilde), offsetof(MPIData,k_bar), offsetof(MPIData,cplx_data) };
-        MPI_Datatype types[3]={ MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX }, tmp_type;
-        MPI_Type_create_struct(3,lengths,offsets,types,&tmp_type);
+        int lengths[2]={ 1, 1 };
+        MPI_Aint offsets[2]={ offsetof(MPIData,k_tilde_m_bar), offsetof(MPIData,cplx_data) };
+        MPI_Datatype types[2]={ MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX }, tmp_type;
+        MPI_Type_create_struct(2,lengths,offsets,types,&tmp_type);
         // Proper padding
         MPI_Type_create_resized(tmp_type, 0, sizeof(MPIData), &custom_type);
         MPI_Type_commit(&custom_type);
@@ -631,14 +582,4 @@ namespace IPT2{
         MPI_Type_create_resized(tmp_type, 0, sizeof(cplx_t), &custom_type);
         MPI_Type_commit(&custom_type);
     }
-}
-
-inline std::tuple<int,int> inverse_Cantor_pairing(int number){
-    // see https://en.wikipedia.org/wiki/Pairing_function for notation and explanation
-    int w = (int)std::floor( ( std::sqrt( 8.0*number + 1.0 ) - 1.0 ) / 2.0 );
-    int t = static_cast<int>( (w)*(w+1)/2 );
-    int n_k_tilde = number - t;
-    int n_k_bar = w - n_k_tilde;
-
-    return std::make_tuple( n_k_bar, n_k_tilde );
 }

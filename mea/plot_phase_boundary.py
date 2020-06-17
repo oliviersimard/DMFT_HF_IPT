@@ -252,6 +252,9 @@ if __name__=="__main__":
         fig.savefig("Figure_phase_diagram_infinite_dimension.pdf")
     else:
         fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D.pdf")
+    
+    plt.show()
+    
     plt.clf()
 
     ####################### 2nd fig #######################

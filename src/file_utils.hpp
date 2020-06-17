@@ -52,9 +52,11 @@ void check_file_content(const std::vector< std::string >& filenamesToSave, std::
 int extractIntegerLastWords(std::string str);
 FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
 std::vector<std::string> get_info_from_filename(const std::string& strName,const std::vector<std::string>& fetches,const char* separation_char="_") noexcept(false);
-void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false);
+void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q_jj, std::vector< std::complex<double> >& GG_iqn_q_szsz, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false);
 arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::string& DATASET_NAME) noexcept(false);
+arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const std::string& DATASET_NAME, std::complex<double> iqn) noexcept(false);
 void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, double k_bar, double k_tilde, H5::H5File* file) noexcept(false);
+void save_matrix_in_HDF5(const arma::Cube< std::complex<double> >& cube_to_save, const std::vector< std::complex<double> >& iqn, H5std_string DATASET_NAME, H5::H5File* file) noexcept(false);
 void save_matrix_in_HDF5(std::complex<double>* mat_to_save, double k_bar, double k_tilde, H5::H5File* file, size_t NX, size_t NY) noexcept(false);
 template<typename... Ts> void check_file_content(std::string pathToDir1, std::string pathToDir2, Ts &... filenamesToSave) noexcept(false);
 

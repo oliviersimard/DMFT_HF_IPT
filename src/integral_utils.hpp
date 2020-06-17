@@ -5,6 +5,7 @@
 #include <complex>
 #include <functional>
 #include <exception>
+#include <assert.h>
 
 // #define INTEGRAL
 #define MAX_ITER_INTEGRAL 20

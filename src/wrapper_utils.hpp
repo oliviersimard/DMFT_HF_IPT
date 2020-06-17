@@ -1,8 +1,14 @@
 #ifndef Wrapper_utils_H_
 #define Wrapper_utils_H_
 
+//#define ARMA_ALLOW_FAKE_GCC
+
 #include <iostream>
 #include <complex>
+#include <armadillo>
+#include <mpi.h>
+
+namespace IPT2{ template<class T> class OneLadder; };
 
 /* Template structure to call functions in classes. */
 template<typename T, typename C, typename Q>
@@ -174,6 +180,131 @@ template <std::size_t k, class T, class... Ts>
 typename std::enable_if<k != 0, typename elem_type_holder<k, tuple<T, Ts...>>::type&>::type get(tuple<T, Ts...>& t) {
   tuple<Ts...>& base = t;
   return get<k - 1>(base);
+}
+
+template< class T >
+class ArmaMPI{
+    /* This specific class sends T-typed Armadillo matrices across MPI processes */
+    friend class IPT2::OneLadder< T >;
+    public:
+        explicit ArmaMPI(size_t n_rows, size_t n_cols, size_t n_slices=0);
+        ~ArmaMPI();
+        void send_Arma_mat_MPI(arma::Mat< T >& mat,int dest, int tag) const noexcept;
+        arma::Mat< T > recv_Arma_mat_MPI(int tag, int src) const noexcept;
+        arma::Cube< T > recv_Arma_cube_MPI(int tag, int src) const noexcept;
+        void fill_TArr(arma::Mat< T >& mat) const noexcept;
+
+    private:
+        T** _TArr;
+        T* _Tmemptr;
+        size_t _n_rows{0};
+        size_t _n_cols{0};
+        size_t _n_slices{0};
+        //MPI_Datatype _cplx_custom_t;
+};
+
+template< class T >
+ArmaMPI< T >::ArmaMPI(size_t n_rows, size_t n_cols, size_t n_slices) : _n_rows(n_rows),_n_cols(n_cols),_n_slices(n_slices){
+    if (_n_slices == 0){
+        T* data = new T[_n_rows*_n_cols];
+        _TArr = new T*[_n_rows];
+        for (size_t i=0; i<_n_rows; i++){
+            _TArr[i] = &data[i*_n_cols];
+        }
+        // constructing the MPI datatype, even if not needed..
+        //IPT2::create_mpi_data_struct_cplx(_cplx_custom_t);
+        _Tmemptr = new T[_n_rows*_n_cols];
+        
+    } else if (_n_slices>0){
+        // constructing the MPI datatype, even if not needed..
+        //IPT2::create_mpi_data_struct_cplx(_cplx_custom_t);
+        _Tmemptr = new T[_n_rows*_n_cols*_n_slices];
+    }
+}
+
+template< class T >
+ArmaMPI< T >::~ArmaMPI(){
+    if (_n_slices==0){
+        delete[] _TArr[0]; // Effectively deletes data*
+        delete[] _TArr;
+    }
+    delete[] _Tmemptr;
+    //MPI_Type_free(&_cplx_custom_t);
+}
+
+template< class T >
+void ArmaMPI< T >::send_Arma_mat_MPI(arma::Mat< T >& mat,int dest,int tag) const noexcept{
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            _TArr[i][j] = mat(i,j);
+        }
+    }
+    // Contiguous memory
+    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,dest,tag,MPI_COMM_WORLD);
+}
+
+template<>
+inline void ArmaMPI< std::complex<double> >::send_Arma_mat_MPI(arma::Mat< std::complex<double> >& mat,int dest,int tag) const noexcept{
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            _TArr[i][j] = mat(i,j);
+        }
+    }
+    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,dest,tag,MPI_COMM_WORLD);
+}
+
+template< class T >
+arma::Mat< T > ArmaMPI< T >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
+    arma::Mat< T > returned_mat(_n_rows,_n_cols);
+    MPI_Recv(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            returned_mat(i,j) = _TArr[i][j];
+        }
+    }
+
+    return returned_mat;
+}
+
+template<>
+inline arma::Mat< std::complex<double> > ArmaMPI< std::complex<double> >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
+    arma::Mat< std::complex<double> > returned_mat(_n_rows,_n_cols);
+    MPI_Recv(_Tmemptr,_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    
+    for (size_t j=0; j<_n_cols; j++){
+        for (size_t i=0; i<_n_rows; i++){
+            returned_mat(i,j) = _Tmemptr[j*_n_rows+i];
+        }
+    }
+
+    return returned_mat;
+}
+
+template<>
+inline arma::Cube< std::complex<double> > ArmaMPI< std::complex<double> >::recv_Arma_cube_MPI(int tag, int src) const noexcept{
+    assert(_n_slices>0);
+    arma::Cube< std::complex<double> > returned_cube(_n_rows,_n_cols,_n_slices);
+    MPI_Recv(_Tmemptr,_n_cols*_n_rows*_n_slices,MPI_CXX_DOUBLE_COMPLEX,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    
+    for (size_t k=0; k<_n_slices; k++){ // column-major storage, matrix by matrix
+        for (size_t j=0; j<_n_cols; j++){
+            for (size_t i=0; i<_n_rows; i++){
+                returned_cube(i,j,k) = _Tmemptr[i + j*_n_rows + k*(_n_rows*_n_cols)];
+            }
+        }
+    }
+
+    return returned_cube;
+}
+
+template< class T >
+inline void ArmaMPI< T >::fill_TArr(arma::Mat< T >& mat) const noexcept{
+    for (size_t i=0; i<_n_rows; i++){
+        for (size_t j=0; j<_n_cols; j++){
+            _TArr[i][j] = mat(i,j);
+        }
+    }
 }
 
 
