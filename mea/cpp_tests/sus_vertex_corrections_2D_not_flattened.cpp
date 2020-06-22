@@ -1,4 +1,4 @@
-#include "sus_vertex_corrections_2D.hpp"
+#include "sus_vertex_corrections_2D_not_flattened.hpp"
 
 int main(int argc, char** argv){
     MPI_Init(&argc,&argv);
@@ -9,9 +9,6 @@ int main(int argc, char** argv){
     
     std::string inputFilename("../../data/2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_128/Self_energy_2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_128_Nit_18.dat");
     std::string inputFilenameLoad("../../data/2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_256/Self_energy_2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_256");
-    // Choose whether current-current or spin-spin correlation function is computed.
-    const bool is_jj = false;
-    const bool is_single_ladder_precomputed = false;
     // Fetching results from string
     std::vector<std::string> results;
     std::vector<std::string> fetches = {"U", "beta", "N_tau"};
@@ -19,8 +16,8 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 27;
-    const unsigned int N_k = 5;
+    const unsigned int N_q = 3;
+    const unsigned int N_k = 3;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling
@@ -37,56 +34,32 @@ int main(int argc, char** argv){
     for (size_t l=0; l<N_q; l++){
         double q_tilde_tmp = l*2.0*M_PI/(double)(N_q-1);
         q_tilde_array.push_back(q_tilde_tmp);
+        #ifdef TRIGTABLES
+        // building finer cosine table
+        sine_table_finer.push_back(std::sin(q_tilde_tmp));
+        cosine_table_finer.push_back(std::cos(q_tilde_tmp));
+        #endif
     }
     // k_t_b_array constructed
     std::vector<double> k_tilde_m_k_bar;
     for (size_t l=0; l<N_k; l++){
         double k_tmp = -M_PI + l*2.0*M_PI/(double)(N_k-1);
         k_tilde_m_k_bar.push_back(k_tmp);
+        #ifdef TRIGTABLES
+        // building sine and cosine tables
+        sine_table.push_back(std::sin(k_tmp));
+        cosine_table.push_back(std::cos(k_tmp));
+        #endif
     }
 
     // HDF5 business
     H5::H5File* file = nullptr;
-    #ifdef INFINITE
-    std::string filename("bb_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_isjj_"+std::to_string(is_jj)+"_infinite_ladder_sum.hdf5");
-    #else
-    std::string filename("bb_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_isjj_"+std::to_string(is_jj)+"_single_ladder_sum.hdf5");
-    #endif
+    std::string filename("bb_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum_test_precompute.hdf5");
     const H5std_string FILE_NAME( filename );
-    const unsigned int DATA_SET_DIM = Ntau;
     // The different processes cannot create more than once the file to be written in.
     if (world_rank==root_process){
         file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     }
-    // Creating HDF5 file to contain the single ladder denominator
-    H5::H5File* file_sl = nullptr;
-    const std::string path_to_save_single_ladder_mat("./sl_data/");
-    const std::string intermediate_path = "single_ladder_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n);
-    const std::string filename_sl = intermediate_path+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_q);
-    const H5std_string FILE_NAME_SL( path_to_save_single_ladder_mat+intermediate_path+"/"+filename_sl+".hdf5" );
-    std::cout << "FILE_NAME_SL: " << FILE_NAME_SL << std::endl;
-    #ifndef INFINITE
-    if ( (world_rank==root_process) && is_single_ladder_precomputed ){
-        try{
-            // Making the directory tree 
-            mkdirTree(path_to_save_single_ladder_mat+intermediate_path,"");
-            std::string pattern_to_look = path_to_save_single_ladder_mat+intermediate_path+"/"+filename_sl+"*";
-            std::cout << pattern_to_look << std::endl;
-            std::vector<std::string> glob_files_found;
-            // Looking if the HDF5 file about to be created exists already
-            glob_files_found = glob(pattern_to_look);
-            char buf_chr[filename_sl.length()+30];
-            sprintf(buf_chr,"File %s exists already!!",filename_sl.c_str());
-            if (glob_files_found.size()>0){
-                throw std::runtime_error( buf_chr );
-            }
-            file_sl = new H5::H5File( FILE_NAME_SL, H5F_ACC_TRUNC );
-        } catch(std::runtime_error& err){
-            std::cerr << err.what() << "\n";
-            exit(1);
-        }
-    }
-    #endif
     // Getting the data
     FileData dataFromFile;
     dataFromFile = get_data(inputFilename,Ntau);
@@ -103,9 +76,10 @@ int main(int argc, char** argv){
     // Bosonic Matsubara array
     std::vector< std::complex<double> > iqn; // for the total susceptibility
     std::vector< std::complex<double> > iqn_tilde; // for the inner loop inside Gamma.
-    for (size_t j=0; j<Ntau; j++){
+    for (size_t j=0; j<3; j++){
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
     }
+    const unsigned int DATA_SET_DIM = iqn.size();
     for (signed int j=(-static_cast<int>(Ntau/2))+1; j<(signed int)static_cast<int>(Ntau/2); j++){ // Bosonic frequencies.
         std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
         iqn_tilde.push_back( matFreq );
@@ -118,13 +92,12 @@ int main(int argc, char** argv){
     splInlineObj.loadFileSpline(inputFilenameLoad,IPT2::spline_type::linear);
     
     // One-ladder calculations
-    #ifndef INFINITE
-    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_tilde_m_k_bar,iqn_tilde,mu,U,beta);
+    #ifdef TRIGTABLES
+    TrigP<double,int> trigObj(sine_table,cosine_table);
+    TrigP<double,int> trigObj_finer(sine_table_finer,cosine_table_finer);
+    IPT2::OneLadder< std::complex<double> > one_ladder_obj(trigObj,trigObj_finer,splInlineObj,iqn,k_tilde_m_k_bar,iqn_tilde,mu,U,beta);
     #else
-    IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,iqn,k_tilde_m_k_bar,iqn_tilde,mu,U,beta);
-    if (is_single_ladder_precomputed){
-        IPT2::InfiniteLadders< std::complex<double> >::_FILE_NAME = FILE_NAME_SL;
-    }
+    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_tilde_m_k_bar,iqn_tilde,mu,U,beta);
     #endif
     
     // Setting MPI stuff up
@@ -145,7 +118,7 @@ int main(int argc, char** argv){
     if (world_rank==root_process){
         IPT2::set_vector_processes(&vec_to_processes,N_k);
         for (auto el : vec_to_processes){
-            std::cout << el.k_tilde_m_k_bar_x << " " << el.k_tilde_m_k_bar_y << std::endl;
+            std::cout << el.k_tilde_x << " " << el.k_tilde_y << std::endl;
         }
         std::cout << "world size: " << world_size << "\n";
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
@@ -161,23 +134,11 @@ int main(int argc, char** argv){
             
         }
         // Root process now deals with its share of the workload
-        #ifndef INFINITE
-        arma::Cube< std::complex<double> > container_sl;
-        if (is_single_ladder_precomputed)
-            container_sl = arma::Cube< std::complex<double> >(Ntau,Ntau,num_elem_per_proc+1);
-        #endif
         for (size_t i=0; i<=num_elem_per_proc; i++){
             auto mpidataObj = vec_to_processes[i];
             clock_t begin = clock();
             try{
-                #ifndef INFINITE
-                arma::Mat< std::complex<double> >* mat_slice_ptr = nullptr;
-                if (is_single_ladder_precomputed)
-                    mat_slice_ptr = &container_sl.slice(i);
-                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_m_k_bar_x,mpidataObj.k_tilde_m_k_bar_y,is_jj,is_single_ladder_precomputed,(void*)mat_slice_ptr);
-                #else
-                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
-                #endif
+                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_x,mpidataObj.k_tilde_y);
             } catch (const std::invalid_argument& err){
                 std::cerr << err.what()  << "\n";
                 exit(1);
@@ -186,26 +147,16 @@ int main(int argc, char** argv){
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
             gathered_MPI_data->push_back(GG_iqn);
-            printf("(%li,%li) calculated by root process\n", mpidataObj.k_tilde_m_k_bar_x, mpidataObj.k_tilde_m_k_bar_y);
-            #ifndef INFINITE
-            if (is_single_ladder_precomputed){ // maybe take this out of the loop
-                try{
-                    save_matrix_in_HDF5(container_sl.slice(i),k_tilde_m_k_bar[mpidataObj.k_tilde_m_k_bar_x],k_tilde_m_k_bar[mpidataObj.k_tilde_m_k_bar_y],file_sl);
-                } catch(const std::runtime_error& err ){
-                    std::cerr << err.what() << "\n";
-                    exit(1);
-                }
-            }
+            #ifndef TRIGTABLES
+            printf("(%li,%li) calculated by root process\n", mpidataObj.k_tilde_x, mpidataObj.k_tilde_y);
+            #else
+            printf("(%i,%i) calculated by root process\n", mpidataObj.k_tilde_x, mpidataObj.k_tilde_y);
             #endif
         }
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         // Fetch data from the slaves
         MPIDataReceive mpi_data_receive;
         int recv_root_num_elem;
-        #ifndef INFINITE
-        ArmaMPI< std::complex<double> > armaMatObj(Ntau,Ntau);
-        arma::Mat< std::complex<double> > single_ladders_to_save;
-        #endif
         int get_size;
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
             ierr = MPI_Recv( &recv_root_num_elem, 1, MPI_INT, 
@@ -220,41 +171,24 @@ int main(int argc, char** argv){
                 gathered_MPI_data->push_back( std::vector<MPIData>(mpi_data_receive.data_struct,mpi_data_receive.data_struct+mpi_data_receive.size) );
                 free(mpi_data_receive.data_struct);
             }
-            #ifndef INFINITE
-            // Precompute the single ladder denominator
-            if (is_single_ladder_precomputed){
-                // Gathering the tags from the slaves
-                std::vector<int> returned_tags_from_slaves(recv_root_num_elem);
-                MPI_Recv( (void*)(returned_tags_from_slaves.data()), recv_root_num_elem, MPI_INT, an_id, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-                for (auto tag : returned_tags_from_slaves){
-                    single_ladders_to_save = armaMatObj.recv_Arma_mat_MPI(tag,an_id);
-                    auto n_ks = inverse_Cantor_pairing(tag); // n_k_bar, n_k_tilde
-                    std::cout << "n_bar: " << std::get<0>(n_ks) << " and n_tilde: " << std::get<1>(n_ks) << std::endl;
-                    try{
-                        save_matrix_in_HDF5(single_ladders_to_save,k_tilde_m_k_bar[std::get<0>(n_ks)],k_tilde_m_k_bar[std::get<1>(n_ks)],file_sl);
-                    } catch( std::runtime_error& err ){
-                        std::cerr << err.what() << "\n";
-                        exit(1);
-                    }
-                }
-            }
-            #endif
         }
 
-        std::ofstream test1("test_1.dat", std::ios::out);
+        std::ofstream test1("test_calculate_spline_Green_function_2D.dat", std::ios::out);
         for (auto el : gathered_MPI_data->back()){
-            test1 << el.cplx_data.real() << "\t\t" << el.cplx_data.imag() << "\n";
+            test1 << el.cplx_data_jj.real() << "\t\t" << el.cplx_data_jj.imag() << "\t\t" << el.cplx_data_szsz.real() << "\t\t" << el.cplx_data_szsz.imag() << "\n";
         }
         test1.close();
 
-        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5(Ntau);
+        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5_jj(iqn.size());
+        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5_szsz(iqn.size());
         for (size_t l=0; l<gathered_MPI_data->size(); l++){
             std::vector<MPIData> mpi_data_hdf5_tmp = gathered_MPI_data->at(l);
-            std::string DATASET_NAME("kbar_"+std::to_string(k_tilde_m_k_bar[mpi_data_hdf5_tmp[0].k_tilde_m_k_bar_x])+"ktilde_"+std::to_string(k_tilde_m_k_bar[mpi_data_hdf5_tmp[0].k_tilde_m_k_bar_y]));
+            std::string DATASET_NAME("kbar_"+std::to_string(k_tilde_m_k_bar[mpi_data_hdf5_tmp[0].k_tilde_x])+"ktilde_"+std::to_string(k_tilde_m_k_bar[mpi_data_hdf5_tmp[0].k_tilde_y]));
             std::cout << "DATASET_NAME: " << DATASET_NAME << std::endl;
             // extracting the std::complex<double> data from the MPI struct
-            std::transform(mpi_data_hdf5_tmp.begin(),mpi_data_hdf5_tmp.end(),mpi_data_to_transfer_hdf5.begin(),[](MPIData d){ return d.cplx_data; });
-            writeInHDF5File(mpi_data_to_transfer_hdf5, file, DATA_SET_DIM, DATASET_NAME);
+            std::transform(mpi_data_hdf5_tmp.begin(),mpi_data_hdf5_tmp.end(),mpi_data_to_transfer_hdf5_jj.begin(),[](MPIData d){ return d.cplx_data_jj; });
+            std::transform(mpi_data_hdf5_tmp.begin(),mpi_data_hdf5_tmp.end(),mpi_data_to_transfer_hdf5_szsz.begin(),[](MPIData d){ return d.cplx_data_szsz; });
+            writeInHDF5File(mpi_data_to_transfer_hdf5_jj, mpi_data_to_transfer_hdf5_szsz, file, DATA_SET_DIM, DATASET_NAME);
         }
 
     } else{
@@ -265,23 +199,11 @@ int main(int argc, char** argv){
         ierr = MPI_Recv( (void*)(vec_for_slaves.data()), num_elem_to_receive, MPI_Data_struct_t, 
             root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
         /* Calculate the sum of the portion of the array */
-        #ifndef INFINITE
-        arma::Cube< std::complex<double> > container_sl;
-        if (is_single_ladder_precomputed)
-            container_sl = arma::Cube< std::complex<double> >(Ntau,Ntau,num_elem_to_receive); // n_rows, n_cols, n_slices
-        #endif
         for(size_t i = 0; i < num_elem_to_receive; i++) {
             auto mpidataObj = vec_for_slaves[i];
             clock_t begin = clock();
             try{
-                #ifndef INFINITE
-                arma::Mat< std::complex<double> >* mat_slice_ptr = nullptr;
-                if (is_single_ladder_precomputed)
-                    mat_slice_ptr = &container_sl.slice(i);
-                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_m_k_bar_x,mpidataObj.k_tilde_m_k_bar_y,is_jj,is_single_ladder_precomputed,(void*)mat_slice_ptr);
-                #else
-                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_jj,is_single_ladder_precomputed);
-                #endif
+                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_x,mpidataObj.k_tilde_y);
             } catch (const std::invalid_argument& err){ // error might be thrown from integral
                 std::cerr << err.what() << "\n";
                 exit(1);
@@ -290,22 +212,17 @@ int main(int argc, char** argv){
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
             gathered_MPI_data->push_back(GG_iqn);
-            printf("(%li, %li) calculated by slave_process %d\n", mpidataObj.k_tilde_m_k_bar_x, mpidataObj.k_tilde_m_k_bar_y, world_rank); //, (void*)&vec_for_slaves);
+            #ifndef TRIGTABLES
+            printf("(%li, %li) calculated by slave_process %d\n", mpidataObj.k_tilde_x, mpidataObj.k_tilde_y, world_rank); //, (void*)&vec_for_slaves);
+            #else
+            printf("(%i, %i) calculated by slave_process %d\n", mpidataObj.k_tilde_x, mpidataObj.k_tilde_y, world_rank); //, (void*)&vec_for_slaves);
+            #endif
         }
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         ierr = MPI_Send( &num_elem_to_receive, 1 , MPI_INT, root_process, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD );
         for (int l=0; l<num_elem_to_receive; l++){
             ierr = MPI_Send( (void*)(gathered_MPI_data->at(l).data()), gathered_MPI_data->at(l).size(), MPI_Data_struct_t, root_process, l+SHIFT_TO_DIFFERENTIATE_TAGS, MPI_COMM_WORLD);
         }
-        #ifndef INFINITE
-        if (is_single_ladder_precomputed){
-            // Sending tags to root.
-            ierr = MPI_Send( (void*)(one_ladder_obj.tag_vec.data()), num_elem_to_receive, MPI_INT, root_process, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD );
-            for (size_t t=0; t<one_ladder_obj.tag_vec.size(); t++){
-                MPI_Send(container_sl.slice(t).memptr(),Ntau*Ntau,MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
-            }
-        }
-        #endif
     }
 
     
@@ -354,9 +271,6 @@ int main(int argc, char** argv){
 
     if (world_rank==root_process){
         delete file;
-        if (is_single_ladder_precomputed){
-            delete file_sl;
-        }
     }
     delete gathered_MPI_data;
     MPI_Type_free(&MPI_Data_struct_t);

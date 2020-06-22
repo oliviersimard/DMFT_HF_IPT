@@ -101,7 +101,7 @@ int main(int argc, char** argv){
     // Bosonic Matsubara array
     std::vector< std::complex<double> > iqn; // for the total susceptibility
     std::vector< std::complex<double> > iqn_tilde; // for the inner loop inside Gamma.
-    for (size_t j=0; j<3; j++){
+    for (size_t j=0; j<Ntau; j++){ // change Ntau for lower value to decrease time when testing...
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
     }
     const unsigned int DATA_SET_DIM = iqn.size(); // this corresponds to the length of the bosonic Matsubara array
@@ -253,7 +253,7 @@ int main(int argc, char** argv){
             #endif
         }
 
-        std::ofstream test1("test_1.dat", std::ios::out);
+        std::ofstream test1("test_susceptibilities_not_flattened_1D.dat", std::ios::out);
         for (auto el : gathered_MPI_data->back()){
             test1 << el.cplx_data_jj.real() << "\t\t" << el.cplx_data_jj.imag() << "\t\t" << el.cplx_data_szsz.real() << "\t\t" << el.cplx_data_szsz.imag() << "\n";
         }
@@ -363,7 +363,7 @@ int main(int argc, char** argv){
     }
 
     /* TEST G(-tau) */
-    std::ofstream test2("test_1_corr_no_cubic_spline.dat", std::ios::out);
+    std::ofstream test2("test_calculate_spline_Green_function_1D.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
         test2 << beta_array[j] << "  " << -1.0*G_k_bar_q_tilde_tau(2,Ntau-j) << "\n";
     }

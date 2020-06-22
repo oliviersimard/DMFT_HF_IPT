@@ -1,6 +1,6 @@
 #include "../../src/IPT2nd3rdorderSingle2.hpp"
 #include <ctime>
-#include <mpi.h>
+// #include <mpi.h>
 /*
 Info HDF5:
 https://support.hdfgroup.org/HDF5/doc/cpplus_RM/compound_8cpp-example.html
@@ -17,7 +17,7 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 //static bool slaves_can_write_in_file = false; // This prevents that the slave processes
 static int root_process = 0;
 
-#define INFINITE
+// #define INFINITE
 
 typedef struct{
     size_t k_tilde;
@@ -346,8 +346,9 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     // Single ladder and its corrections
     arma::Mat< T > GG_n_tilde_n_bar(NI,NI);
     T jj_resp_iqn{0.0}, szsz_resp_iqn{0.0};
+    clock_t begin, end;
     for (size_t n_em=0; n_em<OneLadder< T >::_iqn.size(); n_em++){
-        clock_t begin = clock();
+        begin = clock();
         if (is_single_ladder_precomputed){
             // Should load the data saved previously saved in the simpler simgle ladder calculation..
             const H5std_string DATASET_NAME_OPEN("kbar_"+std::to_string(OneLadder<T>::_k_t_b[n_k_bar])+"ktilde_"+std::to_string(OneLadder<T>::_k_t_b[n_k_tilde]));
@@ -368,33 +369,33 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
             delete file_open;
         } else{
             for (size_t n_bar=0; n_bar<NI; n_bar++){
-                clock_t begin = clock();
+                clock_t begin_inner = clock();
                 for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
                     Gamma_n_tilde_n_bar(n_tilde,n_bar) = Gamma(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_k_t_b[n_k_tilde],qq,OneLadder< T >::_splInlineobj._iwn_array[n_bar],OneLadder< T >::_splInlineobj._iwn_array[n_tilde],OneLadder< T >::_iqn[n_em]);
                 }
-                clock_t end = clock();
-                double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+                clock_t end_inner = clock();
+                double elapsed_secs = double(end_inner - begin_inner) / CLOCKS_PER_SEC;
                 std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
             }
         }
 
-        for (size_t n_bar=0; n_bar<NI; n_bar++){
-            // clock_t begin = clock();
-            denom_corr.slice(n_bar) = Gamma_to_merge_corr(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar],qq,OneLadder< T >::_iqn[n_em]);
-            // clock_t end = clock();
-            // double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            // std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
-        }
+        // for (size_t n_bar=0; n_bar<NI; n_bar++){
+        //     // clock_t begin = clock();
+        //     denom_corr.slice(n_bar) = Gamma_to_merge_corr(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar],qq,OneLadder< T >::_iqn[n_em]);
+        //     // clock_t end = clock();
+        //     // double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        //     // std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
+        // }
 
-        for (size_t n_bar=0; n_bar<NI; n_bar++){
-            tmp_ikn_bar_corr = denom_corr.slice(n_bar);
-            ikn_bar_corr[n_bar] = Gamma_merged_corr(tmp_ikn_bar_corr,OneLadder< T >::_iqn[n_em],qq);
-        }
+        // for (size_t n_bar=0; n_bar<NI; n_bar++){
+        //     tmp_ikn_bar_corr = denom_corr.slice(n_bar);
+        //     ikn_bar_corr[n_bar] = Gamma_merged_corr(tmp_ikn_bar_corr,OneLadder< T >::_iqn[n_em],qq);
+        // }
         
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
                 GG_n_tilde_n_bar(n_tilde,n_bar) = getGreen(OneLadder< T >::_k_t_b[n_k_tilde],OneLadder< T >::_splInlineobj._iwn_array[n_tilde])*getGreen(OneLadder< T >::_k_t_b[n_k_tilde]-qq,OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em]) * ( 
-                    1.0 / ( OneLadder< T >::_U*1.0/Gamma_n_tilde_n_bar(n_tilde,n_bar) - ikn_bar_corr[n_bar] )
+                    1.0 / ( OneLadder< T >::_U*1.0/Gamma_n_tilde_n_bar(n_tilde,n_bar) ) //- ikn_bar_corr[n_bar] )
                     ) * getGreen(OneLadder< T >::_k_t_b[n_k_bar],OneLadder< T >::_splInlineobj._iwn_array[n_bar])*getGreen(OneLadder< T >::_k_t_b[n_k_bar]+qq,OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_iqn[n_em]);
             }
         }
@@ -405,7 +406,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
         MPIData mpi_data_tmp { n_k_tilde, n_k_bar, jj_resp_iqn, szsz_resp_iqn };
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
        
-        clock_t end = clock();
+        end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
         std::cout << "infinite ladder loop n_em: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
     }

@@ -1,7 +1,7 @@
 SRC=$(PWD)/../../src
 OBJ=$(PWD)/obj
 
-CXX=mpic++ -std=c++11 -Wall -g -O3 
+CXX=mpic++ -std=c++11 -Wall -O3 
 INC=${HOME}/gsl/include -I${HOME}/install/HDF5/1.10.6/include
 LIB=${HOME}/gsl/lib -L${HOME}/install/HDF5/1.10.6/lib
 
@@ -12,7 +12,7 @@ PROG=CPP-TESTS
 all: $(PROG)
 
 $(PROG): $(OBJ)/green_utils.o $(OBJ)/file_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/sus_corr_2D.o
-	$(CXX) $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/sus_corr_2D.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/file_utils.o $(CXXFLAGS) -o spl_vc_nspl_2D.out
+	$(CXX) $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/sus_corr_2D.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/file_utils.o $(CXXFLAGS) -o spl_vc_not_fl_2D.out
 
 $(OBJ)/green_utils.o: $(SRC)/green_utils.cpp
 	$(CXX) -c -I$(INC) $(SRC)/green_utils.cpp -o $(OBJ)/green_utils.o
@@ -23,11 +23,11 @@ $(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
 $(OBJ)/IPT2nd3rdorderSingle2.o: $(SRC)/IPT2nd3rdorderSingle2.cpp
 	$(CXX) -c -I$(INC) $(SRC)/IPT2nd3rdorderSingle2.cpp -o $(OBJ)/IPT2nd3rdorderSingle2.o
 
-$(OBJ)/sus_corr_2D.o: $(PWD)/sus_vertex_corrections_2D.cpp
-	$(CXX) -c -I$(INC) $(PWD)/sus_vertex_corrections_2D.cpp -o $(OBJ)/sus_corr_2D.o
+$(OBJ)/sus_corr_2D.o: $(PWD)/sus_vertex_corrections_2D_not_flattened.cpp
+	$(CXX) -c -I$(INC) $(PWD)/sus_vertex_corrections_2D_not_flattened.cpp -o $(OBJ)/sus_corr_2D.o
 
 $(OBJ)/integral_utils.o: $(SRC)/integral_utils.cpp
 	$(CXX) -c -I$(INC) $(SRC)/integral_utils.cpp -o $(OBJ)/integral_utils.o
 
 clean:
-	rm -f $(OBJ)/* $(PWD)/spl_vc_nspl_2D.out
+	rm -f $(OBJ)/* $(PWD)/spl_vc_not_fl_2D.out

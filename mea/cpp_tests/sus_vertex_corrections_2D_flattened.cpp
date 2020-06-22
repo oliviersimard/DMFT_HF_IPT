@@ -1,4 +1,4 @@
-#include "sus_vertex_corrections_1D_flattened.hpp"
+#include "sus_vertex_corrections_2D_flattened.hpp"
 
 int main(int argc, char** argv){
     MPI_Init(&argc,&argv);
@@ -7,9 +7,9 @@ int main(int argc, char** argv){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     
-    std::string inputFilename("../../data/1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_128/Self_energy_1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_128_Nit_25.dat");
-    std::string inputFilenameLoad("../../build4/data/1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_256/Self_energy_1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_256");
-    // Current-current and spin-spin correlation function are computed at same time.
+    std::string inputFilename("../../data/2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_128/Self_energy_2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_128_Nit_18.dat");
+    std::string inputFilenameLoad("../../data/2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_256/Self_energy_2D_U_10.000000_beta_8.000000_n_0.500000_N_tau_256");
+    // Choose whether current-current or spin-spin correlation function is computed.
     const bool is_single_ladder_precomputed = false;
     // Fetching results from string
     std::vector<std::string> results;
@@ -18,11 +18,11 @@ int main(int argc, char** argv){
     results = get_info_from_filename(inputFilename,fetches);
 
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
-    const unsigned int N_q = 17;
-    const unsigned int N_k = 17;
+    const unsigned int N_q = 27;
+    const unsigned int N_k = 5;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
-    const double mu = U/2.0; // Half-filling. Depending whether AFM-PM solution is loaded or not, mu=U/2 in PM only scenario and mu=0.0 in AFM-PM scenario.
+    const double mu = U/2.0; // Half-filling
     const double n = 0.5;
 
     // beta array constructed
@@ -38,20 +38,21 @@ int main(int argc, char** argv){
         q_tilde_array.push_back(q_tilde_tmp);
     }
     // k_t_b_array constructed
-    std::vector<double> k_t_b_array;
+    std::vector<double> k_tilde_m_k_bar;
     for (size_t l=0; l<N_k; l++){
-        double q_tilde_tmp = -M_PI + l*2.0*M_PI/(double)(N_k-1);
-        k_t_b_array.push_back(q_tilde_tmp);
+        double k_tmp = -M_PI + l*2.0*M_PI/(double)(N_k-1);
+        k_tilde_m_k_bar.push_back(k_tmp);
     }
 
     // HDF5 business
     H5::H5File* file = nullptr;
     #ifdef INFINITE
-    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_infinite_ladder_sum_flattened.hdf5");
+    std::string filename("bb_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_infinite_ladder_sum.hdf5");
     #else
-    std::string filename("bb_1D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum_flattened.hdf5");
+    std::string filename("bb_2D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum.hdf5");
     #endif
     const H5std_string FILE_NAME( filename );
+    const unsigned int DATA_SET_DIM = Ntau;
     // The different processes cannot create more than once the file to be written in.
     if (world_rank==root_process){
         file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
@@ -88,9 +89,9 @@ int main(int argc, char** argv){
     // Getting the data
     FileData dataFromFile;
     dataFromFile = get_data(inputFilename,Ntau);
-    std::vector<double> wn = std::move(dataFromFile.iwn);
-    std::vector<double> re = std::move(dataFromFile.re);
-    std::vector<double> im = std::move(dataFromFile.im);
+    std::vector<double> wn = dataFromFile.iwn;
+    std::vector<double> re = dataFromFile.re;
+    std::vector<double> im = dataFromFile.im;
     std::vector< std::complex<double> > sigma_iwn;
     for (size_t i=0; i<wn.size(); i++){
         sigma_iwn.push_back(std::complex<double>(re[i],im[i]));
@@ -101,10 +102,9 @@ int main(int argc, char** argv){
     // Bosonic Matsubara array
     std::vector< std::complex<double> > iqn; // for the total susceptibility
     std::vector< std::complex<double> > iqn_tilde; // for the inner loop inside Gamma.
-    for (size_t j=0; j<Ntau; j++){ // Ntau
+    for (size_t j=0; j<Ntau; j++){
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
     }
-    const unsigned int DATA_SET_DIM = iqn.size();
     for (signed int j=(-static_cast<int>(Ntau/2))+1; j<(signed int)static_cast<int>(Ntau/2); j++){ // Bosonic frequencies.
         std::complex<double> matFreq(0.0 , (2.0*(double)j)*M_PI/beta );
         iqn_tilde.push_back( matFreq );
@@ -118,16 +118,16 @@ int main(int argc, char** argv){
     
     // One-ladder calculations
     #ifndef INFINITE
-    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_tilde_m_k_bar,iqn_tilde,mu,U,beta);
     #else
-    IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,iqn,k_tilde_m_k_bar,iqn_tilde,mu,U,beta);
     if (is_single_ladder_precomputed){
         IPT2::InfiniteLadders< std::complex<double> >::_FILE_NAME = FILE_NAME_SL;
     }
     #endif
     
     // Setting MPI stuff up
-    constexpr size_t tot_k_size = N_k;
+    constexpr size_t tot_k_size = N_k*N_k;
     const size_t num_elem_per_proc = (world_size != 1) ? static_cast<size_t>(tot_k_size/world_size) : tot_k_size-1;
     std::cout << "num_elem_per_proc: " << num_elem_per_proc << "\n";
     MPI_Status status;
@@ -138,14 +138,13 @@ int main(int argc, char** argv){
     // Committing custom data type
     MPI_Datatype MPI_Data_struct_t;
     IPT2::create_mpi_data_struct(MPI_Data_struct_t);
-    //std::vector< std::vector<MPIData> >* gathered_MPI_data = new std::vector< std::vector<MPIData> >();
-    auto_ptr< std::vector< std::vector<MPIData> > > gathered_MPI_data(new std::vector< std::vector<MPIData> >());
+    std::vector< std::vector<MPIData> >* gathered_MPI_data = new std::vector< std::vector<MPIData> >();
 
     // Dispatching the tasks across the processes called in
     if (world_rank==root_process){
         IPT2::set_vector_processes(&vec_to_processes,N_k);
         for (auto el : vec_to_processes){
-            std::cout << el.k_tilde_m_bar << "\n";
+            std::cout << el.k_tilde_m_k_bar_x << " " << el.k_tilde_m_k_bar_y << std::endl;
         }
         std::cout << "world size: " << world_size << "\n";
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
@@ -169,46 +168,44 @@ int main(int argc, char** argv){
                 CubeToSave[i] = new arma::Cube< std::complex<double> >(Ntau,Ntau,iqn.size()); // memory is not initialized
             }
         }
-        //arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_per_proc+1);
         #endif
         for (size_t i=0; i<=num_elem_per_proc; i++){
             auto mpidataObj = vec_to_processes[i];
             clock_t begin = clock();
-            try {
+            try{
                 #ifndef INFINITE
                 arma::Cube< std::complex<double> >* mat_slice_ptr = nullptr;
                 if (is_single_ladder_precomputed)
                     mat_slice_ptr = CubeToSave[i];
-                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_m_bar,is_single_ladder_precomputed,(void*)mat_slice_ptr);
+                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_m_k_bar_x,mpidataObj.k_tilde_m_k_bar_y,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
-                GG_iqn = inf_ladder_obj(mpidataObj.k_tilde_m_bar,is_single_ladder_precomputed);
+                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed);
                 #endif
-            } catch(const std::invalid_argument& err){
-                std::cerr << err.what() << "\n";
+            } catch (const std::invalid_argument& err){
+                std::cerr << err.what()  << "\n";
                 exit(1);
             }
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
-            gathered_MPI_data->push_back(std::move(GG_iqn));
-            printf("%li calculated by root process\n", mpidataObj.k_tilde_m_bar);
+            gathered_MPI_data->push_back(GG_iqn);
+            printf("(%li,%li) calculated by root process\n", mpidataObj.k_tilde_m_k_bar_x, mpidataObj.k_tilde_m_k_bar_y);
             #ifndef INFINITE
             if (is_single_ladder_precomputed){ // maybe take this out of the loop
                 try{
-                    H5std_string  DATASET_NAME( std::string("ktilde_m_bar_")+std::to_string(k_t_b_array[mpidataObj.k_tilde_m_bar]) );
+                    H5std_string  DATASET_NAME( std::string("k_tilde_m_k_bar_x_")+std::to_string(k_tilde_m_k_bar[mpidataObj.k_tilde_m_k_bar_x])+std::string("k_tilde_m_k_bar_y_")+std::to_string(k_tilde_m_k_bar[mpidataObj.k_tilde_m_k_bar_y]) );
                     save_matrix_in_HDF5(*CubeToSave[i],iqn,DATASET_NAME,file_sl);
                 } catch(const std::runtime_error& err ){
                     std::cerr << err.what() << "\n";
                     exit(1);
                 }
-                // deallocating
                 delete CubeToSave[i];
             }
             #endif
         }
         #ifndef INFINITE
         // deallocating
-        delete [] CubeToSave;
+        delete[] CubeToSave;
         #endif
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         // Fetch data from the slaves
@@ -240,8 +237,10 @@ int main(int argc, char** argv){
                 MPI_Recv( (void*)(returned_tags_from_slaves.data()), recv_root_num_elem, MPI_INT, an_id, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
                 for (auto tag : returned_tags_from_slaves){
                     single_ladders_to_save = armaMatObj.recv_Arma_cube_MPI(tag,an_id);
+                    auto n_ks = inverse_Cantor_pairing(tag); // n_k_bar, n_k_tilde
+                    std::cout << "n_bar: " << std::get<0>(n_ks) << " and n_tilde: " << std::get<1>(n_ks) << std::endl;
                     try{
-                        H5std_string  DATASET_NAME( std::string("ktilde_m_bar_")+std::to_string(k_t_b_array[tag]) );
+                        H5std_string  DATASET_NAME( std::string("k_tilde_m_k_bar_x_")+std::to_string(k_tilde_m_k_bar[std::get<0>(n_ks)])+std::string("k_tilde_m_k_bar_y_")+std::to_string(k_tilde_m_k_bar[std::get<1>(n_ks)]) );
                         save_matrix_in_HDF5(single_ladders_to_save,iqn,DATASET_NAME,file_sl);
                     } catch( std::runtime_error& err ){
                         std::cerr << err.what() << "\n";
@@ -252,18 +251,17 @@ int main(int argc, char** argv){
             #endif
         }
 
-        std::ofstream test1("test_susceptibilities_flattened.dat", std::ios::out);
+        std::ofstream test1("test_calculate_spline_Green_function_2D.dat", std::ios::out);
         for (auto el : gathered_MPI_data->back()){
             test1 << el.cplx_data_jj.real() << "\t\t" << el.cplx_data_jj.imag() << "\t\t" << el.cplx_data_szsz.real() << "\t\t" << el.cplx_data_szsz.imag() << "\n";
         }
         test1.close();
 
-        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5_jj(iqn.size()); // Ntau
-        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5_szsz(iqn.size()); // Ntau
-        std::vector<MPIData> mpi_data_hdf5_tmp;
+        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5_jj(iqn.size());
+        std::vector< std::complex<double> > mpi_data_to_transfer_hdf5_szsz(iqn.size());
         for (size_t l=0; l<gathered_MPI_data->size(); l++){
-            mpi_data_hdf5_tmp = std::move(gathered_MPI_data->at(l));
-            std::string DATASET_NAME("ktilde_m_bar_"+std::to_string(k_t_b_array[mpi_data_hdf5_tmp[0].k_tilde_m_bar]));
+            std::vector<MPIData> mpi_data_hdf5_tmp = gathered_MPI_data->at(l);
+            std::string DATASET_NAME("kbar_"+std::to_string(k_tilde_m_k_bar[mpi_data_hdf5_tmp[0].k_tilde_m_k_bar_x])+"ktilde_"+std::to_string(k_tilde_m_k_bar[mpi_data_hdf5_tmp[0].k_tilde_m_k_bar_y]));
             std::cout << "DATASET_NAME: " << DATASET_NAME << std::endl;
             // extracting the std::complex<double> data from the MPI struct
             std::transform(mpi_data_hdf5_tmp.begin(),mpi_data_hdf5_tmp.end(),mpi_data_to_transfer_hdf5_jj.begin(),[](MPIData d){ return d.cplx_data_jj; });
@@ -287,7 +285,6 @@ int main(int argc, char** argv){
                 CubeToSave[i] = new arma::Cube< std::complex<double> >(Ntau,Ntau,iqn.size()); // memory is not initialized
             }
         }
-        // arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_to_receive); // n_rows, n_cols, n_slices
         #endif
         for(size_t i = 0; i < num_elem_to_receive; i++) {
             auto mpidataObj = vec_for_slaves[i];
@@ -297,20 +294,19 @@ int main(int argc, char** argv){
                 arma::Cube< std::complex<double> >* mat_slice_ptr = nullptr;
                 if (is_single_ladder_precomputed)
                     mat_slice_ptr = CubeToSave[i];
-                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_m_bar,is_single_ladder_precomputed,(void*)mat_slice_ptr);
+                GG_iqn = one_ladder_obj(mpidataObj.k_tilde_m_k_bar_x,mpidataObj.k_tilde_m_k_bar_y,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
-                GG_iqn = inf_ladder_obj(mpidataObj.k_tilde_m_bar,is_single_ladder_precomputed);
+                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed);
                 #endif
-            } catch(const std::invalid_argument& err){
+            } catch (const std::invalid_argument& err){ // error might be thrown from integral
                 std::cerr << err.what() << "\n";
                 exit(1);
             }
-
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
-            gathered_MPI_data->push_back(std::move(GG_iqn));
-            printf("%li calculated by slave_process %d\n", mpidataObj.k_tilde_m_bar, world_rank); //, (void*)&vec_for_slaves);
+            gathered_MPI_data->push_back(GG_iqn);
+            printf("(%li, %li) calculated by slave_process %d\n", mpidataObj.k_tilde_m_k_bar_x, mpidataObj.k_tilde_m_k_bar_y, world_rank); //, (void*)&vec_for_slaves);
         }
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         ierr = MPI_Send( &num_elem_to_receive, 1 , MPI_INT, root_process, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD );
@@ -323,18 +319,17 @@ int main(int argc, char** argv){
             ierr = MPI_Send( (void*)(one_ladder_obj.tag_vec.data()), num_elem_to_receive, MPI_INT, root_process, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD );
             for (size_t t=0; t<one_ladder_obj.tag_vec.size(); t++){
                 MPI_Send(CubeToSave[t]->memptr(),Ntau*Ntau*iqn.size(),MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
-                // deallocating
                 delete CubeToSave[t];
             }
-            // deallocating
-            delete [] CubeToSave;
         }
+        delete[] CubeToSave;
         #endif
     }
+
     
     // Should be a loop over the external momentum from this point on...
-    arma::Mat< std::complex<double> > G_k_bar_q_tilde_iwn(q_tilde_array.size(),iwn.size());
-    arma::Mat<double> G_k_bar_q_tilde_tau(q_tilde_array.size(),Ntau+1);
+    arma::Cube< std::complex<double> > G_k_bar_q_tilde_iwn(q_tilde_array.size(),q_tilde_array.size(),iwn.size());
+    arma::Cube<double> G_k_bar_q_tilde_tau(q_tilde_array.size(),q_tilde_array.size(),Ntau+1);
     std::vector<double> FFT_k_bar_q_tilde_tau;
     constexpr double k_bar = M_PI/2.0;
 
@@ -342,30 +337,36 @@ int main(int argc, char** argv){
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         // Building the lattice Green's function from the local DMFT self-energy
         for (size_t l=0; l<q_tilde_array.size(); l++){
-            G_k_bar_q_tilde_iwn(l,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(k_bar-q_tilde_array[l]) - splInlineObj.calculateSpline(iwn[n_bar].imag()) );
+            for (size_t m=0; m<q_tilde_array.size(); m++){
+                G_k_bar_q_tilde_iwn(l,m,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(q_tilde_array[l]+k_bar,q_tilde_array[m]+k_bar) - splInlineObj.calculateSpline(iwn[n_bar].imag()) );
+            }
         }
     }
 
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         for (size_t l=0; l<q_tilde_array.size(); l++){
-            // Substracting the tail of the Green's function
-            G_k_bar_q_tilde_iwn(l,n_bar) -= 1.0/(iwn[n_bar]) + epsilonk(q_tilde_array[l])/iwn[n_bar]/iwn[n_bar]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+            for (size_t m=0; m<q_tilde_array.size(); m++){
+                // Substracting the tail of the Green's function
+                G_k_bar_q_tilde_iwn(l,m,n_bar) -= 1.0/(iwn[n_bar]) + epsilonk(q_tilde_array[l]+k_bar,q_tilde_array[m]+k_bar)/iwn[n_bar]/iwn[n_bar]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
+            }
         }
     }
 
     // FFT of G(iwn) --> G(tau)
     for (size_t l=0; l<q_tilde_array.size(); l++){
-        std::vector< std::complex<double> > G_iwn_k_slice(G_k_bar_q_tilde_iwn(l,arma::span::all).begin(),G_k_bar_q_tilde_iwn(l,arma::span::all).end());
-        FFT_k_bar_q_tilde_tau = IPT2::get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
-        for (size_t i=0; i<beta_array.size(); i++){
-            G_k_bar_q_tilde_tau(l,i) = FFT_k_bar_q_tilde_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
+        for (size_t m=0; m<q_tilde_array.size(); m++){
+            std::vector< std::complex<double> > G_iwn_k_slice(G_k_bar_q_tilde_iwn(arma::span(l,l),arma::span(m,m),arma::span::all).begin(),G_k_bar_q_tilde_iwn(arma::span(l,l),arma::span(m,m),arma::span::all).end());
+            FFT_k_bar_q_tilde_tau = IPT2::get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
+            for (size_t i=0; i<beta_array.size(); i++){
+                G_k_bar_q_tilde_tau(l,m,i) = FFT_k_bar_q_tilde_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]+k_bar,q_tilde_array[m]+k_bar); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
+            }
         }
     }
 
     /* TEST G(-tau) */
-    std::ofstream test2("test_calculate_spline_Green_function.dat", std::ios::out);
+    std::ofstream test2("test_1_corr_no_cubic_spline.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test2 << beta_array[j] << "  " << -1.0*G_k_bar_q_tilde_tau(2,Ntau-j) << "\n";
+        test2 << beta_array[j] << "  " << -1.0*G_k_bar_q_tilde_tau(2,2,Ntau-j) << "\n";
     }
     test2.close();
 
@@ -375,7 +376,7 @@ int main(int argc, char** argv){
             delete file_sl;
         }
     }
-    // delete gathered_MPI_data;
+    delete gathered_MPI_data;
     MPI_Type_free(&MPI_Data_struct_t);
 
     ierr = MPI_Finalize();

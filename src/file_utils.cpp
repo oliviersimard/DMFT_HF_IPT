@@ -328,7 +328,7 @@ void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, d
         // casting data into custom complex struct..
         for (size_t i=0; i<NY; i++){
             for (size_t j=0; j<NX; j++){
-                cplx_mat_to_save[i][j] = cplx_t{mat_to_save(i,j).real(),mat_to_save(i,j).imag()};
+                cplx_mat_to_save[i][j] = cplx_t{mat_to_save.at(i,j).real(),mat_to_save.at(i,j).imag()};
             }
         }
         /*
@@ -424,13 +424,13 @@ void save_matrix_in_HDF5(const arma::Cube< std::complex<double> >& cube_to_save,
         */
         H5::Exception::dontPrint();
 
-        cplx_t cplx_mat_to_save[NY][NX];
+        cplx_t* cplx_mat_to_save = new cplx_t[NX*NY];
         for (size_t k=0; k<NZ; k++){
             H5std_string  ATTR_NAME( std::string("iqn") );
             // casting data into custom complex struct..
-            for (size_t i=0; i<NY; i++){
-                for (size_t j=0; j<NX; j++){
-                    cplx_mat_to_save[i][j] = cplx_t{cube_to_save.slice(k)(i,j).real(),cube_to_save.slice(k)(i,j).imag()};
+            for (size_t j=0; j<NX; j++){
+                for (size_t i=0; i<NY; i++){
+                    cplx_mat_to_save[j*NY+i] = cplx_t{cube_to_save.at(i,j,k).real(),cube_to_save.at(i,j,k).imag()};
                 }
             }
 
@@ -443,14 +443,15 @@ void save_matrix_in_HDF5(const arma::Cube< std::complex<double> >& cube_to_save,
             
             // Create a dataset attribute. 
             H5::Attribute attribute = dataset.createAttribute( ATTR_NAME, H5::PredType::NATIVE_DOUBLE, 
-                                                attr_dataspace);
+                                                attr_dataspace );
         
             // Write the attribute data.
             double attr_data[1] = { iqn[k].imag() };
             attribute.write(H5::PredType::NATIVE_DOUBLE, attr_data);
 
         }
-        
+        delete[] cplx_mat_to_save;
+
         delete group;
 
     } catch( H5::FileIException err ){
@@ -573,12 +574,12 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         custom_cplx.insertMember( MEMBER2, HOFFSET(cplx_t,im), H5::PredType::NATIVE_DOUBLE );
         std::cout << "NX: " << NX << " and NY: " << NY << std::endl;
         
-        cplx_t data_out[NY][NX];
+        cplx_t* data_out = new cplx_t[NY*NX];
         H5::DataSpace memspace_out( RANK_OUT, dims_out );
         dataset_open.read(data_out, custom_cplx, memspace_out);
-        for (size_t i=0; i<NY; i++){
-            for (size_t j=0; j<NX; j++){
-                ret_mat(i,j) = std::complex<double>( data_out[i][j].re,data_out[i][j].im );
+        for (size_t j=0; j<NX; j++){
+            for (size_t i=0; i<NY; i++){
+                ret_mat(i,j) = std::complex<double>( data_out[j*NY+i].re,data_out[j*NY+i].im );
             }
         }
         // for (size_t j=0; j<NX; j++){
@@ -587,6 +588,7 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         // for (size_t j=0; j<NX; j++){
         //     std::cout << data_out[0][j].re << " " << data_out[0][j].im << std::endl;
         // }
+        delete[] data_out;
 
     } catch( H5::FileIException err ){
         //err.printErrorStack();
@@ -641,18 +643,18 @@ arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const s
     const size_t NY = dims_out[0];
     const size_t NX = dims_out[1];
     arma::Mat< std::complex<double> > ret_mat(NY,NX);
+    cplx_t* data_out = new cplx_t[NY*NX];
     try{
         /*
         * Get the class of the datatype that is used by the dataset.
         */
         H5T_class_t type_class = dataset_open.getTypeClass();
         
-        cplx_t data_out[NY][NX];
         H5::DataSpace memspace_out( RANK_OUT, dims_out );
         dataset_open.read(data_out, custom_cplx, memspace_out);
-        for (size_t i=0; i<NY; i++){
-            for (size_t j=0; j<NX; j++){
-                ret_mat(i,j) = std::complex<double>( data_out[i][j].re,data_out[i][j].im );
+        for (size_t j=0; j<NX; j++){
+            for (size_t i=0; i<NY; i++){
+                ret_mat(i,j) = std::complex<double>( data_out[j*NY+i].re,data_out[j*NY+i].im );
             }
         }
         // for (size_t j=0; j<NX; j++){
@@ -661,6 +663,7 @@ arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const s
         // for (size_t j=0; j<NX; j++){
         //     std::cout << data_out[0][j].re << " " << data_out[0][j].im << std::endl;
         // }
+        delete[] data_out;
         delete group;
     } catch( H5::FileIException err ){
         //err.printErrorStack();

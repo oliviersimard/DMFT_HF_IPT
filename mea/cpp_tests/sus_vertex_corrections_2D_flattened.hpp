@@ -22,7 +22,8 @@ static int root_process = 0;
 typedef struct{
     size_t k_tilde_m_k_bar_x;
     size_t k_tilde_m_k_bar_y;
-    std::complex<double> cplx_data;
+    std::complex<double> cplx_data_jj;
+    std::complex<double> cplx_data_szsz;
 } MPIData;
 
 struct MPIDataReceive{
@@ -48,7 +49,7 @@ namespace IPT2{
         public:
             OneLadder& operator=(const OneLadder&) = delete;
             OneLadder(const OneLadder&) = delete;
-            std::vector< MPIData > operator()(size_t n_k_tilde_m_k_bar_x, size_t n_k_tilde_m_k_bar_y, bool is_jj, bool is_single_ladder_precomputed=false, void* arma_ptr=nullptr, double qqx=0.0, double qqy=0.0) const noexcept(false);
+            std::vector< MPIData > operator()(size_t n_k_tilde_m_k_bar_x, size_t n_k_tilde_m_k_bar_y, bool is_single_ladder_precomputed=false, void* arma_ptr=nullptr, double qqx=0.0, double qqy=0.0) const noexcept(false);
             OneLadder()=default;
             explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, const std::vector< T >& iqn_tilde, double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn(iqn), _k_t_b(k_arr), _iqn_tilde(iqn_tilde){
                 this->_mu = mu;
@@ -64,7 +65,7 @@ namespace IPT2{
             const std::vector<double>& _k_t_b;
             double _mu {0.0}, _U {0.0}, _beta {0.0};
             inline T getGreen(double kx, double ky, T iwn) const noexcept;
-            T Gamma(double k_tilde_m_k_bar_x, double k_tilde_m_k_bar_y, T ikn_bar, T ikn_tilde) const noexcept(false);
+            T Gamma(double k_tilde_m_k_bar_x, double k_tilde_m_k_bar_y, double qqx, double qqy, T ikn_bar, T ikn_tilde, T iqn) const noexcept(false);
 
         private:
             const std::vector< T >& _iqn_tilde;
@@ -74,103 +75,6 @@ namespace IPT2{
     template< class T > std::vector<int> OneLadder< T >::tag_vec = {};
     //template< class T > std::vector< T** > OneLadder< T >::mat_sl_vec = {};
 
-}
-
-template< class T >
-class ArmaMPI{
-    /* This specific class sends T-typed Armadillo matrices across MPI processes */
-    friend class IPT2::OneLadder< T >;
-    public:
-        explicit ArmaMPI(size_t n_rows, size_t n_cols);
-        ~ArmaMPI();
-        void send_Arma_mat_MPI(arma::Mat< T >& mat,int dest, int tag) const noexcept;
-        arma::Mat< T > recv_Arma_mat_MPI(int tag, int src) const noexcept;
-        void fill_TArr(arma::Mat< T >& mat) const noexcept;
-
-    private:
-        T** _TArr;
-        T* _Tmemptr;
-        size_t _n_rows;
-        size_t _n_cols;
-        //MPI_Datatype _cplx_custom_t;
-};
-
-template< class T >
-ArmaMPI< T >::ArmaMPI(size_t n_rows, size_t n_cols) : _n_rows(n_rows),_n_cols(n_cols){
-    T* data = new T[_n_rows*_n_cols];
-    _TArr = new T*[_n_rows];
-    for (size_t i=0; i<_n_rows; i++){
-        _TArr[i] = &data[i*_n_cols];
-    }
-    // constructing the MPI datatype, even if not needed..
-    //IPT2::create_mpi_data_struct_cplx(_cplx_custom_t);
-    _Tmemptr = new T[_n_rows*_n_cols];
-}
-
-template< class T >
-ArmaMPI< T >::~ArmaMPI(){
-    delete[] _TArr[0]; // Effectively deletes data*
-    delete[] _TArr;
-    delete[] _Tmemptr;
-    //MPI_Type_free(&_cplx_custom_t);
-}
-
-template< class T >
-void ArmaMPI< T >::send_Arma_mat_MPI(arma::Mat< T >& mat,int dest,int tag) const noexcept{
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            _TArr[i][j] = mat(i,j);
-        }
-    }
-    // Contiguous memory
-    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,dest,tag,MPI_COMM_WORLD);
-}
-
-template<>
-inline void ArmaMPI< std::complex<double> >::send_Arma_mat_MPI(arma::Mat< std::complex<double> >& mat,int dest,int tag) const noexcept{
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            _TArr[i][j] = mat(i,j);
-        }
-    }
-    MPI_Send(&(_TArr[0][0]),_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,dest,tag,MPI_COMM_WORLD);
-}
-
-template< class T >
-arma::Mat< T > ArmaMPI< T >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
-    arma::Mat< T > returned_mat(_n_rows,_n_cols);
-    MPI_Recv(&(_TArr[0][0]),_n_cols*_n_rows*sizeof(T),MPI_BYTE,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            returned_mat(i,j) = _TArr[i][j];
-        }
-    }
-
-    return returned_mat;
-}
-
-template<>
-inline arma::Mat< std::complex<double> > ArmaMPI< std::complex<double> >::recv_Arma_mat_MPI(int tag, int src) const noexcept{
-    arma::Mat< std::complex<double> > returned_mat(_n_rows,_n_cols);
-    MPI_Recv(_Tmemptr,_n_cols*_n_rows,MPI_CXX_DOUBLE_COMPLEX,src,tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-    
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            returned_mat(i,j) = _Tmemptr[i*_n_cols+j];
-        }
-    }
-
-    return returned_mat;
-}
-
-template< class T >
-inline void ArmaMPI< T >::fill_TArr(arma::Mat< T >& mat) const noexcept{
-    for (size_t i=0; i<_n_rows; i++){
-        for (size_t j=0; j<_n_cols; j++){
-            _TArr[i][j] = mat(i,j);
-        }
-    }
 }
 
 template< class T >
@@ -189,10 +93,10 @@ inline T IPT2::OneLadder< T >::getGreen(double kx, double ky, T iwn) const noexc
 }
 
 template< class T >
-T IPT2::OneLadder< T >::Gamma(double k_tilde_m_k_bar_x, double k_tilde_m_k_bar_y, T ikn_bar, T ikn_tilde) const noexcept(false){
+T IPT2::OneLadder< T >::Gamma(double k_tilde_m_k_bar_x, double k_tilde_m_k_bar_y, double qqx, double qqy, T ikn_bar, T ikn_tilde, T iqn) const noexcept(false){
     /*  This method computes the current-vertex correction for the single ladder diagram. It uses the dressed Green's
     functions computed in the paramagnetic state. 
-        
+    
         Parameters:
             k_tilde_m_k_bar_x (double): x component of difference in doublon momentum (Feynman diagram picture).
             k_tilde_m_k_bar_y (double): y component of difference in doublon momentum (Feynman diagram picture).
@@ -229,14 +133,13 @@ T IPT2::OneLadder< T >::Gamma(double k_tilde_m_k_bar_x, double k_tilde_m_k_bar_y
 }
 
 template< class T >
-std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_m_k_bar_x, size_t n_k_tilde_m_k_bar_y, bool is_jj, bool is_single_ladder_precomputed, void* arma_ptr, double qqx, double qqy) const noexcept(false){
+std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_m_k_bar_x, size_t n_k_tilde_m_k_bar_y, bool is_single_ladder_precomputed, void* arma_ptr, double qqx, double qqy) const noexcept(false){
     /*  This method computes the susceptibility given the current-vertex correction for the single ladder diagram. It does so for a set
     of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
         
         Parameters:
             n_k_bar (size_t): right doublon momentum index (Feynman diagram picture).
             n_k_tilde (size_t): left doublon momentum index (Feynman diagram picture).
-            is_jj (bool): boolean parameters that selects the nature of the susceptibility to be computed: spin-spin (false) or current-current (true).
             qq (double): momentum injected in the system. Defaults to 0, because interested in the thermodynamic limit (infinite volume).
         
         Returns:
@@ -249,12 +152,12 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_m_k_bar
     const size_t NI = _splInlineobj._iwn_array.size();
     const Integrals integralsObj;
     const double delta = 2.0*M_PI/(_k_t_b.size()-1);
-    arma::Mat< T > Gamma_n_bar_n_tilde(NI,NI); // Doesn't depend on iq_n
+    arma::Cube< T > Gamma_n_tilde_n_bar(NI,NI,_iqn.size()); // Doesn't depend on iq_n
     
     for (size_t n_bar=0; n_bar<NI; n_bar++){
         clock_t begin = clock();
         for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
-            Gamma_n_bar_n_tilde(n_bar,n_tilde) = Gamma(_k_t_b[n_k_tilde_m_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y],_splInlineobj._iwn_array[n_bar],_splInlineobj._iwn_array[n_tilde]);
+            Gamma_n_tilde_n_bar(n_tilde,n_bar) = Gamma(_k_t_b[n_k_tilde_m_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y],_splInlineobj._iwn_array[n_bar],_splInlineobj._iwn_array[n_tilde]);
         }
         clock_t end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
@@ -265,7 +168,7 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_m_k_bar
         int tag = (int)( ((n_k_tilde_m_k_bar_x+n_k_tilde_m_k_bar_y)*(n_k_tilde_m_k_bar_x+n_k_tilde_m_k_bar_y+1))/2 ) + (int)n_k_tilde_m_k_bar_y;
         std::cout << "tag: " << tag << std::endl;
         tag_vec.push_back(tag);
-        *( static_cast< arma::Mat< T >* >(arma_ptr) ) = Gamma_n_bar_n_tilde;
+        *( static_cast< arma::Cube< T >* >(arma_ptr) ) = Gamma_n_tilde_n_bar;
         // for (size_t i=0; i<_splInlineobj._iwn_array.size(); i++){
         //     std::cout << "el after: " << sl_vec[0][3*_splInlineobj._iwn_array.size()+i] << std::endl;
         // }
@@ -273,39 +176,42 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_m_k_bar
 
     arma::Mat< T > GG_n_bar_n_tilde(NI,NI);
     std::vector< T > tmp_k_integral_inner(_k_t_b.size()), tmp_k_integral_outer(_k_t_b.size());
+    T jj_resp_iqn{0.0}, szsz_resp_iqn{0.0};
     for (size_t em=0; em<_iqn.size(); em++){
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
-                if (is_jj){
-                    for (size_t n_k_bar_x=0; n_k_bar_x<_k_t_b.size(); n_k_bar_x++){
-                        for (size_t n_k_bar_y=0; n_k_bar_y<_k_t_b.size(); n_k_bar_y++){
-                            // This part remains to be done....
-                            tmp_k_integral_inner[n_k_bar_y] = getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y],_splInlineobj._iwn_array[n_tilde]
-                            )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y]+qqy,_splInlineobj._iwn_array[n_tilde]+_iqn[em]
-                            )*Gamma_n_bar_n_tilde(n_bar,n_tilde
-                            )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y],_splInlineobj._iwn_array[n_bar]
-                            )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[em]);
-                        }
-                        tmp_k_integral_outer[n_k_bar_x] = -1.0/(2.0*M_PI)*velocity(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x])*velocity(_k_t_b[n_k_bar_x])*integralsObj.I1D_VEC(tmp_k_integral_inner,delta,"simpson");
+                // jj
+                for (size_t n_k_bar_x=0; n_k_bar_x<_k_t_b.size(); n_k_bar_x++){
+                    for (size_t n_k_bar_y=0; n_k_bar_y<_k_t_b.size(); n_k_bar_y++){
+                        // This part remains to be done....
+                        tmp_k_integral_inner[n_k_bar_y] = getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y],_splInlineobj._iwn_array[n_tilde]
+                        )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y]+qqy,_splInlineobj._iwn_array[n_tilde]+_iqn[em]
+                        )*Gamma_n_tilde_n_bar(n_tilde,n_bar
+                        )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y],_splInlineobj._iwn_array[n_bar]
+                        )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[em]);
                     }
-                    GG_n_bar_n_tilde(n_bar,n_tilde) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(tmp_k_integral_outer,delta,"simpson");
-                } else{
-                    for (size_t n_k_bar_x=0; n_k_bar_x<_k_t_b.size(); n_k_bar_x++){
-                        for (size_t n_k_bar_y=0; n_k_bar_y<_k_t_b.size(); n_k_bar_y++){
-                            // This part remains to be done....
-                            tmp_k_integral_inner[n_k_bar_y] = getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y],_splInlineobj._iwn_array[n_tilde]
-                            )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y]+qqy,_splInlineobj._iwn_array[n_tilde]+_iqn[em]
-                            )*Gamma_n_bar_n_tilde(n_bar,n_tilde
-                            )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y],_splInlineobj._iwn_array[n_bar]
-                            )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[em]);
-                        }
-                        tmp_k_integral_outer[n_k_bar_x] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(tmp_k_integral_inner,delta,"simpson");
-                    }
-                    GG_n_bar_n_tilde(n_bar,n_tilde) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(tmp_k_integral_outer,delta,"simpson");
+                    tmp_k_integral_outer[n_k_bar_x] = -1.0/(2.0*M_PI)*velocity(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x])*velocity(_k_t_b[n_k_bar_x])*integralsObj.I1D_VEC(tmp_k_integral_inner,delta,"simpson");
                 }
+                GG_n_bar_n_tilde(n_bar,n_tilde) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(tmp_k_integral_outer,delta,"simpson");
+                jj_resp_iqn = (1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde);
+                // szsz
+                for (size_t n_k_bar_x=0; n_k_bar_x<_k_t_b.size(); n_k_bar_x++){
+                    for (size_t n_k_bar_y=0; n_k_bar_y<_k_t_b.size(); n_k_bar_y++){
+                        // This part remains to be done....
+                        tmp_k_integral_inner[n_k_bar_y] = getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y],_splInlineobj._iwn_array[n_tilde]
+                        )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+_k_t_b[n_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+_k_t_b[n_k_bar_y]+qqy,_splInlineobj._iwn_array[n_tilde]+_iqn[em]
+                        )*Gamma_n_tilde_n_bar(n_tilde,n_bar
+                        )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x],_k_t_b[n_k_tilde_m_k_bar_y],_splInlineobj._iwn_array[n_bar]
+                        )*getGreen(_k_t_b[n_k_tilde_m_k_bar_x]+qqx,_k_t_b[n_k_tilde_m_k_bar_y]+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[em]);
+                    }
+                    tmp_k_integral_outer[n_k_bar_x] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(tmp_k_integral_inner,delta,"simpson");
+                }
+                GG_n_bar_n_tilde(n_bar,n_tilde) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(tmp_k_integral_outer,delta,"simpson");
+                szsz_resp_iqn = (1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde);
+            
             }
         }
-        MPIData mpi_data_tmp { n_k_tilde_m_k_bar_y, n_k_tilde_m_k_bar_x, (1.0/_beta/_beta)*arma::accu(GG_n_bar_n_tilde) }; // summing over the internal ikn_tilde and ikn_bar
+        MPIData mpi_data_tmp { n_k_tilde_m_k_bar_y, n_k_tilde_m_k_bar_x, jj_resp_iqn, szsz_resp_iqn }; // summing over the internal ikn_tilde and ikn_bar
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
     }
     std::cout << "After the loop.." << std::endl;
@@ -407,7 +313,7 @@ namespace IPT2{
         */
         for (size_t k_t=0; k_t<N_q; k_t++){
             for (size_t k_b=0; k_b<N_q; k_b++){
-                MPIData mpi_data{ k_t, k_b, std::complex<double>(0.0,0.0) };
+                MPIData mpi_data{ k_t, k_b, std::complex<double>(0.0,0.0), std::complex<double>(0.0,0.0) };
                 vec_to_processes->push_back(static_cast<MPIData&&>(mpi_data));
             }
         }
@@ -423,10 +329,10 @@ namespace IPT2{
             Returns:
                 (void): committed MPI datatype.
         */
-        int lengths[3]={ 1, 1, 1 };
-        MPI_Aint offsets[3]={ offsetof(MPIData,k_tilde_m_k_bar_x), offsetof(MPIData,k_tilde_m_k_bar_y), offsetof(MPIData,cplx_data) };
-        MPI_Datatype types[3]={ MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX }, tmp_type;
-        MPI_Type_create_struct(3,lengths,offsets,types,&tmp_type);
+        int lengths[4]={ 1, 1, 1, 1 };
+        MPI_Aint offsets[4]={ offsetof(MPIData,k_tilde_m_k_bar_x), offsetof(MPIData,k_tilde_m_k_bar_y), offsetof(MPIData,cplx_data_jj), offsetof(MPIData,cplx_data_szsz) };
+        MPI_Datatype types[4]={ MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX, MPI_CXX_DOUBLE_COMPLEX }, tmp_type;
+        MPI_Type_create_struct(4,lengths,offsets,types,&tmp_type);
         // Proper padding
         MPI_Type_create_resized(tmp_type, 0, sizeof(MPIData), &custom_type);
         MPI_Type_commit(&custom_type);

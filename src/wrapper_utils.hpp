@@ -1,7 +1,8 @@
 #ifndef Wrapper_utils_H_
 #define Wrapper_utils_H_
 
-//#define ARMA_ALLOW_FAKE_GCC
+// #define ARMA_ALLOW_FAKE_GCC
+// #define ARMA_NO_DEBUG // to disable bound checks
 
 #include <iostream>
 #include <complex>
@@ -306,6 +307,62 @@ inline void ArmaMPI< T >::fill_TArr(arma::Mat< T >& mat) const noexcept{
         }
     }
 }
+
+template<typename U, typename T, typename ...Ts>
+struct TrigP{
+    // Custom class to compute trigonometric functions using a predetermined array instead of always calling std::cos or std::sin.
+    // If for example we want to compute cos(k_array[l]-k_array[j]), one cannot simply compute _cos_prec[l-j]. One should rather use this method
+    // in the following form: trigObj.COS(l,-j).
+    U COS(T first) const noexcept{
+        return _cosine_p[first];
+    }
+    U COS(T first, T second) const noexcept{
+        // cos(x+y) = cos(x)*cos(y) - sin(x)*sin(y)
+        if ( first < static_cast<T>(0) || second < static_cast<T>(0) )
+            return _cosine_p[first]*_cosine_p[second] + _sine_p[first]*_sine_p[second];
+        else
+            return _cosine_p[first]*_cosine_p[second] - _sine_p[first]*_sine_p[second];
+    }
+    
+    // U COS(T first, T second, Ts ...others) const noexcept{
+    //     // cos(x+y+z+...) = cos(x)*cos(y+z+...) - sin(x)*sin(y+z+...)
+    //     if (sizeof...(others)>0){
+    //         if ( first < static_cast<T>(0) )
+    //             return _cosine_p[first]*COS(second, others ...)+_sine_p[first]*SIN(second, others ...);
+    //         else
+    //             return _cosine_p[first]*COS(second, others ...)-_sine_p[first]*SIN(second, others ...);
+    //     } else{
+    //         return COS(first, second);
+    //     }
+    // }
+
+    U SIN(T first) const noexcept{
+        return _sine_p[first];
+    }
+    U SIN(T first, T second) const noexcept{
+        // sin(x+y) = sin(x)*cos(y) + cos(x)*sin(y)
+        if ( first < static_cast<T>(0) )
+            return -_cosine_p[second]*_sine_p[first] + _cosine_p[first]*_sine_p[second];
+        else if ( second < static_cast<T>(0) )
+            return _cosine_p[second]*_sine_p[first] - _cosine_p[first]*_sine_p[second];
+        else if ( second < static_cast<T>(0) && first < static_cast<T>(0) )
+            return -_cosine_p[second]*_sine_p[first] - _cosine_p[first]*_sine_p[second];
+        else
+            return _cosine_p[second]*_sine_p[first] + _cosine_p[first]*_sine_p[second];
+    }
+    // U SIN(T first, T second, Ts ...others) const noexcept{
+    //     // sin(x+y+z+...) = sin(x)*cos(y+z+...) + cos(x)*sin(y+z+...)
+    //     if (sizeof...(others)>0){
+    //         return _sine_p[first]*COS(second, others ...)+_cosine_p[first]*SIN(second, others ...);
+    //     } else{
+    //         return SIN(first, second);
+    //     }
+    // }
+    TrigP(std::vector< U >& sine_p, std::vector< U >& cosine_p) : _sine_p(sine_p), _cosine_p(cosine_p){};
+    private:
+        std::vector< U >& _sine_p;
+        std::vector< U >& _cosine_p;
+};
 
 
 // int main(void){
