@@ -198,7 +198,7 @@ while i<len(keys_list):
 		if is_Green_component:
 			label_imag=r"$-\frac{1}{\pi}\operatorname{Im}G_{\text{loc}}$"
 			label_real=r"$\operatorname{Re}G_{\text{loc}}$"
-			imag_values=list( map( lambda x: -1./np.pi*x.imag, dict_names[str_filename] ) )
+			imag_values=list( map( lambda x: -1.0/np.pi*x.imag, dict_names[str_filename] ) )
 		else:
 			imag_values=list( map( lambda x: -1.0/np.pi*x.imag, dict_names[str_filename] ) )
 			label_imag=r"$-\frac{1}{\pi}\operatorname{Im}G_{\text{loc}}$"

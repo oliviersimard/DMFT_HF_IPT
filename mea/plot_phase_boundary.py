@@ -137,7 +137,7 @@ def get_according_to_condition(path : str, funct) -> tuple:
         if any(char.isdigit() for char in os.path.basename(root)):
             dim_int = int(*findall(r'^\d+',os.path.basename(root))) # All files have dimension mentionned in their name, so any file fits.
         if files != []:
-            largest_int, file_largest_int = extract_largest_int(files,"tau")
+            largest_int, file_largest_int = extract_largest_int(files,"tau") # The file read for magnetization has to contain "tau" in its name...
             Ntau = int(findall(r"(?<=N_tau_)(\d+)",file_largest_int)[0])
             beta = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",file_largest_int)[0])
             U = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",file_largest_int)[0])
@@ -166,7 +166,7 @@ def get_according_to_condition(path : str, funct) -> tuple:
                     if cond and dict_to_store_passing_cond_files[key]._largest_num_iter<MAXVAL: # condition to consider phase delimitation. Needs to have converged in AFM.
                         if beta>max_beta:
                             max_beta=beta
-                    elif rest[0]>0.14 and dict_to_store_passing_cond_files[key]._largest_num_iter>=MAXVAL: # rest[0] might change threshold, depending on hybridisation mixing
+                    elif rest[0]>0.10 and dict_to_store_passing_cond_files[key]._largest_num_iter>=MAXVAL: # rest[0] might change threshold, depending on hybridisation mixing
                         if beta>max_beta:
                             max_beta=beta
             print("max_beta: ", max_beta)
@@ -219,7 +219,7 @@ if __name__=="__main__":
     #axs[1].tick_params(axis='y',left=False)
     axs[1].set_ylabel(r"$n_{\uparrow}-n_{\downarrow}$")
     axs[1].set_xlabel(r"$T (1/\beta)$")
-    axs[1].set_xlim(0.0,0.3)
+    # axs[1].set_xlim(0.0,0.3)
     axs[1].set_ylim(0.0,1.0)
 
     axs[1].yaxis.set_minor_locator(AutoMinorLocator())
@@ -232,18 +232,18 @@ if __name__=="__main__":
         axs[1].set_title(r"Magnetization vs T in $\infty$ dimension")
     else:
         axs[1].set_title(r"Magnetization vs T in {0:d}D".format(dim_int))
-    U_thres = 8.0
-    color = iter(plt.cm.rainbow(np.linspace(0,1,11)))#U_thres+1
+    U_thres = max(Us)
+    color = iter(plt.cm.rainbow(np.linspace(0,1,len(Us)+1)))#U_thres+1
     # extracting U arrays before plotting
     for U in sorted(Us):
         if U<=U_thres:
             magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
             T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
             axs[1].plot(T_arr,magnetization_arr,ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
-        elif U>U_thres and U<=10.0:
-            magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-            T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-            axs[1].plot(T_arr[:29],magnetization_arr[:29],ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+        # elif U>U_thres and U<=10.0:
+        #     magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+        #     T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
+        #     axs[1].plot(T_arr[:29],magnetization_arr[:29],ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
     
     axs[1].legend()
 
@@ -269,7 +269,7 @@ if __name__=="__main__":
 
     ax.set_ylabel(r"$n_{\uparrow}-n_{\downarrow}$")
     ax.set_xlabel(r"$T (1/\beta)$")
-    ax.set_xlim(0.0,0.3)
+    # ax.set_xlim(0.0,0.3)
     ax.set_ylim(0.0,1.0)
 
     ax.yaxis.set_minor_locator(AutoMinorLocator())
@@ -279,8 +279,8 @@ if __name__=="__main__":
     ax.tick_params(axis='both', which='major', direction='out', length=3.5, width=1.0)
     ax.tick_params(axis='y', which='minor', direction='in', length=2.0, width=1.0)
 
-    U_thres = 8.0
-    color = iter(plt.cm.rainbow(np.linspace(0,1,U_thres+1)))#
+    U_thres = max(Us)
+    color = iter(plt.cm.rainbow(np.linspace(0,1,len(Us)+1)))#
     # extracting U arrays before plotting
     for U in sorted(Us):
         if U<=U_thres:

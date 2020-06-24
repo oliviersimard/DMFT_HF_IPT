@@ -7,8 +7,8 @@
 #include <string>
 #include <sys/stat.h>
 
-#define NTAU 512
-#define MAXITER 40
+#define NTAU 4096
+#define MAXITER 150
 #define MAX_ITER_INTEGRAL 20
 #define MINTOL 1e-4
 
@@ -48,11 +48,11 @@ struct stat info = {0};
 
 int main(int argc, char* argv[]){
 
-    const double beta_min=4.0, beta_step=1.0, beta_max=30.0;
-    const double U_min=8.0, U_step=1.0, U_max=20.0;
+    const double beta_min=5.0, beta_step=0.2, beta_max=5.1;
+    const double U_min=1.0, U_step=0.5, U_max=2.0; // Unstable below U=3.0
     const double e_max=2.0;
     const double alpha=0.05;
-    const double hyb_c = 1.0;
+    const double hyb_c=1.0;
 
     arma::Cube<double> Hyb(2,2,2*NTAU+1,arma::fill::zeros);
     arma::Cube<double> SE_1(2,2,2*NTAU+1,arma::fill::zeros), SE(2,2,2*NTAU+1,arma::fill::zeros);
@@ -102,43 +102,6 @@ int main(int argc, char* argv[]){
                 G_1.slice(i) *= std::exp(-i*lambda0*delta_tau); // Multiplication is done for all the elements in the 2X2 spin matrix at each tau
                 G_2[i] *= std::exp(-i*lambda0*delta_tau);
             }
-            
-            /******************************* Testing *********************************/
-            // std::ofstream out1("G_PP_tau_first_iter_before.dat",std::ios::out);
-            // for (int i=0; i<=2*NTAU; i++){
-            //     out1 << i*delta_tau << "\t\t" << G_0[i] << "\t\t" << G_1.slice(i)(up,up) << "\t\t" << G_1.slice(i)(down,down) << "\t\t" << G_2[i] << "\n";
-            // }
-            // out1.close();
-            // std::vector<double> G_up( G_1(arma::span(up,up),arma::span(up,up),arma::span::all).begin(), G_1(arma::span(up,up),arma::span(up,up),arma::span::all).end() );
-            // auto G_0_iwn = linear_spline_Sigma_tau_to_iwn(G_0,iwn_array,beta,delta_tau);
-            // auto G_up_iwn = linear_spline_Sigma_tau_to_iwn(G_up,iwn_array,beta,delta_tau);
-            // auto G_2_iwn = linear_spline_Sigma_tau_to_iwn(G_2,iwn_array,beta,delta_tau);
-
-            // std::ofstream outputTest2("G_PP_iwn_first_iter_before.dat",std::ios::out);
-            // for (int i=0; i<2*NTAU; i++){
-            //     outputTest2 << iwn_array[i].imag() << "\t\t" << G_0_iwn[i].real() << "\t\t" << G_0_iwn[i].imag() << "\t\t" << G_up_iwn[i].real() << "\t\t" << G_up_iwn[i].imag() << "\t\t" << G_2_iwn[i].real() << "\t\t" << G_2_iwn[i].imag() << "\n";
-            // }
-            // outputTest2.close();
-
-            // for (size_t i=0; i<2*NTAU; i++){
-            //     G_0_iwn[i] -= 1.0/iwn_array[i];
-            // }
-            // fft_w2t(G_0_iwn,G_0,beta);
-            // for (size_t j=0; j<=2*NTAU; j++){
-            //     G_0[j] += -0.5;
-            // }
-            // fft_w2t(G_up_iwn,G_up,beta);
-            // fft_w2t(G_2_iwn,G_2,beta);
-            // for (size_t i=0; i<2*NTAU; i++){
-            //     G_0_iwn[i] += 1.0/iwn_array[i];
-            // }
-
-            // std::ofstream outputTest3("G_PP_tau_first_iter_after.dat",std::ios::out);
-            // for (int i=0; i<2*NTAU; i++){
-            //     outputTest3 << i*delta_tau << "\t\t" << G_0[i] << "\t\t" << G_up[i] << "\t\t" << G_2[i] << "\n";
-            // }
-            // outputTest3.close();
-            // /******************************* Testing *********************************/
 
             double lambda = lambda0;
             unsigned int iter = 0;
@@ -148,7 +111,8 @@ int main(int argc, char* argv[]){
             double G_up_diff, G_down_diff;
             while (!is_converged && iter<MAXITER){
                 std::cout << "********************************** iter : " << iter << " **********************************" << "\n";
-                if (iter>2){
+                std::cout << "U: " << U << " beta: " << beta << " h: " << h << "\n";
+                if (iter>1){
                     h=0.0;
                 }
                 // NCA self-energy update in AFM case scenario
@@ -290,27 +254,11 @@ int main(int argc, char* argv[]){
                 fft_w2t(Hyb_up_iwn,Hyb_up,beta);
                 fft_w2t(Hyb_down_iwn,Hyb_down,beta);
                 // Transferring into armadillo container the dumbest way
-                for (size_t i=0; i<2*NTAU; i++){
+                for (size_t i=0; i<=2*NTAU; i++){
                     Hyb.slice(i)(up,up) = (1.0-alpha)*(Hyb_up[i] - 0.5*hyb_c) + alpha*(Hyb.slice(i)(up,up));
                     Hyb.slice(i)(down,down) = (1.0-alpha)*(Hyb_down[i] - 0.5*hyb_c) + alpha*(Hyb.slice(i)(down,down));
                 }
-                /******************************* Testing *********************************/
-                // std::ofstream outHyb2("Hyb_PP_tau_first_iter.dat",std::ios::out);
-                // for (int i=0; i<=2*NTAU; i++){
-                //     outHyb2 << delta_tau*i << "\t\t" << Hyb.slice(i)(up,up) << "\n";
-                // }
-                // outHyb2.close();
-
-                // Hyb_up = std::vector<double>( Hyb(arma::span(up,up),arma::span(up,up),arma::span::all).begin(), Hyb(arma::span(up,up),arma::span(up,up),arma::span::all).end() );
                 
-                // Hyb_up_iwn = linear_spline_Sigma_tau_to_iwn(Hyb_up,iwn_array,beta,delta_tau);
-
-                // std::ofstream outHyb3("Hyb_PP_iwn_first_iter_after.dat",std::ios::out);
-                // for (int i=0; i<2*NTAU; i++){
-                //     outHyb3 << iwn_array[i].imag() << "\t\t" << Hyb_up_iwn[i].real() << "\t\t" << Hyb_up_iwn[i].imag() << "\n";
-                // }
-                // outHyb3.close();
-                /******************************* Testing *********************************/
                 if (iter>0){
                     G_up_diff = 0.0; G_down_diff = 0.0;
                     for (size_t l=0; l<=2*NTAU; l++){
@@ -341,13 +289,23 @@ int main(int argc, char* argv[]){
                 outSE.close();
 
                 std::ofstream outGtau(full_path+"/G_tau_NCA_AFM_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_N_tau_"+std::to_string(NTAU)+"_h_"+std::to_string(h)+"_Nit_"+std::to_string(iter)+".dat",std::ios::out);
-                for (int i=0; i<2*NTAU; i++){
+                for (int i=0; i<=2*NTAU; i++){
                     if (i==0){
                         outGtau << "tau" << "\t\t" << "G_up" << "\t\t" << "G_down" << "\n";
                     }
                     outGtau << i*delta_tau << "\t\t" << G_up[i] << "\t\t" << G_down[i] << "\n";
                 }
                 outGtau.close();
+
+                std::ofstream outGiwn(full_path+"/G_iwn_NCA_AFM_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_N_tau_"+std::to_string(NTAU)+"_h_"+std::to_string(h)+"_Nit_"+std::to_string(iter)+".dat",std::ios::out);
+                for (int i=0; i<2*NTAU; i++){
+                    if (i==0){
+                        outGiwn << "iwn" << "\t\t" << "RE G_up" << "\t\t" << "IM G_up" << "\t\t" << "RE G_down" << "\t\t" << "IM G_down" << "\n";
+                    }
+                    outGiwn << iwn_array[i].imag() << "\t\t" << G_up_iwn[i].real() << "\t\t" << G_up_iwn[i].imag() << "\t\t" << G_down_iwn[i].real() << "\t\t" << G_down_iwn[i].imag() << "\n";
+                }
+                outGiwn.close();
+
 
                 iter+=1;
             }
