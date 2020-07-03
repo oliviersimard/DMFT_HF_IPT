@@ -295,6 +295,49 @@ void FFTtools::fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<dou
     fftw_destroy_plan(pUp); //fftw_destroy_plan(pDown);
 }
 
+void FFTtools::fft_w2t(const std::vector< std::complex<double> >& data1, std::vector<double>& data2, double beta, std::string dir){
+    assert(data1.size()==(data2.size()-1));
+    const unsigned int N_tau = data2.size();
+    std::cout << "size tau: " << N_tau << " size iwn: " << data1.size() << std::endl;
+    constexpr std::complex<double> im(0.0,1.0);
+    std::complex<double>* inUp=new std::complex<double> [N_tau-1];
+    std::complex<double>* outUp=new std::complex<double> [N_tau-1];
+    fftw_plan pUp; //fftw_plan pDown;
+    for(size_t k=0;k<N_tau-1;k++){
+        inUp[k]=data1[k];
+    }
+    if (dir.compare("forward")==0){
+        pUp=fftw_plan_dft_1d(N_tau-1, reinterpret_cast<fftw_complex*>(inUp), reinterpret_cast<fftw_complex*>(outUp), FFTW_FORWARD, FFTW_ESTIMATE);
+        fftw_execute(pUp); //fftw_execute(pDown);
+    } else if (dir.compare("backward")==0){
+        pUp=fftw_plan_dft_1d(N_tau-1, reinterpret_cast<fftw_complex*>(inUp), reinterpret_cast<fftw_complex*>(outUp), FFTW_BACKWARD, FFTW_ESTIMATE);
+        fftw_execute(pUp); //fftw_execute(pDown);
+    }
+
+    if (dir.compare("forward")==0){
+        for(size_t j=0;j<N_tau-1;j++){
+            data2[j]=(outUp[j]*std::exp(im*(double)(N_tau-2)*(double)j*M_PI/((double)N_tau-1.0))).real()/beta;
+        }
+    } else if (dir.compare("backward")==0){
+        for(size_t j=0;j<N_tau-1;j++){
+            data2[j]=(outUp[j]*std::exp(-im*(double)(N_tau-2)*(double)j*M_PI/((double)N_tau-1.0))).real()/beta;
+        }
+    }
+    data2[N_tau-1]=0.0; // Up spin
+    if (dir.compare("forward")==0){
+        for(size_t k=0;k<N_tau-1;k++){
+            data2[N_tau-1]+=(data1[k]*std::exp(im*(double)(N_tau-2)*M_PI)).real()/beta;
+        }
+    } else if(dir.compare("backward")==0){
+        for(size_t k=0;k<N_tau-1;k++){
+            data2[N_tau-1]+=(data1[k]*std::exp(-im*(double)(N_tau-2)*M_PI)).real()/beta;
+        }
+    }
+    delete [] inUp;
+    delete [] outUp;
+    fftw_destroy_plan(pUp); //fftw_destroy_plan(pDown);
+}
+
 #ifndef AFM
 void FFTtools::fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>& data_dg_dtau_pos,
                                                 arma::Cube<double>& data_dg_dtau_neg, Spec specialization){
@@ -542,6 +585,24 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
                 return 1.0/(iwn + sublatt1.WeissGreen.get_mu() - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
             };
             sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.I2D(G_latt,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j]);
+            #elif DIM == 3
+            const size_t size_k = sublatt1.karr_l.size();
+            // std::cout << "size shit " << size_k << std::endl;
+            const double delta_k = 2.0*M_PI/(GreenStuff::N_k-1);
+            std::vector< std::complex<double> > integrate_kx(size_k), integrate_ky(size_k), integrate_kz(size_k);
+            double kky, kkz, mu = sublatt1.WeissGreen.get_mu();
+            for (size_t kz=0; kz<size_k; kz++){
+                kkz = sublatt1.karr_l[kz];
+                for (size_t ky=0; ky<size_k; ky++){
+                    kky = sublatt1.karr_l[ky];
+                    for (size_t kx=0; kx<size_k; kx++){
+                        integrate_kx[kx] = 1.0/(iwnArr_l[j] + mu - epsilonk(sublatt1.karr_l[kx],kky,kkz) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+                    }
+                    integrate_ky[ky] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(integrate_kx),delta_k,"simpson");
+                }
+                integrate_kz[kz] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(integrate_ky),delta_k,"simpson");
+            }
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(integrate_kz),delta_k,"simpson");
             #endif
         }
         // Updating the hybridization function for next round.
@@ -563,6 +624,29 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
         std::cout << "new n: " << sublatt1.density_mu(G_density_mu_m) << " for mu: " << sublatt1.WeissGreen.get_mu() << "\n";
         std::cout << "double occupancy: " << sublatt1.double_occupancy() << "\n";
         std::cout << "iteration #" << iter << "\n";
+
+        /******************************** testing ******************************/ 
+        std::vector<double> SE_up_b(2*GreenStuff::N_tau+1,0), SE_up_f(2*GreenStuff::N_tau+1,0);
+        std::ofstream outputSE_iwn_test("test_self_tau_iwn.dat",std::ios::out);
+        std::vector< std::complex<double> > SE_iwn_vec( sublatt1.SelfEnergy.matsubara_w(arma::span(0,0),arma::span(0,0),arma::span::all).begin(), sublatt1.SelfEnergy.matsubara_w(arma::span(0,0),arma::span(0,0),arma::span::all).end() );
+        for (size_t i=0; i<2*GreenStuff::N_tau; i++){
+            outputSE_iwn_test << iwnArr_l[i].imag() << "\t\t" << SE_iwn_vec[i].real() << "\t\t" << SE_iwn_vec[i].imag() << "\n";
+        }
+        outputSE_iwn_test.close();
+        for (size_t i=0; i<2*GreenStuff::N_tau; i++){
+            SE_iwn_vec[i] -= GreenStuff::U/2.0 + GreenStuff::U*GreenStuff::U/4.0/iwnArr_l[i];
+        }
+        std::ofstream outputSE_tau_test("test_self_tau_m_tau.dat",std::ios::out);
+        FFTtools fftObj;
+        fftObj.fft_w2t(SE_iwn_vec,SE_up_b,GreenStuff::beta,"backward");
+        fftObj.fft_w2t(SE_iwn_vec,SE_up_f,GreenStuff::beta,"forward");
+        for (size_t j=0; j<=2*GreenStuff::N_tau; j++){
+            SE_up_b[j] += GreenStuff::U/2.0 - GreenStuff::U*GreenStuff::U/4.0*0.5;
+            SE_up_f[j] += GreenStuff::U/2.0 - GreenStuff::U*GreenStuff::U/4.0*0.5;
+            outputSE_tau_test << GreenStuff::dtau*j << "\t\t" << SE_up_b[j] << "\t\t" << SE_up_f[j] << "\n";
+        }
+        outputSE_tau_test.close();
+        /******************************** testing ******************************/ 
         iter++;
     }
     GreenStuff::reset_counter();
@@ -810,7 +894,7 @@ double Hpinferior(double tau, double mu, double c, double beta){
 }
 
 // Solving the cubic equation for the hybridisation function in the AFM case
-
+#ifdef AFM
 double get_Hyb_AFM(double n_m_sigma_sublatt, double U, double mu){
     double c_0_a=(mu-U*n_m_sigma_sublatt);
     double c_1_a=U*U*n_m_sigma_sublatt*(1.0-n_m_sigma_sublatt);
@@ -819,6 +903,8 @@ double get_Hyb_AFM(double n_m_sigma_sublatt, double U, double mu){
     double c=2.0; // This is for 1D
     #elif DIM == 2
     double c=4.0; // This is for 1D
+    #elif DIM == 3
+    double c=6.0;
     #endif
     return ( (c*c_0_b) + 2.0*(c*c_0_a) + 2.0*(c_0_a*c_1_a) - 2.0*(c_0_a*c_0_a*c_0_a) );
 }
@@ -835,6 +921,8 @@ cubic_roots get_cubic_roots_G_inf(double n_m_sigma_sublatt, double U, double mu,
     double c=-2.0; // This is for 1D
     #elif DIM == 2
     double c=-4.0; // This is for 1D
+    #elif DIM == 3
+    double c=6.0;
     #endif
     double d = get_Hyb_AFM(n_m_sigma_sublatt,U,mu);
     roots = get_cubic_roots(a,b,c,d);
@@ -881,3 +969,4 @@ double Fpinferior(double tau, double mu, double mu0, double beta, double U, doub
 
     return A*roots.x1.real()*(1.0/(exp(roots.x1.real()*(beta-tau))+exp(-roots.x1.real()*tau))) + B*roots.x2.real()*(1.0/(exp(roots.x2.real()*(beta-tau))+exp(-roots.x2.real()*tau))) + C*roots.x3.real()*(1.0/(exp(roots.x3.real()*(beta-tau))+exp(-roots.x3.real()*tau)));
 }
+#endif

@@ -220,8 +220,7 @@ int main(int argc, char* argv[]){
                     SE_iwn.slice(i)(down,down) = iwn_array[i] + h + U/2.0 - Hyb_down_iwn[i] - 1.0/G_down_iwn[i]; // Physical SE
                     // std::cout << "SE_up: " << SE_iwn.slice(i)(up,up) << "SE_down: " << SE_iwn.slice(i)(down,down) << "\n";
                 }
-
-                // exit(0);
+                
                 // Computing G_loc with the extracted physical self-energy. DMFT procedure
                 std::function< std::complex<double>(double,std::complex<double>) > funct_k_integration_up, funct_k_integration_down;
                 for (size_t i=0; i<2*NTAU; i++){

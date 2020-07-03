@@ -26,13 +26,15 @@ int main(int argc, char** argv){
     const unsigned int N_k=(unsigned int)params.int_arr[2];
     const double beta_init=params.db_arr[6], beta_step=params.db_arr[5], beta_max=params.db_arr[4];
     const double U_init=params.db_arr[3], U_step=params.db_arr[2], U_max=params.db_arr[1];
-    const bool is_full=params.boo_arr[0], load_self=params.boo_arr[1], is_jj=params.boo_arr[2];
+    const bool load_self=params.boo_arr[1]; // is_full=params.boo_arr[0], is_jj=params.boo_arr[2];
     const char* solver_type=params.char_arr[0];
     std::string solver_type_s(solver_type);
     #if DIM == 1
     const double Hyb_c=2; // For the 1D chain with nearest-neighbor hopping, it is 2t.
     #elif DIM == 2
-    const double Hyb_c=4; // For the 2D square lattice with nearest-neighbor hopping. 
+    const double Hyb_c=4; // For the 2D square lattice with nearest-neighbor hopping.
+    #elif DIM == 3
+    const double Hyb_c=6;
     #endif
 
     #ifndef AFM
@@ -46,8 +48,8 @@ int main(int argc, char** argv){
     std::vector<std::ofstream*> vecA_ofstreams{ &objSaveStreamGloc_A, &objSaveStreamSE_A, &objSaveStreamGloc_A_tau };
     #endif
 
-    for (size_t k=0; k<=N_k; k++){ // Used when computing the susceptibilities.
-        double epsilonk = -1.0*M_PI + 2.0*(double)k*M_PI/N_k;
+    for (size_t k=0; k<N_k; k++){ // Used when computing the susceptibilities.
+        double epsilonk = -1.0*M_PI + 2.0*(double)k*M_PI/(N_k-1);
         vecK.push_back(epsilonk);
     }
     #ifdef PARALLEL

@@ -3,6 +3,7 @@
 const unsigned int Integrals::_maxLevel = 20;  // tweek this parameter to get best results with best efficiency.
 const unsigned int Integrals::_minLevel = 5;
 
+#ifndef SUS
 double Integrals::coarse_app(std::function< double(double) > f, double a, double b) const{
     return (b-a) * (f(a)-f(b))/2.0;
 }
@@ -186,38 +187,6 @@ double Integrals::I2D(std::function<double(double,double)> funct,double x0,doubl
     return result;
 }
 
-double Integrals::falsePosMethod(std::function<double(double)> funct, double a, double b, const double tol) const noexcept(false){
-    if (funct(a)*funct(b)>0.0){
-        throw std::range_error("The x-range chosen to sample to find the root is not correct. Modify it such that the function changes sign.");
-    }
-    double c=10.0*tol; // to start the loop
-    unsigned int iter=1;
-    while (std::abs(funct(c))>tol && iter<=MAX_ITER_ROOT){
-        c=(a-b)*funct(a)/(funct(b)-funct(a))+a;
-        // std::cout << "c: " << c << " and funct(c): " << funct(c) << std::endl;
-        if (std::abs(funct(c))<=tol){
-            break;
-        }
-        else if (std::abs(funct(c))>tol){
-            if (funct(a)*funct(c)<0.0){
-                b=c;
-            }
-            else if (funct(c)*funct(b)<0.0){
-                a=c;
-            }
-            else{
-                throw std::runtime_error("Function might not be continuous. Bad behaviour.");
-            }
-        }
-        iter++;
-    }
-
-    if (iter>MAX_ITER_ROOT){
-        throw std::runtime_error("Exceeded the amount of loops allowed for root finding. Current value is: "+std::to_string(MAX_ITER_ROOT));
-    }
-    return c;
-}
-
 std::complex<double> Integrals::I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,std::string rule,double tol,unsigned int maxDelta) const noexcept(false){
     double dk;
     std::complex<double> result(0.0,0.0), prevResult(0.0,0.0), resultSumNk;
@@ -294,17 +263,6 @@ double Integrals::I1D(std::function<double(double)> funct,double k0,double kf,st
     return result;
 }
 
-// double Integrals::I1D(std::vector<double>& vecfunct,double delta_tau) const{
-//     double result, resultSumNk = 0.0;
-
-//     for (unsigned int i=1; i<vecfunct.size()-1; i++){
-//         resultSumNk+=vecfunct[i];
-//     }
-//     result = 0.5*delta_tau*vecfunct[0]+0.5*delta_tau*vecfunct.back()+delta_tau*resultSumNk;
-    
-//     return result;
-// }
-
 std::complex<double> cbrt(std::complex<double> num){
     // computing the cubic root of a complex number using exponential representation of complex number
     double modulus = std::sqrt((num*std::conj(num)).real());
@@ -341,3 +299,50 @@ cubic_roots get_cubic_roots(double a, double b, double c, double d){
 
     return cubic_roots{ x1, x2, x3 };
 }
+
+#endif
+
+double Integrals::falsePosMethod(std::function<double(double)> funct, double a, double b, const double tol) const noexcept(false){
+    if (funct(a)*funct(b)>0.0){
+        throw std::range_error("The x-range chosen to sample to find the root is not correct. Modify it such that the function changes sign.");
+    }
+    double c=10.0*tol; // to start the loop
+    unsigned int iter=1;
+    while (std::abs(funct(c))>tol && iter<=MAX_ITER_ROOT){
+        c=(a-b)*funct(a)/(funct(b)-funct(a))+a;
+        // std::cout << "c: " << c << " and funct(c): " << funct(c) << std::endl;
+        if (std::abs(funct(c))<=tol){
+            break;
+        }
+        else if (std::abs(funct(c))>tol){
+            if (funct(a)*funct(c)<0.0){
+                b=c;
+            }
+            else if (funct(c)*funct(b)<0.0){
+                a=c;
+            }
+            else{
+                throw std::runtime_error("Function might not be continuous. Bad behaviour.");
+            }
+        }
+        iter++;
+    }
+
+    if (iter>MAX_ITER_ROOT){
+        throw std::runtime_error("Exceeded the amount of loops allowed for root finding. Current value is: "+std::to_string(MAX_ITER_ROOT));
+    }
+    return c;
+}
+
+
+
+// double Integrals::I1D(std::vector<double>& vecfunct,double delta_tau) const{
+//     double result, resultSumNk = 0.0;
+
+//     for (unsigned int i=1; i<vecfunct.size()-1; i++){
+//         resultSumNk+=vecfunct[i];
+//     }
+//     result = 0.5*delta_tau*vecfunct[0]+0.5*delta_tau*vecfunct.back()+delta_tau*resultSumNk;
+    
+//     return result;
+// }

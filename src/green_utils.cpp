@@ -8,12 +8,20 @@ std::vector<double> vecK;
 std::vector< std::complex<double> > iwnArr_l;
 std::vector< std::complex<double> > iqnArr_l;
 
-double epsilonk(double kx){
+double epsilonk(double kx) noexcept{
     return -2.0*std::cos(kx);
 }
 
-double epsilonk(double kx, double ky){
+double epsilonk(double kx, double ky) noexcept{
     return -2.0*(std::cos(kx)+std::cos(ky));
+}
+
+double epsilonk2D(double kx, double ky){
+    return -2.0*(std::cos(kx)+std::cos(ky));
+}
+
+double epsilonk(double kx, double ky, double kz) noexcept{
+    return -2.0*(std::cos(kx)+std::cos(ky)+std::cos(kz));
 }
 
 Data& Data::operator=(const Data& obj){

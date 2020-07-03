@@ -4,13 +4,16 @@
 // #define ARMA_ALLOW_FAKE_GCC
 // #define ARMA_NO_DEBUG // to disable bound checks
 
+//#define DEBUG
+#define SUS // Enables only methods relevant when calculating the susceptibility
+
 #include <iostream>
 #include <complex>
 #include <armadillo>
 #include <mpi.h>
 
 namespace IPT2{ template<class T> class OneLadder; };
-
+#ifndef SUS
 /* Template structure to call functions in classes. */
 template<typename T, typename C, typename Q>
 struct functorStruct{
@@ -40,6 +43,61 @@ arma::Mat< std::complex<double> > functorStruct<T,C,Q>::callConFunct(C& obj, Q m
     return (obj.*_conFunct)(model, kk, qq, n, l, SE);
 }
 
+template<typename> struct holder;
+
+template<typename R, typename... Ts> struct holder<R(Ts...)>{
+    R (*my_ptr)(Ts...);
+    //
+    holder(R(*funct)(Ts...)) : my_ptr(funct) {};
+    R operator()(Ts... args){
+        return my_ptr(args...);
+    }
+    holder& operator=( R (*f) (Ts...) ){
+        my_ptr = f;
+        return *this;
+    }
+};
+
+template<typename Fn, Fn fn, typename... Args>
+typename std::result_of<Fn(Args...)>::type
+wrapper(Args&&... args) {
+    return fn(std::forward<Args>(args)...);
+}
+#define WRAPPER(FUNC) wrapper<decltype(&FUNC), &FUNC>
+
+template <class... Ts> struct tuple {};
+
+template <class T, class... Ts>
+struct tuple<T, Ts...> : tuple<Ts...> {
+  tuple(T t, Ts... ts) : tuple<Ts...>(ts...), tail(t) {}
+
+  T tail;
+};
+
+template <std::size_t, class> struct elem_type_holder;
+
+template <class T, class... Ts>
+struct elem_type_holder<0, tuple<T, Ts...>> {
+  typedef T type;
+};
+
+template <std::size_t k, class T, class... Ts>
+struct elem_type_holder<k, tuple<T, Ts...>> {
+  typedef typename elem_type_holder<k - 1, tuple<Ts...>>::type type;
+};
+
+template <std::size_t k, class... Ts>
+typename std::enable_if<k == 0, typename elem_type_holder<0, tuple<Ts...>>::type&>::type get(tuple<Ts...>& t) {
+  return t.tail;
+}
+
+template <std::size_t k, class T, class... Ts>
+typename std::enable_if<k != 0, typename elem_type_holder<k, tuple<T, Ts...>>::type&>::type get(tuple<T, Ts...>& t) {
+  tuple<Ts...>& base = t;
+  return get<k - 1>(base);
+}
+
+#endif
 
 template<class T>
 class auto_ptr {
@@ -111,76 +169,6 @@ inline T& auto_ptr<T>::operator*() const noexcept{
 template<class T>
 inline T* auto_ptr<T>::operator->() const noexcept{
     return _m_ptr;
-}
-
-struct A{
-    std::complex<double> _a {0};
-    double _b {0};
-    A(){ std::cout << "default A ctor" << "\n"; };
-    A(std::complex<double> a, double b) : _a(a), _b(b){ std::cout << "A ctor" << "\n"; };
-    ~A(){ std::cout << "A dtor" << "\n"; };
-};
-
-struct B : A{
-    int _k {0};
-    int _q {1};
-    B(){ std::cout << "default B ctor" << "\n"; };
-    B(int k, int q, std::complex<double> a, double b) : A(a,b), _k(k), _q(q) { std::cout << "B ctor" << "\n"; };
-    ~B(){ std::cout << "B dtor" << "\n"; };
-};
-
-template<typename> struct holder;
-
-template<typename R, typename... Ts> struct holder<R(Ts...)>{
-    R (*my_ptr)(Ts...);
-    //
-    holder(R(*funct)(Ts...)) : my_ptr(funct) {};
-    R operator()(Ts... args){
-        return my_ptr(args...);
-    }
-    holder& operator=( R (*f) (Ts...) ){
-        my_ptr = f;
-        return *this;
-    }
-};
-
-template<typename Fn, Fn fn, typename... Args>
-typename std::result_of<Fn(Args...)>::type
-wrapper(Args&&... args) {
-    return fn(std::forward<Args>(args)...);
-}
-#define WRAPPER(FUNC) wrapper<decltype(&FUNC), &FUNC>
-
-template <class... Ts> struct tuple {};
-
-template <class T, class... Ts>
-struct tuple<T, Ts...> : tuple<Ts...> {
-  tuple(T t, Ts... ts) : tuple<Ts...>(ts...), tail(t) {}
-
-  T tail;
-};
-
-template <std::size_t, class> struct elem_type_holder;
-
-template <class T, class... Ts>
-struct elem_type_holder<0, tuple<T, Ts...>> {
-  typedef T type;
-};
-
-template <std::size_t k, class T, class... Ts>
-struct elem_type_holder<k, tuple<T, Ts...>> {
-  typedef typename elem_type_holder<k - 1, tuple<Ts...>>::type type;
-};
-
-template <std::size_t k, class... Ts>
-typename std::enable_if<k == 0, typename elem_type_holder<0, tuple<Ts...>>::type&>::type get(tuple<Ts...>& t) {
-  return t.tail;
-}
-
-template <std::size_t k, class T, class... Ts>
-typename std::enable_if<k != 0, typename elem_type_holder<k, tuple<T, Ts...>>::type&>::type get(tuple<T, Ts...>& t) {
-  tuple<Ts...>& base = t;
-  return get<k - 1>(base);
 }
 
 template< class T >
@@ -318,8 +306,10 @@ struct TrigP{
     }
     U COS(T first, T second) const noexcept{
         // cos(x+y) = cos(x)*cos(y) - sin(x)*sin(y)
-        if ( first < static_cast<T>(0) || second < static_cast<T>(0) )
-            return _cosine_p[first]*_cosine_p[second] + _sine_p[first]*_sine_p[second];
+        if ( first < static_cast<T>(0) )
+            return _cosine_p[-first]*_cosine_p[second] + _sine_p[-first]*_sine_p[second];
+        else if ( second < static_cast<T>(0) )
+            return _cosine_p[first]*_cosine_p[-second] + _sine_p[first]*_sine_p[-second];
         else
             return _cosine_p[first]*_cosine_p[second] - _sine_p[first]*_sine_p[second];
     }

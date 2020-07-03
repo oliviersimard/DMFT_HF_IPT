@@ -94,24 +94,22 @@ int main(int argc, char** argv){
     IPT2::SplineInline< std::complex<double> > splInlineObj(Ntau,initVec,q_tilde_array,iwn);
     splInlineObj.loadFileSpline(inputFilenameLoad,IPT2::spline_type::linear);
     /************************* testing **********************************/
-    // std::ofstream ofSE1("test_one_SE.dat",std::ios::out);
-    // std::ofstream ofSE2("test_two_SE.dat",std::ios::out);
-    // std::ofstream ofSE3("test_three_SE.dat",std::ios::out);
-    // size_t iii=iwn.size()/2+10;
-    // for (size_t j=0; j<iqn_tilde.size(); j++){
-    //     // std::cout << splInlineObj.calculateSpline( (iwn[iii]-iqn_tilde[j]).imag() );
-    //     ofSE1 << (iwn[iii]-iqn_tilde[j]).imag() << "  " << splInlineObj.calculateSpline( (iwn[iii]-iqn_tilde[j]).imag() ).imag() << "\n";
-    // }
-    // ofSE1.close();
-    // for (size_t j=0; j<iqn_tilde.size(); j++){
-    //     ofSE2 << (iwn[iii]-iqn_tilde[j]).imag() << "  " << sigma_iwn[Ntau-1+iii-j].imag() << "\n";
-    // }
-    // ofSE2.close();
-    // for (size_t j=0; j<sigma_iwn.size(); j++){
-    //     ofSE3 << dataFromFile.iwn[j] << "  " << sigma_iwn[j].imag() << "\n";
-    // }
-    // ofSE3.close();
-    // exit(0);
+    std::cout << "spline stuff" << "\n\n";
+    std::ofstream ofSE1("test_one_SE.dat",std::ios::out);
+    std::ofstream ofSE2("test_two_SE.dat",std::ios::out);
+    size_t iii=12;
+    for (size_t j=0; j<iqn_tilde.size(); j++){
+        // std::cout << splInlineObj.calculateSpline( (iwn[iii]-iqn_tilde[j]).imag() );
+        ofSE1 << (iwn[iii]-iqn_tilde[j]).imag() << "  " << splInlineObj.calculateSpline( (iwn[iii]-iqn_tilde[j]).imag() ).imag() << "\n";
+    }
+    ofSE1.close();
+    std::cout << "simple size_t subtraction" << "\n\n";
+    std::cout << "size SE " << sigma_iwn.size() << std::endl;
+    for (size_t j=0; j<iqn_tilde.size(); j++){
+        ofSE2 << (iwn[iii]-iqn_tilde[j]).imag() << "  " << sigma_iwn[(Ntau-1)+iii-j].imag() << "\n";
+    }
+    ofSE2.close();
+    exit(0);
     /************************* testing **********************************/
     // One-ladder calculations
     #ifdef TRIGTABLES
@@ -119,7 +117,7 @@ int main(int argc, char** argv){
     TrigP<double,int> trigObj_finer(sine_table_finer,cosine_table_finer);
     IPT2::OneLadder< std::complex<double> > one_ladder_obj(trigObj,trigObj_finer,splInlineObj,iqn,k_tilde_m_k_bar,iqn_tilde,mu,U,beta);
     #else
-    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,sigma_iwn,iqn,k_tilde_m_k_bar,sine_table,cosine_table,iqn_tilde,mu,U,beta);
+    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_tilde_m_k_bar,sine_table,cosine_table,iqn_tilde,mu,U,beta);
     #endif
     
     // Setting MPI stuff up

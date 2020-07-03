@@ -11,6 +11,9 @@
 #define MAX_ITER_INTEGRAL 20
 #define MAX_ITER_ROOT 100000
 #define ROOT_FINDING_TOL 0.0001
+// for Gaussian quadratures
+#define ABS_TOL 1e-2
+#define MAX_DEPTH 2
 
 struct cubic_roots{ // Hosting the roots of cubic equation
     std::complex<double> x1;
@@ -23,6 +26,7 @@ cubic_roots get_cubic_roots(double a, double b, double c, double d);
 
 class Integrals{
     public:
+        #ifndef SUS
         double coarse_app(std::function< double(double) >,double,double) const;
         std::complex<double> coarse_app(std::function< std::complex<double>(double,std::complex<double>) >,double,double,std::complex<double>) const;
         double trap_app(std::function< double(double) >,double,double) const;
@@ -44,14 +48,20 @@ class Integrals{
         std::complex<double> I2D(std::function<std::complex<double>(double,double,std::complex<double>)>,double,double,double,double,std::complex<double>,std::string rule="trapezoidal",double tol=1e-4,unsigned int maxVal=40,bool is_converged=false) const noexcept(false);
         std::complex<double> I1D(std::function<std::complex<double>(double,std::complex<double>)> funct,double k0,double kf,std::complex<double> iwn,std::string rule="trapezoidal",double tol=1e-5,unsigned int maxDelta=100) const noexcept(false);
         double I1D(std::function<double(double)> funct,double k0,double kf,std::string rule="trapezoidal",double tol=1e-5,unsigned int maxDelta=100) const noexcept(false);
-        // double I1D(std::vector<double>& vecfunct,double delta_tau) const;
-        template<typename T> T I1D_VEC(std::vector< T >& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
-        template<typename T> T I1D_VEC(std::vector< T >&& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
         // MonteCarlo integral
         template<typename T, typename U> double integral_functional_3d(std::function<U(T,T)> f, T xmin, T xmax, T ymin, T ymax, U zmin, U zmax, bool(*y_cond)(T x,T y)) const;
         // template<typename T, typename U> inline typename std::enable_if< std::is_same< U,std::complex<double> >::value >::type integral_functional_3d(std::function<std::complex<double>(T,T)> f, T xmin, T xmax, T ymin, T ymax, std::complex<double> zmin, std::complex<double> zmax, bool(*y_cond)(T x,T y)) const;
         template<typename T> std::complex<double> integral_functional_3d(std::function<std::complex<double>(T,T)> f, T xmin, T xmax, T ymin, T ymax, std::complex<double> zmin, std::complex<double> zmax, bool(*y_cond)(T x,T y)) const;
         template<typename T, typename U> U I2D_constrained(std::function<U(T,T)> funct,std::function<bool(T,T)> cond,T x0,T xf,T y0,T yf,const double tol=1e-2,unsigned int maxVal=20,bool is_converged=false) const;
+        #endif
+        // double I1D(std::vector<double>& vecfunct,double delta_tau) const;
+        template<typename T> T I1D_VEC(std::vector< T >& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
+        template<typename T> T I1D_VEC(std::vector< T >&& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
+        // Gaussian Quadratures
+        template<typename T, typename U>
+        inline U gauss_quad_2D( std::function<U(T,T)> funct_to_integrate, T x1, T x2, T y1, T y2, int depth = 1) const noexcept; //, U abs_tol = static_cast<U>(ABS_TOL), U prev_result = static_cast<U>(0)) const noexcept;
+        template<typename T, typename U>
+        inline void gauss_quad_2D_generate_max_depth_vals( U (*func)(T,T), T x1, T x2, T y1, T y2, std::vector<U>& container, int depth=1) const noexcept;
         // False position method to find roots
         double falsePosMethod(std::function<double(double)>,double,double,const double tol=ROOT_FINDING_TOL) const noexcept(false);
     
@@ -61,6 +71,7 @@ class Integrals{
 
 };
 
+#ifndef SUS
 template<typename T, typename U>
 double Integrals::integral_functional_3d(std::function<U(T,T)> f, T xmin, T xmax, T ymin, T ymax, U zmin, U zmax, bool(*y_cond)(T x,T y)) const{
     int count;
@@ -199,6 +210,7 @@ U Integrals::I2D_constrained(std::function<U(T,T)> funct,std::function<bool(T,T)
 
     return result;
 }
+#endif
 
 template<typename T>
 T Integrals::I1D_VEC(std::vector< T >& vecfunct,double delta,std::string rule) const noexcept(false){
@@ -244,6 +256,63 @@ T Integrals::I1D_VEC(std::vector< T >&& vecfunct,double delta,std::string rule) 
     return result;
 }
 
+template<typename T, typename U>
+inline U Integrals::gauss_quad_2D(std::function<U(T,T)> func, T x1, T x2, T y1, T y2, int depth) const noexcept{
+    // sqrt(3) = 1.7320508075688772
+    T w1 = static_cast<T>(1.0), w2 = static_cast<T>(1.0);
+    constexpr T xi1 = (T)(-1.0/1.7320508075688772), xi2 = (T)(1.0/1.7320508075688772);
+    constexpr T eta1 = (T)(-1.0/1.7320508075688772), eta2 = (T)(1.0/1.7320508075688772);
+    T hx = (x2-x1)/static_cast<T>(2.0), hy = (y2-y1)/static_cast<T>(2.0);
+    T dx = (x2+x1)/static_cast<T>(2.0), dy = (y2+y1)/static_cast<T>(2.0);
+    // U abst{0};
+
+    U layer = hx*hy*w1*w1*func(hx*xi1+dx,hy*eta1+dy) + hx*hy*w1*w2*func(hx*xi1+dx,hy*eta2+dy) + 
+        hx*hy*w2*w1*func(hx*xi2+dx,hy*eta1+dy) + hx*hy*w2*w2*func(hx*xi2+dx,hy*eta2+dy);
+    
+    // if (depth > 1){
+    //     abst = std::abs(layer-prev_result)/4.0;
+    // }
+    // if ( (depth > 1) && (std::abs(abst) < std::abs(abs_tol)) ){
+    //     return layer;
+    if (depth==MAX_DEPTH){
+        return layer;
+    } else{
+        depth += 1;
+        // layer /= static_cast<T>(4.0);
+        return gauss_quad_2D(func,x1,x1+hx,y1,y1+hy,depth) + gauss_quad_2D(func,x1,x1+hx,y1+hy,y2,depth) +
+            gauss_quad_2D(func,x1+hx,x2,y1,y1+hy,depth) + gauss_quad_2D(func,x1+hx,x2,y1+hy,y2,depth);
+    }
+}
+
+template<typename T, typename U>
+inline void Integrals::gauss_quad_2D_generate_max_depth_vals( U (*func)(T,T), T x1, T x2, T y1, T y2, std::vector<U>& container, int depth) const noexcept{
+    // sqrt(3) = 1.7320508075688772
+    constexpr T xi1 = (T)(-1.0/1.7320508075688772), xi2 = (T)(1.0/1.7320508075688772);
+    constexpr T eta1 = (T)(-1.0/1.7320508075688772), eta2 = (T)(1.0/1.7320508075688772);
+    T hx = (x2-x1)/static_cast<T>(2.0), hy = (y2-y1)/static_cast<T>(2.0);
+    T dx = (x2+x1)/static_cast<T>(2.0), dy = (y2+y1)/static_cast<T>(2.0);
+
+    U layer1 = func(hx*xi1+dx,hy*eta1+dy);
+    U layer2 = func(hx*xi1+dx,hy*eta2+dy);
+    U layer3 = func(hx*xi2+dx,hy*eta1+dy);
+    U layer4 = func(hx*xi2+dx,hy*eta2+dy);
+    if (depth==MAX_DEPTH){
+        container.push_back(layer1);
+        container.push_back(layer2);
+        container.push_back(layer3);
+        container.push_back(layer4);
+    }
+
+    if (depth==MAX_DEPTH){
+        return;
+    } else{
+        depth += 1;
+        gauss_quad_2D_generate_max_depth_vals(func,x1,x1+hx,y1,y1+hy,container,depth); // lower left corner
+        gauss_quad_2D_generate_max_depth_vals(func,x1,x1+hx,y1+hy,y2,container,depth); // upper left corner
+        gauss_quad_2D_generate_max_depth_vals(func,x1+hx,x2,y1,y1+hy,container,depth); // lower right corner
+        gauss_quad_2D_generate_max_depth_vals(func,x1+hx,x2,y1+hy,y2,container,depth); // upper right corner
+    }
+}
 
 // template<typename T, typename U>
 // inline typename std::enable_if< std::is_same< U,std::complex<double> >::value >::type Integrals::integral_functional_3d(std::function<std::complex<double>(T,T)> f

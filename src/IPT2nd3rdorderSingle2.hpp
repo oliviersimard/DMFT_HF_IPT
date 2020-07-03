@@ -26,12 +26,14 @@ double Hsuperior(double tau, double mu, double c, double beta);
 double Hpsuperior(double tau, double mu, double c, double beta);
 double Hinferior(double tau, double mu, double c, double beta);
 double Hpinferior(double tau, double mu, double c, double beta);
+#ifdef AFM
 cubic_roots get_cubic_roots_G_inf(double n_m_sigma_sublatt, double U, double mu, double mu0);
 double get_Hyb_AFM(double n_m_sigma_sublatt, double U, double mu);
 double Fsuperior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
 double Finferior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
 double Fpsuperior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
 double Fpinferior(double tau, double mu, double mu0, double beta, double U, double n_m_sublatt);
+#endif
 
 
 class FFTtools{
@@ -40,6 +42,7 @@ class FFTtools{
         enum Spec { plain_positive, plain_negative, dG_dtau_positive, dG_dtau_negative };
 
         void fft_w2t(arma::Cube< std::complex<double> >& data1, arma::Cube<double>& data2, int index=0);
+        void fft_w2t(const std::vector< std::complex<double> >& data1, std::vector<double>& data2, double beta, std::string dir="forward");
         void fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>&, arma::Cube<double>&, Spec);
         void fft_spec_AFM(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>& data_dg_dtau_pos,arma::Cube<double>& data_dg_dtau_neg, Spec specialization, double n_a_up);
         
@@ -66,7 +69,11 @@ class DMFTproc{
         void update_parametrized_self_energy_AFM(FFTtools,double h);
         double density_mu(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu(const arma::Cube< std::complex<double> >&) const;
+        #ifdef AFM
+        #ifndef SUS
         tuple<double,double> density_mu_AFM(const arma::Cube< std::complex<double> >& G) const;
+        #endif
+        #endif
         double density_mu0(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu0(const arma::Cube< std::complex<double> >&) const;
         std::tuple<double,double> density_mu0_AFM(const arma::Cube< std::complex<double> >& G0_1) const;
@@ -140,13 +147,17 @@ IPT2::SplineInline< T >& IPT2::SplineInline< T >::operator=(const IPT2::SplineIn
 
 template<typename T>
 T IPT2::SplineInline<T>::compute_linear_spline(double reIwn) const {
+    #ifdef DEBUG
     assert(_iwn.size()==_iwn_cplx.size());
     assert(_iwn.size()>2);
+    #endif
     size_t n = _iwn.size();
     std::vector<double>::const_iterator it;
     it=std::lower_bound(_iwn.begin(),_iwn.end(),reIwn);
+    #ifdef DEBUG
     if (VERBOSE>0)
         std::cout << std::setprecision(10) << "it: " << *it << " and reIwn: " << reIwn << " and it+1: " << *(it+1) << std::endl; //" and _iwn[idx]: " << _iwn[idx] << std::endl;
+    #endif
     int idx=std::max( int( it - _iwn.begin() ) - 1, 0);
     // Have to correct for the boundaries. Loaded iwn data doesn't have the same precision as the values iwn produced in main, so the 
     // function lower_bound returns "it" has the iwn.size()/2 value: with the -1 in the definition of "idx", it means one jumps across the discontinuity..
@@ -163,11 +174,8 @@ T IPT2::SplineInline<T>::compute_linear_spline(double reIwn) const {
     }
     // std::cout << std::setprecision(10) << "idx: " << idx << " and iwn[idx]: " << _iwn[idx] << " reIwn: " << reIwn << " iwn[idx+1] " << _iwn[idx+1] << std::endl;
     double h = reIwn-_iwn[idx];
-    T interpol;
     // interpol = y_i + (y_{i+1}-y_i) / (x_{i+1}-x_i) * (x - x_i). h and x_i would be purely imaginary, so no need to transform back to imaginary data, because it cancels out due to division.
-    interpol = _iwn_cplx[idx] + ( (_iwn_cplx[idx+1]-_iwn_cplx[idx]) / (_iwn[idx+1]-_iwn[idx]) ) * h;
-
-    return interpol;
+    return _iwn_cplx[idx] + ( (_iwn_cplx[idx+1]-_iwn_cplx[idx]) / (_iwn[idx+1]-_iwn[idx]) ) * h;
 }
 
 template<>

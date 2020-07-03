@@ -12,7 +12,7 @@ extern "C" {
 //#include <type_traits> // for use of std::is_same in static_assert
 #include "wrapper_utils.hpp"
 
-#define DIM 1 // 1 or 2
+#define DIM 3 // 1, 2 or 3
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
 #define MULT_N_TAU 2 // Has to be an even number
@@ -37,8 +37,10 @@ extern std::vector< std::complex<double> > iqnArr_l;
 extern const arma::Mat< std::complex<double> > ZEROS_;
 extern arma::Mat< std::complex<double> > statMat;
 
-extern double epsilonk(double,double);
-extern double epsilonk(double);
+extern double epsilonk(double kx, double ky, double kz) noexcept;
+extern double epsilonk(double,double) noexcept;
+extern double epsilonk(double) noexcept;
+double epsilonk2D(double kx, double ky);
 
 namespace ThreadFunctor{ struct gamma_tensor_content; };
 template<typename T> inline void calculateSusceptibilities(T&,const std::string&,const std::string&,const bool&,const bool&);

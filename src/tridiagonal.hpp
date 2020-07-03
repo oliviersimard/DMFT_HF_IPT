@@ -172,8 +172,10 @@ void spline<T>::set_boundary(spline::bd_type left, T left_value,
 template<class T>
 void spline<T>::set_points(const std::vector<double>& x,
                         const arma::Cube< T >& y, int index, bool cubic_spline){
+    #ifdef DEBUG
     assert(x.size()==y.n_slices);
     assert(x.size()>2);
+    #endif
     m_x=x;
     m_y=y;
     int n=x.size();
@@ -181,9 +183,11 @@ void spline<T>::set_points(const std::vector<double>& x,
     std::vector< T > initVec_b(n,0.0), initVec_a_c(n,0.0); // <--------------------------- Tested its effects when initVec_a_c(n-1,0.0).
     m_b=initVec_b; m_a=initVec_a_c; m_c=initVec_a_c; // Must init containers holding the spline coefficients.
     // TODO: maybe sort x and y, rather than returning an error
+    #ifdef DEBUG
     for(size_t i=0; i<n-1; i++) {
         assert(m_x[i]<m_x[i+1]);
     }
+    #endif
     if(cubic_spline==true) { // cubic spline interpolation
         // setting up the matrix and right hand side of the equation system
         // for the parameters b[]

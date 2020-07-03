@@ -560,7 +560,7 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
     */
     H5::DataSpace dataspace_open = dataset_open.getSpace();
     hsize_t dims_out[2];
-    int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
+    // int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
     const size_t NY = dims_out[0];
     const size_t NX = dims_out[1];
     arma::Mat< std::complex<double> > ret_mat(NY,NX);
@@ -568,7 +568,7 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
         /*
         * Get the class of the datatype that is used by the dataset.
         */
-        H5T_class_t type_class = dataset_open.getTypeClass();
+        // H5T_class_t type_class = dataset_open.getTypeClass();
         H5::CompType custom_cplx( sizeof(cplx_t) );
         custom_cplx.insertMember( MEMBER1, HOFFSET(cplx_t,re), H5::PredType::NATIVE_DOUBLE );
         custom_cplx.insertMember( MEMBER2, HOFFSET(cplx_t,im), H5::PredType::NATIVE_DOUBLE );
@@ -639,7 +639,7 @@ arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const s
     */
     H5::DataSpace dataspace_open = dataset_open.getSpace();
     hsize_t dims_out[2];
-    int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
+    // int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
     const size_t NY = dims_out[0];
     const size_t NX = dims_out[1];
     arma::Mat< std::complex<double> > ret_mat(NY,NX);
@@ -648,7 +648,7 @@ arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const s
         /*
         * Get the class of the datatype that is used by the dataset.
         */
-        H5T_class_t type_class = dataset_open.getTypeClass();
+        // H5T_class_t type_class = dataset_open.getTypeClass();
         
         H5::DataSpace memspace_out( RANK_OUT, dims_out );
         dataset_open.read(data_out, custom_cplx, memspace_out);

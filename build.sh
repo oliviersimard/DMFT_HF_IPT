@@ -6,7 +6,7 @@ dirTest="${PWD}/test/obj" #This directory will also contain the object files, bu
 dirData="${PWD}/data" #This directory will store the different results produced by the program. As for the obj directories, this directory should remain in place after creation.
 
 read -p "clang or gcc compiler?: " OPT
-read -p "dimension: 1 or 2?: " DIM
+read -p "dimension: 1, 2 or 3?: " DIM
 read -p "parallelized calculations? (y or n): " PRLL
 
 # Creating the important directories...
@@ -63,8 +63,25 @@ if [[ ${OPT} == "clang" ]]; then # Makefile are mainly for debugging with VSCode
                         echo -e "ERROR: You must choose between yes (y) or no (n).\n"
                         exit 1   
                 fi
+        elif [[ "$DIM" -eq "3" ]]; then
+                if [[ ${PRLL} == "y" ]]; then
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DDIM:STRING="threeD" -DPRLL:BOOL=ON .. && make -j 2
+                        else
+                                rm -rf ${buildDir} && mkdir ${buildDir} && cd build && cmake -DDIM:STRING="threeD" -DPRLL:BOOL=ON .. && make -j 2
+                        fi
+                elif [[ ${PRLL} == "n" ]]; then
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DDIM:STRING="threeD" .. && make -j 2
+                        else
+                                rm -rf ${buildDir} && mkdir ${buildDir} && cd build && cmake -DDIM:STRING="threeD" .. && make -j 2
+                        fi
+                else
+                        echo -e "ERROR: You must choose between yes (y) or no (n).\n"
+                        exit 1   
+                fi
         else
-                echo -e "ERROR: You must choose between 1D (1) or 2D (2).\n"
+                echo -e "ERROR: You must choose between 1D (1), 2D (2) or 3D (3).\n"
                 exit 1   
         fi
 
@@ -103,8 +120,25 @@ elif [[ ${OPT} == "gcc" ]]; then
                         echo -e "ERROR: You must choose between yes (y) or no (n).\n"
                         exit 1
                 fi
+        elif [[ "$DIM" -eq "3" ]]; then
+                if [[ ${PRLL} == "y" ]]; then
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="threeD" -DPRLL:BOOL=ON .. && make -j 2
+                        else
+                                rm -rf ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="threeD" -DPRLL:BOOL=ON .. && make -j 2
+                        fi
+                elif [[ ${PRLL} == "n" ]]; then
+                        if [ ! -d "./$buildDir" ]; then
+                                mkdir ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="threeD" .. && make -j 2
+                        else
+                                rm -rf ${buildDir} && cd ${buildDir} && cmake -DCMPLR:STRING=${OPT} -DDIM:STRING="threeD" .. && make -j 2
+                        fi
+                else
+                        echo -e "ERROR: You must choose between yes (y) or no (n).\n"
+                        exit 1
+                fi
         else
-                echo -e "ERROR: You must choose between 1D (1) or 2D (2).\n"
+                echo -e "ERROR: You must choose between 1D (1), 2D (2) or 3D (3).\n"
                 exit 1
         fi
         #make --file=Makefile_GCC -j 2

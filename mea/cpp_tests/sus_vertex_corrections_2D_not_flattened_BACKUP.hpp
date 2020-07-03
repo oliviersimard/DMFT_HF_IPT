@@ -86,9 +86,9 @@ namespace IPT2{
             //     this->_beta = beta;
             // };
             #else
-            explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& SE, const std::vector< T >& iqn, const std::vector<double>& k_arr, 
+            explicit OneLadder(const SplineInline< T >& splInlineobj, const std::vector< T >& iqn, const std::vector<double>& k_arr, 
                             const std::vector<double>& sine_table, const std::vector<double>& cosine_table, const std::vector< T >& iqn_tilde, 
-                            double mu, double U, double beta) : _splInlineobj(splInlineobj), _SE(SE), _iqn(iqn), _k_t_b(k_arr), _sine_table(sine_table),
+                            double mu, double U, double beta) : _splInlineobj(splInlineobj), _iqn(iqn), _k_t_b(k_arr), _sine_table(sine_table),
                             _cosine_table(cosine_table), _iqn_tilde(iqn_tilde){
                 this->_mu = mu;
                 this->_U = U;
@@ -98,13 +98,12 @@ namespace IPT2{
 
         protected:
             const SplineInline< T >& _splInlineobj;
-            const std::vector< T >& _SE;
             const std::vector< T >& _iqn;
             const std::vector<double>& _k_t_b;
             double _mu {0.0}, _U {0.0}, _beta {0.0};
             #ifndef TRIGTABLES
             inline T getGreen(double kx, double ky, T iwn) const noexcept;
-            T Gamma(double k_tilde_x, double k_tilde_y, double k_bar_x, double k_bar_y, double qqx, double qqy, size_t n_ikn_bar, size_t n_ikn_tilde, size_t n_iqn, const Integrals& integralsObj) const noexcept(false);
+            T Gamma(double k_tilde_x, double k_tilde_y, double k_bar_x, double k_bar_y, double qqx, double qqy, T ikn_bar, T ikn_tilde, T iqn, const Integrals& integralsObj) const noexcept(false);
             #else
             inline T getGreen(int kx, int ky, T iwn) const noexcept;
             // inline T getGreen(int el, T iwn) const noexcept;
@@ -177,7 +176,7 @@ inline T IPT2::OneLadder< T >::getGreen_finer(int k_tilde_x, int kx, int k_tilde
 #ifndef TRIGTABLES
 
 template< class T >
-T IPT2::OneLadder< T >::Gamma(double k_tilde_x, double k_tilde_y, double k_bar_x, double k_bar_y, double qqx, double qqy, size_t n_ikn_bar, size_t n_ikn_tilde, size_t n_iqn, const Integrals& integralsObj) const noexcept(false){
+T IPT2::OneLadder< T >::Gamma(double k_tilde_x, double k_tilde_y, double k_bar_x, double k_bar_y, double qqx, double qqy, T ikn_bar, T ikn_tilde, T iqn, const Integrals& integralsObj) const noexcept(false){
     /*  This method computes the current-vertex correction for the single ladder diagram. It uses the dressed Green's
     functions computed in the paramagnetic state. 
     
@@ -195,28 +194,15 @@ T IPT2::OneLadder< T >::Gamma(double k_tilde_x, double k_tilde_y, double k_bar_x
     T lower_val{0.0};
     std::vector< T > tmp_iqn_integral(_iqn_tilde.size());
     std::function<T(double,double)> inner_2D_int;
-    const size_t Ntau = _splInlineobj._N_tau_size;
-    T ikn_tilde = _splInlineobj._iwn_array[n_ikn_tilde], ikn_bar = _splInlineobj._iwn_array[n_ikn_bar];
     for (size_t j=0; j<_iqn_tilde.size(); j++){
-        #ifndef DEBUG
         inner_2D_int = [&](double kx, double ky){
-            return ( 1.0/(  ikn_tilde-_iqn_tilde[j] + _mu + 2.0*(std::cos(k_tilde_x-kx)+std::cos(k_tilde_y-ky)) - _SE[(Ntau-1)+n_ikn_tilde-j] ) 
-                )*( 1.0/( ikn_bar-_iqn_tilde[j]+_iqn[n_iqn] + _mu + 2.0*(std::cos(k_bar_x-kx+qqx)+std::cos(k_bar_y-ky+qqy)) - _SE[(Ntau-1)+n_ikn_bar-j+n_iqn] ) 
+            return ( 1.0/( ikn_tilde-_iqn_tilde[j] + _mu + 2.0*(std::cos(k_tilde_x-kx)+std::cos(k_tilde_y-ky)) - _splInlineobj.calculateSpline( (ikn_tilde-_iqn_tilde[j]).imag() ) ) 
+                )*( 1.0/( ikn_bar-_iqn_tilde[j]+iqn + _mu + 2.0*(std::cos(k_bar_x-kx+qqx)+std::cos(k_bar_y-ky+qqy)) - _splInlineobj.calculateSpline( (ikn_bar-_iqn_tilde[j]+iqn).imag() ) ) 
                 );
             // return getGreen(k_tilde_x-kx,k_tilde_y-ky,ikn_tilde-_iqn_tilde[j])*getGreen(k_bar_x-kx+qqx,k_bar_y-ky+qqy,ikn_bar-_iqn_tilde[j]+iqn);
         };
         // to sum over Matsubara frequencies
         tmp_iqn_integral[j] = integralsObj.gauss_quad_2D(inner_2D_int,0.0,2.0*M_PI,0.0,2.0*M_PI);
-        #else
-        inner_2D_int = [&](double kx, double ky){
-            return ( 1.0/( ikn_tilde-_iqn_tilde[j] + _mu + 2.0*(std::cos(k_tilde_x-kx)+std::cos(k_tilde_y-ky)) - _splInlineobj.calculateSpline( (ikn_tilde-_iqn_tilde[j]).imag() ) )
-            )*( 1.0/( ikn_bar-_iqn_tilde[j]+_iqn[n_iqn] + _mu + 2.0*(std::cos(k_bar_x-kx+qqx)+std::cos(k_bar_y-ky+qqy)) - _splInlineobj.calculateSpline( (ikn_bar-_iqn_tilde[j]+_iqn[n_iqn]).imag() ) )
-            );
-            // return getGreen(k_tilde_x-kx,k_tilde_y-ky,ikn_tilde-_iqn_tilde[j])*getGreen(k_bar_x-kx+qqx,k_bar_y-ky+qqy,ikn_bar-_iqn_tilde[j]+iqn);
-        };
-        // to sum over Matsubara frequencies
-        tmp_iqn_integral[j] = integralsObj.gauss_quad_2D(inner_2D_int,0.0,2.0*M_PI,0.0,2.0*M_PI);
-        #endif
     }
     // Summing over the bosonic Matsubara frequencies
     std::for_each(tmp_iqn_integral.begin(),tmp_iqn_integral.end(),[&](T n){ return lower_val+=n; });
@@ -250,17 +236,16 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
     arma::Mat< T > GG_n_tilde_n_bar_jj(NI,NI), GG_n_tilde_n_bar_szsz(NI,NI);
     T jj_resp_iqn{0.0}, szsz_resp_iqn{0.0};
     std::function<T(double,double)> inner_2D_int_jj, inner_2D_int_szsz;
-    clock_t begin, end;
     for (size_t n_em=0; n_em<_iqn.size(); n_em++){
+        clock_t begin = clock();
         // numerator
         for (size_t n_bar=0; n_bar<NI; n_bar++){
-            begin = clock();
             std::cout << "n_bar: " << n_bar << std::endl;
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
-                #ifndef DEBUG
+
                 inner_2D_int_jj = [&](double k_bar_x, double k_bar_y){
                     // denominator
-                    Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em) = Gamma(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],k_bar_x,k_bar_y,qqx,qqy,n_bar,n_tilde,n_em,integralsObj);
+                    Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em) = Gamma(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],k_bar_x,k_bar_y,qqx,qqy,_splInlineobj._iwn_array[n_bar],_splInlineobj._iwn_array[n_tilde],_iqn[n_em],integralsObj);
                     // jj
                     // return -1.0*velocity(_k_t_b[n_k_tilde_x])*velocity(k_bar_x
                     //     )*getGreen(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],_splInlineobj._iwn_array[n_tilde]
@@ -268,36 +253,6 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
                     //     )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
                     //     )*getGreen(k_bar_x,k_bar_y,_splInlineobj._iwn_array[n_bar]
                     //     )*getGreen(k_bar_x+qqx,k_bar_y+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[n_em]);
-                    return -1.0*(2.0*_sine_table[n_k_tilde_x])*(2.0*std::sin(k_bar_x)
-                        )*( 1.0/( _splInlineobj._iwn_array[n_tilde] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[NI/2+n_tilde] ) 
-                        )*( 1.0/( _splInlineobj._iwn_array[n_tilde]-_iqn[n_em] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[(NI-1)+n_tilde-n_em] )
-                        )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar] + _mu + 2.0*(std::cos(k_bar_x)+std::cos(k_bar_y)) - _SE[NI/2+n_bar] )
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar]+_iqn[n_em] + _mu + 2.0*(std::cos(k_bar_x+qqx)+std::cos(k_bar_y+qqy)) - _SE[n_bar+n_em] ) 
-                        );
-                };
-
-                inner_2D_int_szsz = [&](double k_bar_x, double k_bar_y){
-                    // denominator
-                    Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em) = Gamma(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],k_bar_x,k_bar_y,qqx,qqy,n_bar,n_tilde,n_em,integralsObj);
-                    // szsz
-                    // return getGreen(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],_splInlineobj._iwn_array[n_tilde]
-                        // )*getGreen(_k_t_b[n_k_tilde_x]-qqx,_k_t_b[n_k_tilde_y]-qqy,_splInlineobj._iwn_array[n_tilde]-_iqn[n_em]
-                        // )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
-                        // )*getGreen(k_bar_x,k_bar_y,_splInlineobj._iwn_array[n_bar]
-                        // )*getGreen(k_bar_x+qqx,k_bar_y+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[n_em]);
-                    return ( 1.0/( _splInlineobj._iwn_array[n_tilde] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[NI/2+n_tilde] ) 
-                        )*( 1.0/( _splInlineobj._iwn_array[n_tilde]-_iqn[n_em] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[(NI-1)+n_tilde-n_em] )
-                        )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar] + _mu + 2.0*(std::cos(k_bar_x)+std::cos(k_bar_y)) - _SE[NI/2+n_bar] )
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar]+_iqn[n_em] + _mu + 2.0*(std::cos(k_bar_x+qqx)+std::cos(k_bar_y+qqy)) - _SE[n_bar+n_em] ) 
-                        );
-                };
-                #else
-                inner_2D_int_jj = [&](double k_bar_x, double k_bar_y){
-                    // denominator
-                    Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em) = Gamma(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],k_bar_x,k_bar_y,qqx,qqy,n_bar,n_tilde,n_em,integralsObj);
-                    // jj
                     return -1.0*(2.0*_sine_table[n_k_tilde_x])*(2.0*std::sin(k_bar_x)
                         )*( 1.0/( _splInlineobj._iwn_array[n_tilde] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _splInlineobj.calculateSpline( (_splInlineobj._iwn_array[n_tilde]).imag() ) ) 
                         )*( 1.0/( _splInlineobj._iwn_array[n_tilde]-_iqn[n_em] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _splInlineobj.calculateSpline( (_splInlineobj._iwn_array[n_tilde]-_iqn[n_em]).imag() ) )
@@ -309,8 +264,13 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
 
                 inner_2D_int_szsz = [&](double k_bar_x, double k_bar_y){
                     // denominator
-                    Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em) = Gamma(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],k_bar_x,k_bar_y,qqx,qqy,n_bar,n_tilde,n_em,integralsObj);
+                    Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em) = Gamma(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],k_bar_x,k_bar_y,qqx,qqy,_splInlineobj._iwn_array[n_bar],_splInlineobj._iwn_array[n_tilde],_iqn[n_em],integralsObj);
                     // szsz
+                    // return getGreen(_k_t_b[n_k_tilde_x],_k_t_b[n_k_tilde_y],_splInlineobj._iwn_array[n_tilde]
+                        // )*getGreen(_k_t_b[n_k_tilde_x]-qqx,_k_t_b[n_k_tilde_y]-qqy,_splInlineobj._iwn_array[n_tilde]-_iqn[n_em]
+                        // )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
+                        // )*getGreen(k_bar_x,k_bar_y,_splInlineobj._iwn_array[n_bar]
+                        // )*getGreen(k_bar_x+qqx,k_bar_y+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[n_em]);
                     return ( 1.0/( _splInlineobj._iwn_array[n_tilde] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _splInlineobj.calculateSpline( (_splInlineobj._iwn_array[n_tilde]).imag() ) ) 
                         )*( 1.0/( _splInlineobj._iwn_array[n_tilde]-_iqn[n_em] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _splInlineobj.calculateSpline( (_splInlineobj._iwn_array[n_tilde]-_iqn[n_em]).imag() ) )
                         )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
@@ -318,18 +278,18 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
                         )*( 1.0/( _splInlineobj._iwn_array[n_bar]+_iqn[n_em] + _mu + 2.0*(std::cos(k_bar_x+qqx)+std::cos(k_bar_y+qqy)) - _splInlineobj.calculateSpline( (_splInlineobj._iwn_array[n_bar]+_iqn[n_em]).imag() ) ) 
                         );
                 };
-                #endif
+
                 GG_n_tilde_n_bar_jj.at(n_tilde,n_bar) = integralsObj.gauss_quad_2D(inner_2D_int_jj,0.0,2.0*M_PI,0.0,2.0*M_PI);
                 GG_n_tilde_n_bar_szsz.at(n_tilde,n_bar) = integralsObj.gauss_quad_2D(inner_2D_int_szsz,0.0,2.0*M_PI,0.0,2.0*M_PI);
             }
-            end = clock();
-            double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "loop n_em: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
         }
-        jj_resp_iqn = (2.0/_beta/_beta/(2.0*M_PI)/(2.0*M_PI))*arma::accu(GG_n_tilde_n_bar_jj);
-        szsz_resp_iqn = (2.0/_beta/_beta/(2.0*M_PI)/(2.0*M_PI))*arma::accu(GG_n_tilde_n_bar_szsz);
+        jj_resp_iqn = (1.0/_beta/_beta/(2.0*M_PI)/(2.0*M_PI))*arma::accu(GG_n_tilde_n_bar_jj);
+        szsz_resp_iqn = (1.0/_beta/_beta/(2.0*M_PI)/(2.0*M_PI))*arma::accu(GG_n_tilde_n_bar_szsz);
         MPIData mpi_data_tmp { n_k_tilde_x, n_k_tilde_y, jj_resp_iqn, szsz_resp_iqn }; // summing over the internal ikn_tilde and ikn_bar
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "loop n_em: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
     }
     std::cout << "After the loop.." << std::endl;
     
