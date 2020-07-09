@@ -16,14 +16,23 @@ template<typename T, typename... Ts> inline T eps(T,Ts...);
 
 int main(void){
     
+    #ifndef NCA
     std::string inputFilename("../../data/1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_1024/Self_energy_1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_1024_Nit_25.dat");
+    #else
+    std::string inputFilename("../../../NCA_OCA/data_1D_test_NCA_damping_0.05/1D_U_8.000000_beta_4.000000_n_0.500000_Ntau_4096/SE_1D_NCA_AFM_U_8.000000_beta_4.000000_N_tau_4096_h_0.000000_Nit_89.dat");
+    #endif
     // Choose whether current-current or spin-spin correlation function is computed.
     std::vector<std::string> results;
     std::vector<std::string> fetches = {"U", "beta", "N_tau"};
     
     results = get_info_from_filename(inputFilename,fetches);
+    #ifndef NCA
     const unsigned int Ntau = 2*(unsigned int)atof(results[2].c_str());
-    const unsigned int N_k = 51;
+    #else
+    const unsigned int NCA_Ntau = 2*(unsigned int)atof(results[2].c_str());
+    const unsigned int Ntau = 2*2048;
+    #endif
+    const unsigned int N_k = 401;
     const unsigned int N_q = 3;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
@@ -41,31 +50,58 @@ int main(void){
         double k_tmp = l*2.0*M_PI/(double)(N_k-1);
         k_array.push_back(k_tmp);
     }
-    // q_array constructed
+    // q_array constructed for injected momentum
     std::vector<double> q_array;
     for (size_t l=0; l<N_q; l++){
         double q_tmp = l*2.0*M_PI/(double)(N_q-1);
         q_array.push_back(q_tmp);
     }
     // HDF5 business
-    std::string filename(std::string("bb_")+std::to_string(DIM)+std::string("D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_k)+std::string(".hdf5"));
+    #ifndef NCA
+    std::string filename(std::string("bb_")+std::to_string(DIM)+std::string("D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_k)+".hdf5");
+    #else
+    std::string filename(std::string("bb_")+std::to_string(DIM)+std::string("D_U_")+std::to_string(U)+std::string("_beta_")+std::to_string(beta)+std::string("_Ntau_")+std::to_string(Ntau)+std::string("_Nk_")+std::to_string(N_k)+"_NCA.hdf5");
+    #endif
     const H5std_string FILE_NAME( filename );
     const unsigned int DATA_SET_DIM = Ntau;
     H5::H5File* file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     // Getting the data
     FileData dataFromFile;
+    #ifndef NCA
     dataFromFile = get_data(inputFilename,Ntau);
+    #else
+    dataFromFile = get_data(inputFilename,NCA_Ntau);
+    #endif
     
-    std::vector<double> wn = dataFromFile.iwn;
-    std::vector<double> re = dataFromFile.re;
-    std::vector<double> im = dataFromFile.im;
-    std::vector< std::complex<double> > sigma_iwn;
-    for (size_t i=0; i<wn.size(); i++){
-        sigma_iwn.push_back(std::complex<double>(re[i],im[i]));
-    }
+    std::vector<double> wn = std::move(dataFromFile.iwn);
+    std::vector<double> re = std::move(dataFromFile.re);
+    std::vector<double> im = std::move(dataFromFile.im);
 
-    std::vector< std::complex<double> > iwn(wn.size());
-    std::transform(wn.begin(),wn.end(),iwn.begin(),[](double d){ return std::complex<double>(0.0,d); }); // casting into array of double for cubic spline.
+    std::vector< std::complex<double> > sigma_iwn(Ntau);
+    std::vector< std::complex<double> > iwn(Ntau);
+    #ifdef NCA
+    try{
+        if (wn.size()<Ntau)
+            throw std::out_of_range("Problem in the truncation of the self-energy in loading process.");
+        
+        for (size_t i=0; i<Ntau; i++){
+            sigma_iwn[i] = std::complex<double>(re[i+wn.size()/2-Ntau/2+1],im[i+wn.size()/2-Ntau/2+1]);
+        }
+    } catch(const std::out_of_range& err){
+        std::cerr << err.what() << "\n";
+        exit(1);
+    }
+    #else
+    for (size_t i=0; i<wn.size(); i++){
+        sigma_iwn[i]=std::complex<double>(re[i],im[i]);
+    }
+    #endif
+    #ifndef NCA
+    std::transform(wn.data()+wn.size()/2-Ntau/2,wn.data()+wn.size()/2+Ntau/2,iwn.data(),[](double d){ return std::complex<double>(0.0,d); });
+    #else
+    std::transform(wn.data()+wn.size()/2-Ntau/2+1,wn.data()+wn.size()/2+Ntau/2+1,iwn.data(),[](double d){ return std::complex<double>(0.0,d); });
+    #endif
+
     // Bosonic Matsubara array
     std::vector< std::complex<double> > iqn;
     for (size_t j=0; j<iwn.size(); j++){
@@ -98,7 +134,7 @@ int main(void){
     /* TEST dG(-tau)/dtau */
     std::ofstream test1("test_1_fewer_moments.dat", std::ios::out);
     for (size_t j=0; j<beta_array.size(); j++){
-        test1 << beta_array[j] << "  " << dG_dtau_m_FFT(52,j) << "\n";
+        test1 << beta_array[j] << "  " << dG_dtau_m_FFT(2,j) << "\n";
     }
     test1.close();
     #elif DIM == 2
@@ -260,6 +296,100 @@ int main(void){
 
     }
     #elif DIM == 2
+    arma::Cube< std::complex<double> > G_k_q_iwn(k_array.size(),iwn.size(),k_array.size());
+    arma::Cube<double> G_k_q_tau(k_array.size(),Ntau+1,k_array.size()), dG_dtau_FFT_q(k_array.size(),Ntau+1,k_array.size());
+    std::vector<double> FFT_k_q_tau;
+    arma::Cube<double> dGG_tau_for_k_jj(k_array.size(),beta_array.size(),k_array.size()), dGG_tau_for_k_szsz(k_array.size(),beta_array.size(),k_array.size());
+    arma::Cube< std::complex<double> > cubic_spline_GG_iqn_k_jj(iqn.size(),k_array.size(),k_array.size()), cubic_spline_GG_iqn_k_szsz(iqn.size(),k_array.size(),k_array.size());
+    arma::Cube<double> GG_tau_for_k_jj(2,2,beta_array.size()), GG_tau_for_k_szsz(2,2,beta_array.size());
+    for (size_t emx=0; emx<q_array.size(); emx++){
+        for (size_t emy=0; emy<q_array.size(); emy++){
+            std::cout << "qx: " << q_array[emx] << " qy: " << q_array[emy] << "\n";
+            // Building the lattice Green's function from the local DMFT self-energy
+            for (size_t l=0; l<k_array.size(); l++){
+                for (size_t m=0; m<k_array.size(); m++){
+                    for (size_t j=0; j<iwn.size(); j++){
+                        G_k_q_iwn(l,j,m) = 1.0/( iwn[j] + mu - epsilonk(k_array[l]+q_array[emx],k_array[m]+q_array[emy]) - sigma_iwn[j] );
+                    }
+                }
+            }
+            
+            for (size_t mm=0; mm<k_array.size(); mm++){
+                dG_dtau_FFT_q.slice(mm) = get_derivative_FFT(G_k_q_iwn.slice(mm),iwn,k_array,beta_array,U,mu,q_array[emx],std::string("positive"),mm,q_array[emy]);
+            }
+
+            // Substracting the tail of the Green's function
+            for (size_t l=0; l<k_array.size(); l++){
+                for (size_t j=0; j<iwn.size(); j++){
+                    for (size_t m=0; m<k_array.size(); m++){
+                        G_k_q_iwn(l,j,m) -= 1.0/(iwn[j]) + epsilonk(k_array[l]+q_array[emx],k_array[m]+q_array[emy])/iwn[j]/iwn[j]; //+ ( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) )/iwn[j]/iwn[j]/iwn[j];
+                    }
+                }
+            }
+            
+            // FFT of G(iwn) --> G(tau)
+            for (size_t l=0; l<k_array.size(); l++){
+                for (size_t m=0; m<k_array.size(); m++){
+                    std::vector< std::complex<double> > G_iwn_k_q_slice(G_k_q_iwn(arma::span(l,l),arma::span::all,arma::span(m,m)).begin(),G_k_q_iwn(arma::span(l,l),arma::span::all,arma::span(m,m)).end());
+                    FFT_k_q_tau = get_iwn_to_tau(G_iwn_k_q_slice,beta); // beta_arr.back() is beta
+                    for (size_t i=0; i<beta_array.size(); i++){
+                        G_k_q_tau(l,i,m) = FFT_k_q_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(k_array[l]+q_array[emx],k_array[m]+q_array[emy]); //+ 0.25*beta_array[i]*(beta-beta_array[i])*( U*U/4.0 + epsilonk(k_array[l]+q_array[em])*epsilonk(k_array[l]+q_array[em]) );
+                    }
+                }
+            }
+
+            for (size_t l=0; l<k_array.size(); l++){
+                for (size_t m=0; m<k_array.size(); m++){
+                    spline<double> splObj_GG_jj, splObj_GG_szsz;
+                    
+                    for (size_t i=0; i<beta_array.size(); i++){
+                        dGG_tau_for_k_jj(l,i,m) = velocity(k_array[l])*velocity(k_array[l])*(-2.0)*( dG_dtau_m_FFT(l,i,m)*G_k_q_tau(l,i,m) - G_k_tau(l,Ntau-i,m)*dG_dtau_FFT_q(l,i,m) );
+                        dGG_tau_for_k_szsz(l,i,m) = (-2.0)*( dG_dtau_m_FFT(l,i,m)*G_k_q_tau(l,i,m) - G_k_tau(l,Ntau-i,m)*dG_dtau_FFT_q(l,i,m) );
+                        GG_tau_for_k_jj.slice(i)(0,0) = velocity(k_array[l])*velocity(k_array[l])*(-2.0)*(-1.0)*( G_k_q_tau(l,i,m)*G_k_tau(l,Ntau-i,m) );
+                        GG_tau_for_k_szsz.slice(i)(0,0) = (-2.0)*(-1.0)*( G_k_q_tau(l,i,m)*G_k_tau(l,Ntau-i,m) );
+                    }
+                
+                    // Taking the derivative for boundary conditions
+                    double left_der_GG_jj = dGG_tau_for_k_jj(l,0,m);
+                    double right_der_GG_jj = dGG_tau_for_k_jj(l,Ntau,m);
+                    double left_der_GG_szsz = dGG_tau_for_k_szsz(l,0,m);
+                    double right_der_GG_szsz = dGG_tau_for_k_szsz(l,Ntau,m);
+
+                    splObj_GG_jj.set_boundary(spline<double>::bd_type::first_deriv,left_der_GG_jj,spline<double>::bd_type::first_deriv,right_der_GG_jj);
+                    splObj_GG_szsz.set_boundary(spline<double>::bd_type::first_deriv,left_der_GG_szsz,spline<double>::bd_type::first_deriv,right_der_GG_szsz);
+                    splObj_GG_jj.set_points(beta_array,GG_tau_for_k_jj);
+                    splObj_GG_szsz.set_points(beta_array,GG_tau_for_k_szsz);
+
+                    std::vector< std::complex<double> > cub_spl_GG_jj = splObj_GG_jj.bosonic_corr(iqn,beta);
+                    std::vector< std::complex<double> > cub_spl_GG_szsz = splObj_GG_szsz.bosonic_corr(iqn,beta);
+                    for (size_t i=0; i<iqn.size(); i++){
+                        cubic_spline_GG_iqn_k_jj(i,l,m) = cub_spl_GG_jj[i];
+                        cubic_spline_GG_iqn_k_szsz(i,l,m) = cub_spl_GG_szsz[i];
+                    }
+                }
+            }
+            
+            std::vector< std::complex<double> > GG_iqn_q_jj(iqn.size()), GG_iqn_q_szsz(iqn.size());
+            arma::Mat< std::complex<double> > tmp_int_iqn_k_jj(iqn.size(),k_array.size()), tmp_int_iqn_k_szsz(iqn.size(),k_array.size());
+            for (size_t j=0; j<iqn.size(); j++){
+                for (size_t i=0; i<k_array.size(); i++){
+                    std::vector< std::complex<double> > GG_iqn_k_tmp_jj(cubic_spline_GG_iqn_k_jj(arma::span(j,j),arma::span(i,i),arma::span::all).begin(),cubic_spline_GG_iqn_k_jj(arma::span(j,j),arma::span(i,i),arma::span::all).end());
+                    std::vector< std::complex<double> > GG_iqn_k_tmp_szsz(cubic_spline_GG_iqn_k_szsz(arma::span(j,j),arma::span(i,i),arma::span::all).begin(),cubic_spline_GG_iqn_k_szsz(arma::span(j,j),arma::span(i,i),arma::span::all).end());
+                    tmp_int_iqn_k_jj(j,i) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_k_tmp_jj),delta,"simpson");
+                    tmp_int_iqn_k_szsz(j,i) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_k_tmp_szsz),delta,"simpson");
+                }
+                std::vector< std::complex<double> > GG_iqn_tmp_jj(tmp_int_iqn_k_jj(j,arma::span::all).begin(),tmp_int_iqn_k_jj(j,arma::span::all).end());
+                std::vector< std::complex<double> > GG_iqn_tmp_szsz(tmp_int_iqn_k_szsz(j,arma::span::all).begin(),tmp_int_iqn_k_szsz(j,arma::span::all).end());
+                GG_iqn_q_jj[j] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_tmp_jj),delta,"simpson");
+                GG_iqn_q_szsz[j] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_tmp_szsz),delta,"simpson");
+            }
+
+            std::string DATASET_NAME("qx_"+std::to_string(q_array[emx])+"_qy_"+std::to_string(q_array[emy]));
+            writeInHDF5File(GG_iqn_q_jj, GG_iqn_q_szsz, file, DATA_SET_DIM, DATASET_NAME);
+        }
+    }
+    #elif DIM == 3
+    const Integrals integralsObj;
     arma::Cube< std::complex<double> > G_k_q_iwn(k_array.size(),iwn.size(),k_array.size());
     arma::Cube<double> G_k_q_tau(k_array.size(),Ntau+1,k_array.size()), dG_dtau_FFT_q(k_array.size(),Ntau+1,k_array.size());
     std::vector<double> FFT_k_q_tau;

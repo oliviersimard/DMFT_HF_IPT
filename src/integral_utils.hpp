@@ -6,6 +6,7 @@
 #include <functional>
 #include <exception>
 #include <assert.h>
+#include <type_traits>
 
 // #define INTEGRAL
 #define MAX_ITER_INTEGRAL 20
@@ -13,7 +14,43 @@
 #define ROOT_FINDING_TOL 0.0001
 // for Gaussian quadratures
 #define ABS_TOL 1e-2
-#define MAX_DEPTH 2
+#define MAX_DEPTH 3
+
+template<class T>
+struct GaussEl{
+    T jj{0};
+    T szsz{0};
+    GaussEl()=default;
+    GaussEl(T a, T b) : jj(a), szsz(b){};
+    GaussEl operator+(const GaussEl& a) const noexcept;
+    GaussEl operator+(const T& a) const noexcept;
+    GaussEl operator*(const T& a) const noexcept;
+};
+
+template<class T>
+GaussEl<T> GaussEl<T>::operator+(const T& a) const noexcept{
+    return GaussEl<T>(this->jj+a,this->szsz+a);
+}
+template<class T>
+GaussEl<T> GaussEl<T>::operator*(const T& a) const noexcept{
+    return GaussEl<T>(this->jj*a,this->szsz*a);
+}
+template<class T>
+GaussEl<T> GaussEl<T>::operator+(const GaussEl<T>& a) const noexcept{
+    return GaussEl<T>( this->jj+a.jj, this->szsz+a.szsz );
+}
+template<class T>
+GaussEl<T> operator*(const GaussEl<T>& a, const T& num) noexcept{
+    return GaussEl<T>(a.jj*num, a.szsz*num);
+}
+template<class T>
+GaussEl<T> operator*(const GaussEl<T>& a, const double& num) noexcept{
+    return GaussEl<T>(a.jj*num, a.szsz*num);
+}
+template<class T>
+GaussEl<T> operator*(const double& num,const GaussEl<T>& a) noexcept{
+    return operator*(a, num);
+}
 
 struct cubic_roots{ // Hosting the roots of cubic equation
     std::complex<double> x1;
@@ -26,7 +63,6 @@ cubic_roots get_cubic_roots(double a, double b, double c, double d);
 
 class Integrals{
     public:
-        #ifndef SUS
         double coarse_app(std::function< double(double) >,double,double) const;
         std::complex<double> coarse_app(std::function< std::complex<double>(double,std::complex<double>) >,double,double,std::complex<double>) const;
         double trap_app(std::function< double(double) >,double,double) const;
@@ -53,13 +89,71 @@ class Integrals{
         // template<typename T, typename U> inline typename std::enable_if< std::is_same< U,std::complex<double> >::value >::type integral_functional_3d(std::function<std::complex<double>(T,T)> f, T xmin, T xmax, T ymin, T ymax, std::complex<double> zmin, std::complex<double> zmax, bool(*y_cond)(T x,T y)) const;
         template<typename T> std::complex<double> integral_functional_3d(std::function<std::complex<double>(T,T)> f, T xmin, T xmax, T ymin, T ymax, std::complex<double> zmin, std::complex<double> zmax, bool(*y_cond)(T x,T y)) const;
         template<typename T, typename U> U I2D_constrained(std::function<U(T,T)> funct,std::function<bool(T,T)> cond,T x0,T xf,T y0,T yf,const double tol=1e-2,unsigned int maxVal=20,bool is_converged=false) const;
-        #endif
+    
         // double I1D(std::vector<double>& vecfunct,double delta_tau) const;
         template<typename T> T I1D_VEC(std::vector< T >& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
         template<typename T> T I1D_VEC(std::vector< T >&& vecfunct,double delta,std::string rule="trapezoidal") const noexcept(false);
         // Gaussian Quadratures
         template<typename T, typename U>
-        inline U gauss_quad_2D( std::function<U(T,T)> funct_to_integrate, T x1, T x2, T y1, T y2, int depth = 1) const noexcept; //, U abs_tol = static_cast<U>(ABS_TOL), U prev_result = static_cast<U>(0)) const noexcept;
+        inline U gauss_quad_1D(std::function<U(T)> func, T x1, T x2, int depth = 1) const noexcept;
+
+        template<typename T, typename U, typename std::enable_if< std::is_same< U, std::complex<T> >::value >::type* = nullptr >
+        inline U gauss_quad_2D(std::function<U(T,T)> func, T x1, T x2, T y1, T y2, int depth=1) const noexcept{
+            // sqrt(3) = 1.7320508075688772
+            T w1 = static_cast<T>(1.0), w2 = static_cast<T>(1.0);
+            constexpr T xi1 = (T)(-1.0/1.7320508075688772), xi2 = (T)(1.0/1.7320508075688772);
+            constexpr T eta1 = (T)(-1.0/1.7320508075688772), eta2 = (T)(1.0/1.7320508075688772);
+            T hx = (x2-x1)/static_cast<T>(2.0), hy = (y2-y1)/static_cast<T>(2.0);
+            T dx = (x2+x1)/static_cast<T>(2.0), dy = (y2+y1)/static_cast<T>(2.0);
+            // U abst{0};
+
+            U layer = hx*hy*w1*w1*func(hx*xi1+dx,hy*eta1+dy) + hx*hy*w1*w2*func(hx*xi1+dx,hy*eta2+dy) + 
+                hx*hy*w2*w1*func(hx*xi2+dx,hy*eta1+dy) + hx*hy*w2*w2*func(hx*xi2+dx,hy*eta2+dy);
+            
+            // if (depth > 1){
+            //     abst = std::abs(layer-prev_result)/4.0;
+            // }
+            // if ( (depth > 1) && (std::abs(abst) < std::abs(abs_tol)) ){
+            //     return layer;
+            if (depth==MAX_DEPTH){
+                return layer;
+            } else{
+                depth += 1;
+                // layer /= static_cast<T>(4.0);
+                return gauss_quad_2D(func,x1,x1+hx,y1,y1+hy,depth) + gauss_quad_2D(func,x1,x1+hx,y1+hy,y2,depth) +
+                    gauss_quad_2D(func,x1+hx,x2,y1,y1+hy,depth) + gauss_quad_2D(func,x1+hx,x2,y1+hy,y2,depth);
+            }
+        }
+
+        template<typename T, typename U, typename std::enable_if< std::is_same< U, GaussEl<std::complex<T>> >::value >::type* = nullptr>
+        inline U gauss_quad_2D(std::function<U(T,T)> func, T x1, T x2, T y1, T y2, int depth=1) const noexcept{
+            // sqrt(3) = 1.7320508075688772
+            T w1 = static_cast<T>(1.0), w2 = static_cast<T>(1.0);
+            constexpr T xi1 = (T)(-1.0/1.7320508075688772), xi2 = (T)(1.0/1.7320508075688772);
+            constexpr T eta1 = (T)(-1.0/1.7320508075688772), eta2 = (T)(1.0/1.7320508075688772);
+            T hx = (x2-x1)/static_cast<T>(2.0), hy = (y2-y1)/static_cast<T>(2.0);
+            T dx = (x2+x1)/static_cast<T>(2.0), dy = (y2+y1)/static_cast<T>(2.0);
+
+            U down_left = func(hx*xi1+dx,hy*eta1+dy);
+            U up_left = func(hx*xi1+dx,hy*eta2+dy);
+            U down_right = func(hx*xi2+dx,hy*eta1+dy);
+            U up_right = func(hx*xi2+dx,hy*eta2+dy);
+
+            U layer = hx*hy*w1*w1*down_left + hx*hy*w1*w2*up_left + 
+                hx*hy*w2*w1*down_right + hx*hy*w2*w2*up_right;
+            
+            if (depth==3){
+                return layer;
+            } else{
+                depth += 1;
+                // layer /= static_cast<T>(4.0);
+                return gauss_quad_2D(func,x1,x1+hx,y1,y1+hy,depth) + gauss_quad_2D(func,x1,x1+hx,y1+hy,y2,depth) +
+                    gauss_quad_2D(func,x1+hx,x2,y1,y1+hy,depth) + gauss_quad_2D(func,x1+hx,x2,y1+hy,y2,depth);
+            }
+        }
+        
+        template<typename T, typename U>
+        inline U gauss_quad_3D( std::function<U(T,T,T)>, T x1, T x2, T y1, T y2, T z1, T z2, int depth = 1) const noexcept;
         template<typename T, typename U>
         inline void gauss_quad_2D_generate_max_depth_vals( U (*func)(T,T), T x1, T x2, T y1, T y2, std::vector<U>& container, int depth=1) const noexcept;
         // False position method to find roots
@@ -71,7 +165,6 @@ class Integrals{
 
 };
 
-#ifndef SUS
 template<typename T, typename U>
 double Integrals::integral_functional_3d(std::function<U(T,T)> f, T xmin, T xmax, T ymin, T ymax, U zmin, U zmax, bool(*y_cond)(T x,T y)) const{
     int count;
@@ -210,7 +303,6 @@ U Integrals::I2D_constrained(std::function<U(T,T)> funct,std::function<bool(T,T)
 
     return result;
 }
-#endif
 
 template<typename T>
 T Integrals::I1D_VEC(std::vector< T >& vecfunct,double delta,std::string rule) const noexcept(false){
@@ -257,32 +349,47 @@ T Integrals::I1D_VEC(std::vector< T >&& vecfunct,double delta,std::string rule) 
 }
 
 template<typename T, typename U>
-inline U Integrals::gauss_quad_2D(std::function<U(T,T)> func, T x1, T x2, T y1, T y2, int depth) const noexcept{
-    // sqrt(3) = 1.7320508075688772
+inline U Integrals::gauss_quad_1D(std::function<U(T)> func, T x1, T x2, int depth) const noexcept{
     T w1 = static_cast<T>(1.0), w2 = static_cast<T>(1.0);
-    constexpr T xi1 = (T)(-1.0/1.7320508075688772), xi2 = (T)(1.0/1.7320508075688772);
-    constexpr T eta1 = (T)(-1.0/1.7320508075688772), eta2 = (T)(1.0/1.7320508075688772);
-    T hx = (x2-x1)/static_cast<T>(2.0), hy = (y2-y1)/static_cast<T>(2.0);
-    T dx = (x2+x1)/static_cast<T>(2.0), dy = (y2+y1)/static_cast<T>(2.0);
-    // U abst{0};
+    T xi1 = (T)(-1.0/1.7320508075688772), xi2 = (T)(1.0/1.7320508075688772);
+    T hx = (x2-x1)/static_cast<T>(2.0);
+    T dx = (x2+x1)/static_cast<T>(2.0);
 
-    U layer = hx*hy*w1*w1*func(hx*xi1+dx,hy*eta1+dy) + hx*hy*w1*w2*func(hx*xi1+dx,hy*eta2+dy) + 
-        hx*hy*w2*w1*func(hx*xi2+dx,hy*eta1+dy) + hx*hy*w2*w2*func(hx*xi2+dx,hy*eta2+dy);
+    U layer = hx*w1*func(hx*xi1+dx) + hx*w2*func(hx*xi2+dx);
     
-    // if (depth > 1){
-    //     abst = std::abs(layer-prev_result)/4.0;
-    // }
-    // if ( (depth > 1) && (std::abs(abst) < std::abs(abs_tol)) ){
-    //     return layer;
     if (depth==MAX_DEPTH){
         return layer;
     } else{
         depth += 1;
-        // layer /= static_cast<T>(4.0);
-        return gauss_quad_2D(func,x1,x1+hx,y1,y1+hy,depth) + gauss_quad_2D(func,x1,x1+hx,y1+hy,y2,depth) +
-            gauss_quad_2D(func,x1+hx,x2,y1,y1+hy,depth) + gauss_quad_2D(func,x1+hx,x2,y1+hy,y2,depth);
+        return gauss_quad_1D(func,x1,x1+hx,depth) + gauss_quad_1D(func,x1+hx,x2,depth);
     }
 }
+
+template<typename T, typename U>
+inline U Integrals::gauss_quad_3D( std::function<U(T,T,T)> func, T x1, T x2, T y1, T y2, T z1, T z2, int depth) const noexcept{
+    T w1 = static_cast<T>(1.0), w2 = static_cast<T>(1.0);
+    T xi1 = -(T)(1.0/1.7320508075688772), xi2 = (T)(1.0/1.7320508075688772);
+    T eta1 = -(T)(1.0/1.7320508075688772), eta2 = (T)(1.0/1.7320508075688772);
+    T gamma1 = (T)(1.0/1.7320508075688772), gamma2 = -(T)(1.0/1.7320508075688772);
+    T hx = (x2-x1)/static_cast<T>(2.0), hy = (y2-y1)/static_cast<T>(2.0), hz = (z2-z1)/static_cast<T>(2.0);
+    T dx = (x2+x1)/static_cast<T>(2.0), dy = (y2+y1)/static_cast<T>(2.0), dz = (z2+z1)/static_cast<T>(2.0);
+
+    U layer = hz*hx*hy*w1*w1*w1*func(hx*xi1+dx,hy*eta1+dy,hz*gamma1+dz) + hz*hx*hy*w1*w2*w1*func(hx*xi1+dx,hy*eta2+dy,hz*gamma1+dz) + 
+        hz*hx*hy*w2*w1*w1*func(hx*xi2+dx,hy*eta1+dy,hz*gamma1+dz) + hz*hx*hy*w2*w2*w1*func(hx*xi2+dx,hy*eta2+dy,hz*gamma1+dz) + 
+        hz*hx*hy*w1*w1*w2*func(hx*xi1+dx,hy*eta1+dy,hz*gamma2+dz) + hz*hx*hy*w1*w2*w2*func(hx*xi1+dx,hy*eta2+dy,hz*gamma2+dz) + 
+        hz*hx*hy*w2*w1*w2*func(hx*xi2+dx,hy*eta1+dy,hz*gamma2+dz) + hz*hx*hy*w2*w2*w2*func(hx*xi2+dx,hy*eta2+dy,hz*gamma2+dz);
+    
+    if (depth==MAX_DEPTH){
+        return layer;
+    } else{
+        depth += 1;
+        return gauss_quad_3D(func,x1,x1+hx,y1,y1+hy,z1,z1+hz,depth) + gauss_quad_3D(func,x1,x1+hx,y1+hy,y2,z1,z1+hz,depth) +
+            gauss_quad_3D(func,x1+hx,x2,y1,y1+hy,z1,z1+hz,depth) + gauss_quad_3D(func,x1+hx,x2,y1+hy,y2,z1,z1+hz,depth) + 
+            gauss_quad_3D(func,x1,x1+hx,y1,y1+hy,z1+hz,z2,depth) + gauss_quad_3D(func,x1,x1+hx,y1+hy,y2,z1+hz,z2,depth) +
+            gauss_quad_3D(func,x1+hx,x2,y1,y1+hy,z1+hz,z2,depth) + gauss_quad_3D(func,x1+hx,x2,y1+hy,y2,z1+hz,z2,depth);
+    }
+}
+
 
 template<typename T, typename U>
 inline void Integrals::gauss_quad_2D_generate_max_depth_vals( U (*func)(T,T), T x1, T x2, T y1, T y2, std::vector<U>& container, int depth) const noexcept{
@@ -313,44 +420,5 @@ inline void Integrals::gauss_quad_2D_generate_max_depth_vals( U (*func)(T,T), T 
         gauss_quad_2D_generate_max_depth_vals(func,x1+hx,x2,y1+hy,y2,container,depth); // upper right corner
     }
 }
-
-// template<typename T, typename U>
-// inline typename std::enable_if< std::is_same< U,std::complex<double> >::value >::type Integrals::integral_functional_3d(std::function<std::complex<double>(T,T)> f
-//                     , T xmin, T xmax, T ymin, T ymax, std::complex<double> zmin, std::complex<double> zmax, bool(*y_cond)(T x,T y)) const{
-//     int count;
-//     int total(0), inBoxR(0), inBoxI(0);
-//     for (count=0; count < 1000000; count++){
-//         T u1 = (T)rand()/(T)RAND_MAX;
-//         T xcoord = ((xmax - xmin)*u1) + xmin;
-
-//         T u2 = (T)rand()/(T)RAND_MAX;
-//         T ycoord = ((ymax - ymin)*u2) + ymin;
-
-//         double u3R = (double)rand()/(double)RAND_MAX;
-//         double u3I = (double)rand()/(double)RAND_MAX;
-//         std::complex<double> zcoord( (zmax - zmin).real()*u3R + zmin.real(), (zmax - zmin).imag()*u3I + zmin.imag() );
-
-//         if (y_cond(xcoord,ycoord)){
-//             total++;
-//             std::complex<double> val = f(xcoord,ycoord);
-//             // std::cout << "bool: " << ((val < zcoord)) << " val: " << val << " z: " << zcoord << "\n";
-//             if ( (val.real() > zcoord.real()) && (zcoord.real() > 0.0) ){
-//                 inBoxR++;
-//             } else if( (val.real() < zcoord.real()) && (zcoord.real() < 0.0) ){
-//                 inBoxR--;
-//             }
-//             if ( (val.imag() > zcoord.imag()) && (zcoord.imag() > 0.0) ){
-//                 inBoxI++;
-//             } else if( (val.imag() < zcoord.imag()) && (zcoord.imag() < 0.0) ){
-//                 inBoxI--;
-//             }
-//         }
-//     }
-//     std::cout << "total: " << total << " inBoxR: " << inBoxR << " inBoxI: " << inBoxI << std::endl;
-//     double densityR = inBoxR/(double)total;
-//     double densityI = inBoxI/(double)total;
-//     std::cout << "densityR: " << densityR << " densityI: " << densityI << " and volume " << (xmax - xmin)*(ymax - ymin)*(zmax - zmin) << "\n";
-//     return std::complex<double>(densityR,densityI)*(double)(xmax - xmin)*(ymax - ymin)*(zmax - zmin);
-// }
 
 #endif /* Integral_utils_H_ */

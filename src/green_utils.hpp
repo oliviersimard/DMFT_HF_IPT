@@ -12,7 +12,7 @@ extern "C" {
 //#include <type_traits> // for use of std::is_same in static_assert
 #include "wrapper_utils.hpp"
 
-#define DIM 3 // 1, 2 or 3
+#define DIM 1 // 1, 2 or 3
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
 #define MULT_N_TAU 2 // Has to be an even number

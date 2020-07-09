@@ -586,23 +586,13 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
             };
             sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.I2D(G_latt,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j]);
             #elif DIM == 3
-            const size_t size_k = sublatt1.karr_l.size();
-            // std::cout << "size shit " << size_k << std::endl;
-            const double delta_k = 2.0*M_PI/(GreenStuff::N_k-1);
-            std::vector< std::complex<double> > integrate_kx(size_k), integrate_ky(size_k), integrate_kz(size_k);
-            double kky, kkz, mu = sublatt1.WeissGreen.get_mu();
-            for (size_t kz=0; kz<size_k; kz++){
-                kkz = sublatt1.karr_l[kz];
-                for (size_t ky=0; ky<size_k; ky++){
-                    kky = sublatt1.karr_l[ky];
-                    for (size_t kx=0; kx<size_k; kx++){
-                        integrate_kx[kx] = 1.0/(iwnArr_l[j] + mu - epsilonk(sublatt1.karr_l[kx],kky,kkz) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
-                    }
-                    integrate_ky[ky] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(integrate_kx),delta_k,"simpson");
-                }
-                integrate_kz[kz] = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(integrate_ky),delta_k,"simpson");
-            }
-            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0) = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(integrate_kz),delta_k,"simpson");
+            std::function<std::complex<double>(double,double,double)> int_3D_solver;
+            // const double delta_k = 2.0*M_PI/(GreenStuff::N_k-1);
+            double mu = sublatt1.WeissGreen.get_mu();
+            int_3D_solver = [&](double kx, double ky, double kz){
+                return 1.0/(iwnArr_l[j] + mu - epsilonk(kx,ky,kz) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0) = 1.0/(2.0*M_PI)/(2.0*M_PI)/(2.0*M_PI)*integralsObj.gauss_quad_3D(int_3D_solver,0.0,2.0*M_PI,0.0,2.0*M_PI,0.0,2.0*M_PI);
             #endif
         }
         // Updating the hybridization function for next round.

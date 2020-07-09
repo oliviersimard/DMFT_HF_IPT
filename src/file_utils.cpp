@@ -124,6 +124,25 @@ int extractIntegerLastWords(std::string str){
     return integerStr;
 }
 
+int get_largest_Nit(const std::string& filename) noexcept(false){
+    std::string patternFile = filename+"*";
+    std::vector< std::string > vecStr;
+    try{
+        vecStr=glob(patternFile);
+    }catch (const std::runtime_error& err){
+        std::cerr << err.what() << "\n";
+        exit(1);
+    }
+    
+    int largestNum=1; // Numbers after N_it are always positive.
+    for (auto str : vecStr){ // Getting the largest iteration number to eventually load for interpolation.
+        int tempNum=extractIntegerLastWords(str);
+        if (tempNum>largestNum)
+            largestNum=tempNum;
+    }
+    return largestNum;
+}
+
 FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false){
     /*  This method fetches the data (self-energy) contained inside a file named "strName". The data has to be laid out 
     the following way: 
@@ -560,7 +579,7 @@ arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::
     */
     H5::DataSpace dataspace_open = dataset_open.getSpace();
     hsize_t dims_out[2];
-    // int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
+    dataspace_open.getSimpleExtentDims( dims_out, nullptr );
     const size_t NY = dims_out[0];
     const size_t NX = dims_out[1];
     arma::Mat< std::complex<double> > ret_mat(NY,NX);
@@ -629,6 +648,7 @@ arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const s
 
     // std::cout << "Group fetched: " << "iqn_"+std::to_string(iqn.imag()) << std::endl;
     H5::Group* group = new H5::Group(file->openGroup(DATASET_NAME));
+    
     try {  // to determine if the dataset exists in the group
         dataset_open = H5::DataSet( group->openDataSet( "iqn_"+std::to_string(iqn.imag()) ) );
     } catch( H5::GroupIException not_found_error ) {
@@ -639,9 +659,10 @@ arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const s
     */
     H5::DataSpace dataspace_open = dataset_open.getSpace();
     hsize_t dims_out[2];
-    // int n_dims = dataspace_open.getSimpleExtentDims( dims_out, nullptr );
+    dataspace_open.getSimpleExtentDims( dims_out, nullptr );
     const size_t NY = dims_out[0];
     const size_t NX = dims_out[1];
+    std::cout << NY << " and " << NX << std::endl;
     arma::Mat< std::complex<double> > ret_mat(NY,NX);
     cplx_t* data_out = new cplx_t[NY*NX];
     try{

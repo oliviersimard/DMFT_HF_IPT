@@ -11,7 +11,7 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 
 struct FileData;
 
-FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
+// FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
 std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj="Green");
 template<typename T> std::vector< T > generate_random_numbers(size_t arr_size, T min, T max) noexcept;
 arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector<double>& beta_arr, double U, double mu, double q=0.0, std::string opt="positive");
@@ -363,60 +363,60 @@ arma::Mat<double> get_derivative_FFT(arma::Mat< std::complex<double> > G_k_iwn, 
 }
 
 
-FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false){
-    /*  This method fetches the data (self-energy) contained inside a file named "strName". The data has to be laid out 
-    the following way: 
-        1. 1st column are the fermionic Matsubara frequencies.
-        2. 2nd column are the real parts of the self-energy.
-        3. 3rd column are the imaginary parts of the self-energy. 
+// FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false){
+//     /*  This method fetches the data (self-energy) contained inside a file named "strName". The data has to be laid out 
+//     the following way: 
+//         1. 1st column are the fermionic Matsubara frequencies.
+//         2. 2nd column are the real parts of the self-energy.
+//         3. 3rd column are the imaginary parts of the self-energy. 
         
-        Parameters:
-            strName (const std::string&): Filename containeing the self-energy.
-            Ntau (const unsigned int&): Number of fermionic Matsubara frequencies (length of the columns).
+//         Parameters:
+//             strName (const std::string&): Filename containeing the self-energy.
+//             Ntau (const unsigned int&): Number of fermionic Matsubara frequencies (length of the columns).
         
-        Returns:
-            fileDataObj (struct FileData): struct containing a vector of data for each column in the data file.
-    */
+//         Returns:
+//             fileDataObj (struct FileData): struct containing a vector of data for each column in the data file.
+//     */
 
-    std::vector<double> iwn(Ntau,0.0);
-    std::vector<double> re(Ntau,0.0);
-    std::vector<double> im(Ntau,0.0);
+//     std::vector<double> iwn(Ntau,0.0);
+//     std::vector<double> re(Ntau,0.0);
+//     std::vector<double> im(Ntau,0.0);
 
-    std::ifstream inputFile(strName);
-    std::string increment("");
-    unsigned int idx = 0;
-    size_t pos=0;
-    std::string token;
-    const std::string delimiter = "\t\t";
-    if (inputFile.fail()){
-        std::cerr << "Error loading the file..." << "\n";
-        throw std::ios_base::failure("Check loading file procedure..");
-    } 
-    std::vector<double> tmp_vec;
-    while (getline(inputFile,increment)){
-        if (increment[0]=='/'){
-            continue;
-        }
-        while ((pos = increment.find(delimiter)) != std::string::npos) {
-            token = increment.substr(0, pos);
-            increment.erase(0, pos + delimiter.length());
-            tmp_vec.push_back(std::atof(token.c_str()));
-        }
-        tmp_vec.push_back(std::atof(increment.c_str()));
-        iwn[idx] = tmp_vec[0];
-        re[idx] = tmp_vec[1];
-        im[idx] = tmp_vec[2];
+//     std::ifstream inputFile(strName);
+//     std::string increment("");
+//     unsigned int idx = 0;
+//     size_t pos=0;
+//     std::string token;
+//     const std::string delimiter = "\t\t";
+//     if (inputFile.fail()){
+//         std::cerr << "Error loading the file..." << "\n";
+//         throw std::ios_base::failure("Check loading file procedure..");
+//     } 
+//     std::vector<double> tmp_vec;
+//     while (getline(inputFile,increment)){
+//         if (increment[0]=='/'){
+//             continue;
+//         }
+//         while ((pos = increment.find(delimiter)) != std::string::npos) {
+//             token = increment.substr(0, pos);
+//             increment.erase(0, pos + delimiter.length());
+//             tmp_vec.push_back(std::atof(token.c_str()));
+//         }
+//         tmp_vec.push_back(std::atof(increment.c_str()));
+//         iwn[idx] = tmp_vec[0];
+//         re[idx] = tmp_vec[1];
+//         im[idx] = tmp_vec[2];
 
-        increment.clear();
-        tmp_vec.clear();
-        idx++;
-    }
+//         increment.clear();
+//         tmp_vec.clear();
+//         idx++;
+//     }
     
-    inputFile.close();
+//     inputFile.close();
 
-    FileData fileDataObj={iwn,re,im};
-    return fileDataObj;
-}
+//     FileData fileDataObj={iwn,re,im};
+//     return fileDataObj;
+// }
 
 std::vector<double> get_iwn_to_tau(const std::vector< std::complex<double> >& F_iwn, double beta, std::string obj){
     /*  This method computes the imaginary-time object related to "F_iwn". Prior to calling in this method, one needs

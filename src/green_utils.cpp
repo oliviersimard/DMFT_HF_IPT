@@ -16,10 +16,6 @@ double epsilonk(double kx, double ky) noexcept{
     return -2.0*(std::cos(kx)+std::cos(ky));
 }
 
-double epsilonk2D(double kx, double ky){
-    return -2.0*(std::cos(kx)+std::cos(ky));
-}
-
 double epsilonk(double kx, double ky, double kz) noexcept{
     return -2.0*(std::cos(kx)+std::cos(ky)+std::cos(kz));
 }

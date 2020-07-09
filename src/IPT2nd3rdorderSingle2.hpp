@@ -70,9 +70,7 @@ class DMFTproc{
         double density_mu(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu(const arma::Cube< std::complex<double> >&) const;
         #ifdef AFM
-        #ifndef SUS
         tuple<double,double> density_mu_AFM(const arma::Cube< std::complex<double> >& G) const;
-        #endif
         #endif
         double density_mu0(double, const arma::Cube< std::complex<double> >&) const; // used for false position method
         double density_mu0(const arma::Cube< std::complex<double> >&) const;
@@ -147,17 +145,17 @@ IPT2::SplineInline< T >& IPT2::SplineInline< T >::operator=(const IPT2::SplineIn
 
 template<typename T>
 T IPT2::SplineInline<T>::compute_linear_spline(double reIwn) const {
-    #ifdef DEBUG
-    assert(_iwn.size()==_iwn_cplx.size());
-    assert(_iwn.size()>2);
-    #endif
+
+    // assert(_iwn.size()==_iwn_cplx.size());
+    // assert(_iwn.size()>2);
+    
     size_t n = _iwn.size();
     std::vector<double>::const_iterator it;
     it=std::lower_bound(_iwn.begin(),_iwn.end(),reIwn);
-    #ifdef DEBUG
-    if (VERBOSE>0)
-        std::cout << std::setprecision(10) << "it: " << *it << " and reIwn: " << reIwn << " and it+1: " << *(it+1) << std::endl; //" and _iwn[idx]: " << _iwn[idx] << std::endl;
-    #endif
+    
+    // if (VERBOSE>0)
+    //     std::cout << std::setprecision(10) << "it: " << *it << " and reIwn: " << reIwn << " and it+1: " << *(it+1) << std::endl; //" and _iwn[idx]: " << _iwn[idx] << std::endl;
+    
     int idx=std::max( int( it - _iwn.begin() ) - 1, 0);
     // Have to correct for the boundaries. Loaded iwn data doesn't have the same precision as the values iwn produced in main, so the 
     // function lower_bound returns "it" has the iwn.size()/2 value: with the -1 in the definition of "idx", it means one jumps across the discontinuity..
@@ -180,26 +178,16 @@ T IPT2::SplineInline<T>::compute_linear_spline(double reIwn) const {
 
 template<>
 inline void IPT2::SplineInline< std::complex<double> >::loadFileSpline(const std::string& filename, const IPT2::spline_type& spl_t) noexcept(false){
-    std::ifstream infile;   
-    std::string firstline("");
-    std::string patternFile = filename+"*";
-    std::vector< std::string > vecStr;
-    try{
-        vecStr=glob(patternFile);
-    }catch (const std::runtime_error& err){
-        std::cerr << err.what() << "\n";
-        exit(1);
-    }
-    
-    int largestNum=1; // Numbers after N_it are always positive.
-    for (auto str : vecStr){ // Getting the largest iteration number to eventually load for interpolation.
-        int tempNum=extractIntegerLastWords(str);
-        if (tempNum>largestNum)
-            largestNum=tempNum;
-    }
+    #ifndef NCA
+    int largestNum = get_largest_Nit(filename);
+    #endif
     arma::Cube< std::complex<double> > inputFunct(2,2,2*_N_tau_size);
     std::cout << "Size of loaded self-energy array: " << 2*_N_tau_size << "\n";
+    #ifndef NCA
     std::string finalFile=filename+"_Nit_"+std::to_string(largestNum)+".dat";
+    #else
+    std::string finalFile(filename);
+    #endif
     std::cout << "The file from which the spline is done: "+finalFile << "\n";
 
     FileData dataFromFile;

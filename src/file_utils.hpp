@@ -49,6 +49,7 @@ struct FileData{
 std::vector<std::string> glob(const std::string& pattern) noexcept(false);
 void mkdirTree(std::string sub, std::string dir) noexcept(false);
 void check_file_content(const std::vector< std::string >& filenamesToSave, std::string pathToDir1, std::string pathToDir2) noexcept(false);
+int get_largest_Nit(const std::string& filename) noexcept(false);
 int extractIntegerLastWords(std::string str);
 FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
 std::vector<std::string> get_info_from_filename(const std::string& strName,const std::vector<std::string>& fetches,const char* separation_char="_") noexcept(false);

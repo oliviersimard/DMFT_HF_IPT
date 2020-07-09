@@ -200,8 +200,8 @@ T IPT2::OneLadder< T >::Gamma(double k_tilde_x, double k_tilde_y, double k_bar_x
     for (size_t j=0; j<_iqn_tilde.size(); j++){
         #ifndef DEBUG
         inner_2D_int = [&](double kx, double ky){
-            return ( 1.0/(  ikn_tilde-_iqn_tilde[j] + _mu + 2.0*(std::cos(k_tilde_x-kx)+std::cos(k_tilde_y-ky)) - _SE[(Ntau-1)+n_ikn_tilde-j] ) 
-                )*( 1.0/( ikn_bar-_iqn_tilde[j]+_iqn[n_iqn] + _mu + 2.0*(std::cos(k_bar_x-kx+qqx)+std::cos(k_bar_y-ky+qqy)) - _SE[(Ntau-1)+n_ikn_bar-j+n_iqn] ) 
+            return ( 1.0/(  ikn_tilde-_iqn_tilde[j] + _mu - epsilonk(k_tilde_x-kx,k_tilde_y-ky) - _SE[(Ntau-1)+n_ikn_tilde-j] ) 
+                )*( 1.0/( ikn_bar-_iqn_tilde[j]+_iqn[n_iqn] + _mu - epsilonk(k_bar_x-kx+qqx,k_bar_y-ky+qqy) - _SE[(Ntau-1)+n_ikn_bar-j+n_iqn] ) 
                 );
             // return getGreen(k_tilde_x-kx,k_tilde_y-ky,ikn_tilde-_iqn_tilde[j])*getGreen(k_bar_x-kx+qqx,k_bar_y-ky+qqy,ikn_bar-_iqn_tilde[j]+iqn);
         };
@@ -268,12 +268,12 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
                     //     )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
                     //     )*getGreen(k_bar_x,k_bar_y,_splInlineobj._iwn_array[n_bar]
                     //     )*getGreen(k_bar_x+qqx,k_bar_y+qqy,_splInlineobj._iwn_array[n_bar]+_iqn[n_em]);
-                    return -1.0*(2.0*_sine_table[n_k_tilde_x])*(2.0*std::sin(k_bar_x)
+                    return -1.0*(2.0*_sine_table[n_k_tilde_x])*(velocity(k_bar_x)
                         )*( 1.0/( _splInlineobj._iwn_array[n_tilde] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[NI/2+n_tilde] ) 
                         )*( 1.0/( _splInlineobj._iwn_array[n_tilde]-_iqn[n_em] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[(NI-1)+n_tilde-n_em] )
                         )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar] + _mu + 2.0*(std::cos(k_bar_x)+std::cos(k_bar_y)) - _SE[NI/2+n_bar] )
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar]+_iqn[n_em] + _mu + 2.0*(std::cos(k_bar_x+qqx)+std::cos(k_bar_y+qqy)) - _SE[n_bar+n_em] ) 
+                        )*( 1.0/( _splInlineobj._iwn_array[n_bar] + _mu - epsilonk(k_bar_x,k_bar_y) - _SE[NI/2+n_bar] )
+                        )*( 1.0/( _splInlineobj._iwn_array[n_bar]+_iqn[n_em] + _mu - epsilonk(k_bar_x+qqx,k_bar_y+qqy) - _SE[n_bar+n_em] ) 
                         );
                 };
 
@@ -289,8 +289,8 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
                     return ( 1.0/( _splInlineobj._iwn_array[n_tilde] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[NI/2+n_tilde] ) 
                         )*( 1.0/( _splInlineobj._iwn_array[n_tilde]-_iqn[n_em] + _mu + 2.0*( _cosine_table[n_k_tilde_x]+_cosine_table[n_k_tilde_y] ) - _SE[(NI-1)+n_tilde-n_em] )
                         )*Gamma_n_tilde_n_bar.at(n_tilde,n_bar,n_em
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar] + _mu + 2.0*(std::cos(k_bar_x)+std::cos(k_bar_y)) - _SE[NI/2+n_bar] )
-                        )*( 1.0/( _splInlineobj._iwn_array[n_bar]+_iqn[n_em] + _mu + 2.0*(std::cos(k_bar_x+qqx)+std::cos(k_bar_y+qqy)) - _SE[n_bar+n_em] ) 
+                        )*( 1.0/( _splInlineobj._iwn_array[n_bar] + _mu - epsilonk(k_bar_x,k_bar_y) - _SE[NI/2+n_bar] )
+                        )*( 1.0/( _splInlineobj._iwn_array[n_bar]+_iqn[n_em] + _mu - epsilonk2D(k_bar_x+qqx,k_bar_y+qqy) - _SE[n_bar+n_em] ) 
                         );
                 };
                 #else
@@ -324,7 +324,7 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
             }
             end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "loop n_em: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
+            std::cout << "loop n_bar: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
         }
         jj_resp_iqn = (2.0/_beta/_beta/(2.0*M_PI)/(2.0*M_PI))*arma::accu(GG_n_tilde_n_bar_jj);
         szsz_resp_iqn = (2.0/_beta/_beta/(2.0*M_PI)/(2.0*M_PI))*arma::accu(GG_n_tilde_n_bar_szsz);

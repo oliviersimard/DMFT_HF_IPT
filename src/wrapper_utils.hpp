@@ -4,8 +4,9 @@
 // #define ARMA_ALLOW_FAKE_GCC
 // #define ARMA_NO_DEBUG // to disable bound checks
 
-//#define DEBUG
-#define SUS // Enables only methods relevant when calculating the susceptibility
+#define NCA
+// #define DEBUG
+// #define SUS // Enables only methods relevant when calculating the susceptibility
 
 #include <iostream>
 #include <complex>
@@ -353,17 +354,5 @@ struct TrigP{
         std::vector< U >& _sine_p;
         std::vector< U >& _cosine_p;
 };
-
-
-// int main(void){
-//     int&& fuck = 6;
-//     auto&& obj_B = generate_B();
-//     std::cout << "_a: " << obj_B->_a << "\n";
-//     std::cout << "_q: " << obj_B->_q << "\n";
-//     auto lol = (*obj_B)._a;
-//     std::cout << "fuck " << fuck << "\n";
-
-//     return 0;
-// }
 
 #endif /* Wrapper_utils_H_ */

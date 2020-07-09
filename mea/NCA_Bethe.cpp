@@ -112,7 +112,7 @@ int main(int argc, char* argv[]){
             while (!is_converged && iter<MAXITER){
                 std::cout << "********************************** iter : " << iter << " **********************************" << "\n";
                 std::cout << "U: " << U << " beta: " << beta << " h: " << h << "\n";
-                if (iter>1){
+                if (iter>0){
                     h=0.0;
                 }
                 // NCA self-energy update in AFM case scenario

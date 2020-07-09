@@ -3,7 +3,6 @@
 const unsigned int Integrals::_maxLevel = 20;  // tweek this parameter to get best results with best efficiency.
 const unsigned int Integrals::_minLevel = 5;
 
-#ifndef SUS
 double Integrals::coarse_app(std::function< double(double) > f, double a, double b) const{
     return (b-a) * (f(a)-f(b))/2.0;
 }
@@ -300,8 +299,6 @@ cubic_roots get_cubic_roots(double a, double b, double c, double d){
     return cubic_roots{ x1, x2, x3 };
 }
 
-#endif
-
 double Integrals::falsePosMethod(std::function<double(double)> funct, double a, double b, const double tol) const noexcept(false){
     if (funct(a)*funct(b)>0.0){
         throw std::range_error("The x-range chosen to sample to find the root is not correct. Modify it such that the function changes sign.");
@@ -333,16 +330,3 @@ double Integrals::falsePosMethod(std::function<double(double)> funct, double a, 
     }
     return c;
 }
-
-
-
-// double Integrals::I1D(std::vector<double>& vecfunct,double delta_tau) const{
-//     double result, resultSumNk = 0.0;
-
-//     for (unsigned int i=1; i<vecfunct.size()-1; i++){
-//         resultSumNk+=vecfunct[i];
-//     }
-//     result = 0.5*delta_tau*vecfunct[0]+0.5*delta_tau*vecfunct.back()+delta_tau*resultSumNk;
-    
-//     return result;
-// }
