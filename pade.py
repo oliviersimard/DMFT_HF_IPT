@@ -103,7 +103,7 @@ for name in filenames:
 	assert len(omega_n)==len(Rf_n)==len(If_n), "The lengths of Matsubara array, Re F(iwn) and Im F(iwn) have to be equal."
 
 	f_n = Rf_n + 1j*If_n
-	N = len(omega_n)-7 # Substracting the last Matsubara frequencies
+	N = len(omega_n)-70 # Substracting the last Matsubara frequencies
 	g = np.zeros((N, N), dtype = np.clongdouble)
 	omega_n = omega_n[0:N]
 

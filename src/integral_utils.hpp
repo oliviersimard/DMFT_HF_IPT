@@ -14,7 +14,7 @@
 #define ROOT_FINDING_TOL 0.0001
 // for Gaussian quadratures
 #define ABS_TOL 1e-2
-#define MAX_DEPTH 3
+#define MAX_DEPTH 6
 
 template<class T>
 struct GaussEl{
@@ -50,6 +50,36 @@ GaussEl<T> operator*(const GaussEl<T>& a, const double& num) noexcept{
 template<class T>
 GaussEl<T> operator*(const double& num,const GaussEl<T>& a) noexcept{
     return operator*(a, num);
+}
+// overloading operators to handle the vectors in gauss integral methods
+template<typename T, typename U>
+std::vector<T> operator*(std::vector<T> src, const U& number) noexcept{
+    for (size_t i=0; i<src.size(); i++){
+        src[i] *= number;
+    }
+    return src;
+}
+template<typename T, typename U>
+std::vector<T> operator*(const U& number, std::vector<T> src) noexcept{
+    return operator*(src,number);
+}
+template<typename T, typename U>
+std::vector<T> operator+(std::vector<T> src, const U& number) noexcept{
+    for (size_t i=0; i<src.size(); i++){
+        src[i] += number;
+    }
+    return src;
+}
+template<typename T>
+std::vector<T> operator+(std::vector<T> src, std::vector<T> other) noexcept{
+    for (size_t i=0; i<src.size(); i++){
+        src[i] += other[i];
+    }
+    return src;
+}
+template<typename T, typename U>
+std::vector<T> operator+(const U& number, std::vector<T> src) noexcept{
+    return operator+(src,number);
 }
 
 struct cubic_roots{ // Hosting the roots of cubic equation

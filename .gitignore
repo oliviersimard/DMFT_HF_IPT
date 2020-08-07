@@ -22,3 +22,4 @@ mea/cpp_tests/bb*
 mea/cpp_tests/sl_data
 mea/cpp_tests/susceptibilities/
 *.hdf5
+mea/cpp_tests/figs_article

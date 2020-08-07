@@ -4,7 +4,7 @@
 // #define ARMA_ALLOW_FAKE_GCC
 // #define ARMA_NO_DEBUG // to disable bound checks
 
-#define NCA
+// #define NCA
 // #define DEBUG
 // #define SUS // Enables only methods relevant when calculating the susceptibility
 
@@ -264,7 +264,7 @@ inline arma::Mat< std::complex<double> > ArmaMPI< std::complex<double> >::recv_A
     
     for (size_t j=0; j<_n_cols; j++){
         for (size_t i=0; i<_n_rows; i++){
-            returned_mat(i,j) = _Tmemptr[j*_n_rows+i];
+            returned_mat(i,j) = _Tmemptr[j*_n_rows+i]; // column-major storage
         }
     }
 

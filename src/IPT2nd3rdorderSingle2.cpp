@@ -687,18 +687,19 @@ void DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1
         nA_up = -1.0*sublatt1.LocalGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(0,0); nA_down = -1.0*sublatt1.LocalGreen.matsubara_t_pos.slice(2*GreenStuff::N_tau)(1,1);
         std::cout << "nA_up: " << nA_up << " and nA_down: " << nA_down << " for mu: " << sublatt1.WeissGreen.get_mu() << "\n";
         // Determining G_loc
+        auto mu = sublatt1.WeissGreen.get_mu();
         for (size_t j=0; j<iwnArr_l.size(); j++){
             //std::cout << j << "\n";
             #if DIM == 1
-            std::function<std::complex<double>(double,std::complex<double>)> G_latt_AA_up = [&](double kx, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1)) );
+            std::function<std::complex<double>(double)> G_latt_AA_up = [&](double kx){
+                return 1.0/( iwnArr_l[j] + mu - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx)*epsilonk(kx)/(iwnArr_l[j] + mu + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1)) );
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(2.0*M_PI)*integralsObj.I1D(G_latt_AA_up,-M_PI/1.0,M_PI/1.0,iwnArr_l[j],"simpson",1e-5,50);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(2.0*M_PI)*integralsObj.gauss_quad_1D(G_latt_AA_up,0.0,2.0*M_PI);
             //
-            std::function<std::complex<double>(double,std::complex<double>)> G_latt_AA_down = [&](double kx, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx)*epsilonk(kx)/(iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0)) );
+            std::function<std::complex<double>(double)> G_latt_AA_down = [&](double kx){
+                return 1.0/( iwnArr_l[j] + mu + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx)*epsilonk(kx)/(iwnArr_l[j] + mu - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0)) );
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(1,1)=1./(2.0*M_PI)*integralsObj.I1D(G_latt_AA_down,-M_PI/1.0,M_PI/1.0,iwnArr_l[j],"simpson",1e-5,50);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(1,1)=1./(2.0*M_PI)*integralsObj.gauss_quad_1D(G_latt_AA_down,0.0,2.0*M_PI);
             // Off-diagonal parts AB and BA, which are equal with nearest-neighbour hopping only
             // std::function<std::complex<double>(double,std::complex<double>)> G_latt_AB = [&](double kx, std::complex<double> iwn){
             //     return epsilonk(kx)/( ( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) )*( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) ) - epsilonk(kx)*epsilonk(kx) );
@@ -709,15 +710,15 @@ void DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1
             
             #elif DIM == 2
             // std::cout << "iwn: " << iwnArr_l[j] << "\n";
-            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt_AA_up = [&](double kx, double ky, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx,ky)*epsilonk(kx,ky)/( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) ) );
+            std::function<std::complex<double>(double,double)> G_latt_AA_up = [&](double kx, double ky){
+                return 1.0/( iwnArr_l[j] + mu - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - epsilonk(kx,ky)*epsilonk(kx,ky)/( iwnArr_l[j] + mu + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) ) );
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.0*M_PI*M_PI)*integralsObj.I2D(G_latt_AA_up,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j],"trapezoidal",1e-4,100);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.0*M_PI*M_PI)*integralsObj.gauss_quad_2D(G_latt_AA_up,0.0,2.0*M_PI,0.0,2.0*M_PI);
             //
-            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt_AA_down = [&](double kx, double ky, std::complex<double> iwn){
-                return 1.0/( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx,ky)*epsilonk(kx,ky)/( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) ) );
+            std::function<std::complex<double>(double,double)> G_latt_AA_down = [&](double kx, double ky){
+                return 1.0/( iwnArr_l[j] + mu + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) - epsilonk(kx,ky)*epsilonk(kx,ky)/( iwnArr_l[j] + mu - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) ) );
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(1,1)=1./(4.0*M_PI*M_PI)*integralsObj.I2D(G_latt_AA_down,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j],"trapezoidal",1e-4,100);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(1,1)=1./(4.0*M_PI*M_PI)*integralsObj.gauss_quad_2D(G_latt_AA_down,0.0,2.0*M_PI,0.0,2.0*M_PI);
             //
             // std::function<std::complex<double>(double,double,std::complex<double>)> G_latt_AB = [&](double kx, double ky, std::complex<double> iwn){
             //     return epsilonk(kx,ky)/( ( iwn + sublatt1.WeissGreen.get_mu() - h - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) )*( iwn + sublatt1.WeissGreen.get_mu() + h - sublatt1.SelfEnergy.matsubara_w.slice(j)(1,1) ) - epsilonk(kx,ky)*epsilonk(kx,ky) );

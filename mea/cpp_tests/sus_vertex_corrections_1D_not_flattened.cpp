@@ -14,7 +14,7 @@ int main(int argc, char** argv){
     std::string inputFilenameLoad("../../build4/data/1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_512/Self_energy_1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_512");
     #endif 
     // Current-current and spin-spin correlation functions are computed at same time.
-    const bool is_single_ladder_precomputed = false;
+    const bool is_single_ladder_precomputed = true;
     // Fetching results from string
     std::vector<std::string> results;
     std::vector<std::string> fetches = {"U", "beta", "N_tau"};
@@ -153,7 +153,7 @@ int main(int argc, char** argv){
     // Bosonic Matsubara array
     std::vector< std::complex<double> > iqn; // for the total susceptibility
     std::vector< std::complex<double> > iqn_tilde; // for the inner loop inside Gamma.
-    for (size_t j=0; j<Ntau/2; j++){ // change Ntau for lower value to decrease time when testing...
+    for (size_t j=0; j<Ntau; j++){ // change Ntau for lower value to decrease time when testing...
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
     }
     const unsigned int DATA_SET_DIM = iqn.size(); // this corresponds to the length of the bosonic Matsubara array
@@ -291,6 +291,7 @@ int main(int argc, char** argv){
         }
         // Root process now deals with its share of the workload
         #ifndef INFINITE
+        #ifdef FULL_FORMULA
         arma::Cube< std::complex<double> >** CubeToSave = new arma::Cube< std::complex<double> >* [num_elem_per_proc+1];
         // allocating to save the single ladder data for later use...
         if (is_single_ladder_precomputed){
@@ -298,15 +299,22 @@ int main(int argc, char** argv){
                 CubeToSave[i] = new arma::Cube< std::complex<double> >(Ntau,Ntau,iqn.size()); // memory is not initialized
             }
         }
+        #else
+        arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_per_proc+1);
+        #endif
         #endif
         for (size_t i=0; i<=num_elem_per_proc; i++){
             auto mpidataObj = vec_to_processes[i];
             clock_t begin = clock();
             try {
                 #ifndef INFINITE
+                #ifdef FULL_FORMULA
                 arma::Cube< std::complex<double> >* mat_slice_ptr = nullptr;
                 if (is_single_ladder_precomputed)
                     mat_slice_ptr = CubeToSave[i];
+                #else
+                arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
+                #endif
                 GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
                 GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed);
@@ -328,27 +336,40 @@ int main(int argc, char** argv){
                     #else
                     H5std_string  DATASET_NAME( std::string("ktildex_")+std::to_string(k_t_b_array[mpidataObj.k_bar])+std::string("ktildey_")+std::to_string(k_t_b_array[mpidataObj.k_tilde]) );
                     #endif
+                    #ifdef FULL_FORMULA
                     save_matrix_in_HDF5(*CubeToSave[i],iqn,DATASET_NAME,file_sl);
+                    #else
+                    save_matrix_in_HDF5(container_sl.slice(i),DATASET_NAME,file_sl);
+                    #endif
                 } catch(const std::runtime_error& err ){
                     std::cerr << err.what() << "\n";
                     exit(1);
                 }
+                #ifdef FULL_FORMULA
                 // deallocating
                 delete CubeToSave[i];
+                #endif
             }
             #endif
         }
         #ifndef INFINITE
+        #ifdef FULL_FORMULA
         // deallocating
         delete [] CubeToSave;
+        #endif 
         #endif
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         // Fetch data from the slaves
         MPIDataReceive mpi_data_receive;
         int recv_root_num_elem;
         #ifndef INFINITE
+        #ifdef FULL_FORMULA
         ArmaMPI< std::complex<double> > armaMatObj(Ntau,Ntau,iqn.size());
         arma::Cube< std::complex<double> > single_ladders_to_save;
+        #else
+        ArmaMPI< std::complex<double> > armaMatObj(Ntau,Ntau);
+        arma::Mat< std::complex<double> > single_ladders_to_save;
+        #endif
         #endif
         int get_size;
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
@@ -371,7 +392,11 @@ int main(int argc, char** argv){
                 std::vector<int> returned_tags_from_slaves(recv_root_num_elem);
                 MPI_Recv( (void*)(returned_tags_from_slaves.data()), recv_root_num_elem, MPI_INT, an_id, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
                 for (auto tag : returned_tags_from_slaves){
+                    #ifdef FULL_FORMULA
                     single_ladders_to_save = armaMatObj.recv_Arma_cube_MPI(tag,an_id);
+                    #else
+                    single_ladders_to_save = armaMatObj.recv_Arma_mat_MPI(tag,an_id);
+                    #endif
                     auto n_ks = inverse_Cantor_pairing(tag); // n_k_bar, n_k_tilde
                     std::cout << "n_bar: " << std::get<0>(n_ks) << " and n_tilde: " << std::get<1>(n_ks) << std::endl;
                     try{
@@ -380,7 +405,11 @@ int main(int argc, char** argv){
                         #else
                         H5std_string  DATASET_NAME( std::string("ktildex_")+std::to_string(k_t_b_array[std::get<0>(n_ks)])+std::string("ktildey_")+std::to_string(k_t_b_array[std::get<1>(n_ks)]) );
                         #endif
+                        #ifdef FULL_FORMULA
                         save_matrix_in_HDF5(single_ladders_to_save,iqn,DATASET_NAME,file_sl);
+                        #else
+                        save_matrix_in_HDF5(single_ladders_to_save,DATASET_NAME,file_sl);
+                        #endif
                     } catch( std::runtime_error& err ){
                         std::cerr << err.what() << "\n";
                         exit(1);
@@ -421,6 +450,7 @@ int main(int argc, char** argv){
             root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
         /* Calculate the sum of the portion of the array */
         #ifndef INFINITE
+        #ifdef FULL_FORMULA
         arma::Cube< std::complex<double> >** CubeToSave = new arma::Cube< std::complex<double> >* [num_elem_per_proc];
         // allocating to save the single ladder data for later use...
         if (is_single_ladder_precomputed){
@@ -428,15 +458,22 @@ int main(int argc, char** argv){
                 CubeToSave[i] = new arma::Cube< std::complex<double> >(Ntau,Ntau,iqn.size()); // memory is not initialized
             }
         }
+        #else
+        arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_to_receive); // n_rows, n_cols, n_slices
+        #endif
         #endif
         for(size_t i = 0; i < num_elem_to_receive; i++) {
             auto mpidataObj = vec_for_slaves[i];
             clock_t begin = clock();
             try{
                 #ifndef INFINITE
+                #ifdef FULL_FORMULA
                 arma::Cube< std::complex<double> >* mat_slice_ptr = nullptr;
                 if (is_single_ladder_precomputed)
                     mat_slice_ptr = CubeToSave[i];
+                #else
+                arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
+                #endif
                 GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
                 GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed);
@@ -462,13 +499,19 @@ int main(int argc, char** argv){
             // Sending tags to root.
             ierr = MPI_Send( (void*)(one_ladder_obj.tag_vec.data()), num_elem_to_receive, MPI_INT, root_process, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD );
             for (size_t t=0; t<one_ladder_obj.tag_vec.size(); t++){
+                #ifdef FULL_FORMULA
                 MPI_Send(CubeToSave[t]->memptr(),Ntau*Ntau*iqn.size(),MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
                 // deallocating
                 delete CubeToSave[t];
+                #else
+                MPI_Send(container_sl.slice(t).memptr(),Ntau*Ntau,MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
+                #endif
             }
         }
+        #ifdef FULL_FORMULA
         // deallocating
         delete [] CubeToSave;
+        #endif
         #endif
     }
 

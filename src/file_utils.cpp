@@ -325,7 +325,7 @@ void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q_jj, std::vect
 
 }
 
-void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, double k_bar, double k_tilde, H5::H5File* file) noexcept(false){
+void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, H5std_string DATASET_NAME, H5::H5File* file) noexcept(false){
     /* This method saves the denominator of the single ladder contribution inside an HDF5 file for later use - especially in the
     case where one wants to compute the infinite ladder contribution.
         
@@ -340,14 +340,13 @@ void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, d
     const size_t NY = mat_to_save.n_rows;
     const H5std_string MEMBER1 = std::string( "RE" );
     const H5std_string MEMBER2 = std::string( "IM" );
-    const H5std_string  DATASET_NAME( std::string("kbar_")+std::to_string(k_bar)+std::string("ktilde_")+std::to_string(k_tilde) );
     const int RANK = 2;
     try{
-        cplx_t cplx_mat_to_save[NY][NX];
+        cplx_t* cplx_mat_to_save = new cplx_t[NX*NY];
         // casting data into custom complex struct..
-        for (size_t i=0; i<NY; i++){
-            for (size_t j=0; j<NX; j++){
-                cplx_mat_to_save[i][j] = cplx_t{mat_to_save.at(i,j).real(),mat_to_save.at(i,j).imag()};
+        for (size_t j=0; j<NX; j++){
+            for (size_t i=0; i<NY; i++){
+                cplx_mat_to_save[j*NY+i] = cplx_t{mat_to_save.at(i,j).real(),mat_to_save.at(i,j).imag()};
             }
         }
         /*
@@ -360,8 +359,8 @@ void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, d
         * size dataset.
         */
         hsize_t dimsf[2];              // dataset dimensions
-        dimsf[0] = NX;
-        dimsf[1] = NY;
+        dimsf[0] = NY;
+        dimsf[1] = NX;
         H5::DataSpace dataspace( RANK, dimsf );
         H5::CompType mCmplx_type( sizeof(cplx_t) );
         mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
@@ -372,7 +371,8 @@ void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, d
         dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, mCmplx_type, dataspace));
         // Write data to dataset
         dataset->write( cplx_mat_to_save, mCmplx_type );
-
+        
+        delete[] cplx_mat_to_save;
         delete dataset;
     } catch( H5::FileIException err ){
         //err.printErrorStack();

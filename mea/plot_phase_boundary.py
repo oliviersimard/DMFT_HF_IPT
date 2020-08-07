@@ -105,7 +105,7 @@ def rearrange_files_into_dir(path_to_root : str) -> None:
     
     return None
 
-def AFM_phase_boundary_condition(filename : str, delimiter='\t\t', col_num=(1,2), tol=1e-2) -> bool:
+def AFM_phase_boundary_condition(filename : str, delimiter='\t\t', col_num=(1,2), tol=2e-2) -> bool:
     bool_cond = False
     col_num_data_1 = []; col_num_data_2 = []
     with open(filename, "r") as f:
@@ -193,12 +193,14 @@ if __name__=="__main__":
     list_magnetization_for_Us_as_function_beta = sorted(dict_to_store_magnetization_for_Us_as_function_beta.items(),key=operator.itemgetter(0,1))
     
     ######################### plotting ##########################
-
+    ms = 3.5
     # The top panel plot shows the phase boundary
     fig, axs = plt.subplots(nrows=1,ncols=2,sharey=False)
     fig.subplots_adjust(wspace=0.25)
     axs[0].grid()
 
+    # ordering to plot with lines
+    params_respecting_condiction = sorted(params_respecting_condiction,key=operator.itemgetter(1))
     T_arr = list( map( lambda x: 1.0/x[0], params_respecting_condiction ) )
     U_arr = list( map( lambda x: x[1], params_respecting_condiction ) )
 
@@ -206,20 +208,36 @@ if __name__=="__main__":
         axs[0].set_title(r"AFM-PM phase boundary in $\infty$ dimension")
     else:
         axs[0].set_title(r"AFM-PM phase boundary in {0:d}D".format(dim_int))
-    axs[0].scatter(U_arr,T_arr,marker='o',c="red",s=10.0)
+    # axs[0].scatter(U_arr,T_arr,marker='o',c="red",s=10.0)
+    axs[0].plot(U_arr[::],T_arr[::],marker='o',ms=ms,c="red",linewidth=0.5)
     axs[0].set_xlabel(r"$U$")
     axs[0].set_ylabel(r"$T (1/\beta)$")
     axs[0].set_xlim(left=0.0,right=max(Us)+1.0)
+    axs[0].set_ylim(bottom=min(T_arr)-0.02,top=max(T_arr)+0.02)
 
-    axs[0].text(0.25,0.15,"AFM",transform=axs[0].transAxes,size=20,weight=20)
-    axs[0].text(0.55,0.75,"PM",transform=axs[0].transAxes,size=20,weight=20)
+    axs[0].text(0.30,0.15,"AFM",transform=axs[0].transAxes,size=20,weight=20)
+    axs[0].text(0.65,0.75,"PM",transform=axs[0].transAxes,size=20,weight=20)
+    # Arrows that show the U values probed in vicinity of phase boundary (1D NCA)
+    len_arrow_x = 0.015
+    if dim_int==1 and "NCA" not in path:
+        axs[0].annotate(r"",xy=(3.0,0.116),xytext=(3.0,0.116+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        axs[0].annotate(r"",xy=(7.0,0.164),xytext=(7.0,0.164+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        #axs[0].annotate(r"",xy=(15.0,0.068),xytext=(15.0,0.068+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+    elif dim_int==2 and "NCA" not in path:
+        axs[0].annotate(r"",xy=(3.0,0.157),xytext=(3.0,0.157+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        axs[0].annotate(r"",xy=(7.0,0.295),xytext=(7.0,0.295+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        #axs[0].annotate(r"",xy=(14.0,0.148),xytext=(14.0,0.148+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+    elif dim_int==1 and "NCA" in path:
+        #axs[0].annotate(r"",xy=(4.0,0.295),xytext=(4.0,0.295+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        axs[0].annotate(r"",xy=(8.0,0.228),xytext=(8.0,0.228+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        axs[0].annotate(r"",xy=(14.0,0.143),xytext=(14.0,0.143+len_arrow_x),arrowprops=dict(arrowstyle="->"))
 
     # The lower panel shows the evolution of the magntization as a function of temperature for different values of U
     axs[1].grid()
     #axs[1].tick_params(axis='y',left=False)
     axs[1].set_ylabel(r"$n_{\uparrow}-n_{\downarrow}$")
     axs[1].set_xlabel(r"$T (1/\beta)$")
-    # axs[1].set_xlim(0.0,0.3)
+    axs[1].set_xlim(0.0,0.4)
     axs[1].set_ylim(0.0,1.0)
 
     axs[1].yaxis.set_minor_locator(AutoMinorLocator())
@@ -233,13 +251,14 @@ if __name__=="__main__":
     else:
         axs[1].set_title(r"Magnetization vs T in {0:d}D".format(dim_int))
     U_thres = max(Us)
-    color = iter(plt.cm.rainbow(np.linspace(0,1,len(Us)+1)))#U_thres+1
+    U_step_plotting = 1
+    color = iter(plt.cm.rainbow(np.linspace(0,1,3)))#len(Us)//U_step_plotting+1
     # extracting U arrays before plotting
-    for U in sorted(Us):
-        if U<=U_thres:
+    for U in sorted(Us)[::U_step_plotting]:
+        if U==8.0 or U==14.0:
             magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
             T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-            axs[1].plot(T_arr,magnetization_arr,ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+            axs[1].plot(T_arr,magnetization_arr,ms=ms,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
         # elif U>U_thres and U<=10.0:
         #     magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
         #     T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
@@ -251,7 +270,12 @@ if __name__=="__main__":
     if dim_int==0:
         fig.savefig("Figure_phase_diagram_infinite_dimension.pdf")
     else:
-        fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D.pdf")
+        if "NCA" in path:
+            plt.suptitle("NCA",fontsize=15)
+            fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D_NCA.pdf")
+        else:
+            plt.suptitle("IPT",fontsize=15)
+            fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D.pdf")
     
     plt.show()
     
@@ -286,7 +310,7 @@ if __name__=="__main__":
         if U<=U_thres:
             magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
             T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-            ax.plot(T_arr,magnetization_arr,ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+            ax.plot(T_arr,magnetization_arr,ms=ms,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
     
     ax.legend()
     my_dpi=128
