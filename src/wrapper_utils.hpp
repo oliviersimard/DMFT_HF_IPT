@@ -4,7 +4,7 @@
 // #define ARMA_ALLOW_FAKE_GCC
 // #define ARMA_NO_DEBUG // to disable bound checks
 
-// #define NCA
+#define NCA
 // #define DEBUG
 // #define SUS // Enables only methods relevant when calculating the susceptibility
 

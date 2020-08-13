@@ -348,6 +348,7 @@ void FFTtools::fft_spec(GreenStuff& data1, GreenStuff& data2, arma::Cube<double>
     for (unsigned int j=0; j<timeGrid; j++){
         substractG.push_back(data1.matsubara_w.slice(j)(0,0) - green_inf_v.slice(j)(0,0)); // Meant for the WeissGreen
     }
+    
     assert(substractG.size()==green_inf_v.n_slices && "Check FFTtools for mismatch between arrays.");
     
     double F_decal[2*timeGrid];
@@ -640,6 +641,97 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
         iter++;
     }
     GreenStuff::reset_counter();
+}
+std::vector< std::complex<double> > DMFTloop(IPT2::DMFTproc& sublatt1, const unsigned int N_it) noexcept(false){
+    /* DMFT loop */
+    const Integrals integralsObj;
+    unsigned int iter=1;
+    double n,n0,G0_diff;
+    bool converged=false;
+    arma::Cube< std::complex<double> > WeissGreenTmpA(2,2,iwnArr_l.size()); // Initialization of the hybridization function.
+    arma::Cube< std::complex<double> > G0_density_mu0_m(2,2,iwnArr_l.size()), G_density_mu_m(2,2,iwnArr_l.size());
+    std::function<double(double)> wrapped_density_mu, wrapped_density_mu0;
+    for (size_t i=0; i<iwnArr_l.size(); i++){
+        sublatt1.Hyb.matsubara_w.slice(i)(0,0) = GreenStuff::get_hyb_c()/iwnArr_l[i];
+    }
+    while (iter<=N_it && !converged){ // Everything has been designed to accomodate a bipartite lattice.
+        G0_diff=0.0; // resetting G0_diff
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            sublatt1.WeissGreen.matsubara_w.slice(j)(0,0)=1.0/(iwnArr_l[j]+sublatt1.WeissGreen.get_mu0()-sublatt1.Hyb.matsubara_w.slice(j)(0,0));
+        }
+        sublatt1.update_impurity_self_energy(); // Spits out Sigma(iwn). To begin with, mu=U/2.0.
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            G0_density_mu0_m.slice(j)(0,0)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(0,0);
+            G_density_mu_m.slice(j)(0,0)=iwnArr_l[j]-sublatt1.Hyb.matsubara_w.slice(j)(0,0)-sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0);
+        }
+        // Compute the various chemical potentials to get n_target
+        n=sublatt1.density_mu(G_density_mu_m);
+        n0=sublatt1.density_mu0(G0_density_mu0_m);
+
+        if ( ( std::abs(n-sublatt1.n)>ROOT_FINDING_TOL ) && iter>1 ){ // iter > 1 is important
+            try{
+                wrapped_density_mu = [&](double mu){ return sublatt1.density_mu(mu,G_density_mu_m)-sublatt1.n; };
+                double mu_new = integralsObj.falsePosMethod(wrapped_density_mu,-20.,20.);
+                sublatt1.WeissGreen.update_mu(mu_new); // Updates mu from instance WeissGreen.
+            }catch (const std::exception& err){
+                std::cerr << err.what() << "\n";
+            }
+        }
+        if ( ( std::abs(n0-sublatt1.n)>ROOT_FINDING_TOL ) ){
+            try{
+                wrapped_density_mu0 = [&](double mu0){ return sublatt1.density_mu0(mu0,G0_density_mu0_m)-sublatt1.n; };
+                double mu0_new = integralsObj.falsePosMethod(wrapped_density_mu0,-20.,20.);
+                sublatt1.WeissGreen.update_mu0(mu0_new); // Updates mu0 from instance WeissGreen.
+            }catch (const std::exception& err){
+                std::cerr << err.what() << "\n";
+            }
+        }
+        // Determining G_loc
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            #if DIM == 1
+            std::function<std::complex<double>(double)> int_1D_solver;
+            double mu = sublatt1.WeissGreen.get_mu();
+            int_1D_solver = [&](double kx){
+                return 1.0/(iwnArr_l[j] + mu - epsilonk(kx) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1.0/(2.0*M_PI)*integralsObj.gauss_quad_1D(int_1D_solver,0.0,2.0*M_PI);
+            #elif DIM == 2
+            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt = [&](double kx, double ky, std::complex<double> iwn){
+                return 1.0/(iwn + sublatt1.WeissGreen.get_mu() - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.I2D(G_latt,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j]);
+            #elif DIM == 3
+            std::function<std::complex<double>(double,double,double)> int_3D_solver;
+            // const double delta_k = 2.0*M_PI/(GreenStuff::N_k-1);
+            double mu = sublatt1.WeissGreen.get_mu();
+            int_3D_solver = [&](double kx, double ky, double kz){
+                return 1.0/(iwnArr_l[j] + mu - epsilonk(kx,ky,kz) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            };
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0) = 1.0/(2.0*M_PI)/(2.0*M_PI)/(2.0*M_PI)*integralsObj.gauss_quad_3D(int_3D_solver,0.0,2.0*M_PI,0.0,2.0*M_PI,0.0,2.0*M_PI);
+            #endif
+        }
+        // Updating the hybridization function for next round.
+        for (size_t j=0; j<iwnArr_l.size(); j++){
+            sublatt1.Hyb.matsubara_w.slice(j)(0,0) = iwnArr_l[j] + sublatt1.WeissGreen.get_mu() - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0) - 1.0/sublatt1.LocalGreen.matsubara_w.slice(j)(0,0);
+        }
+        if (iter>2){
+            for (size_t j=0; j<iwnArr_l.size(); j++) G0_diff+=std::abs(WeissGreenTmpA.slice(j)(0,0)-sublatt1.WeissGreen.matsubara_w.slice(j)(0,0));
+            std::cout << "G0_diff: " << G0_diff << std::endl;
+            if (G0_diff<0.0001 && std::abs(n-sublatt1.n)<ROOT_FINDING_TOL && std::abs(n0-sublatt1.n)<ROOT_FINDING_TOL) converged=true; 
+        }
+        if (iter>2){ // Assess the convergence process 
+            for (size_t j=0; j<iwnArr_l.size(); j++){
+                WeissGreenTmpA.slice(j)(0,0) = sublatt1.WeissGreen.matsubara_w.slice(j)(0,0);
+            }
+        }
+        std::cout << "double occupancy: " << sublatt1.double_occupancy() << "\n";
+        std::cout << "iteration #" << iter << "\n";
+
+        iter++;
+    }
+    std::vector< std::complex<double> > SE_iwn_vec( sublatt1.SelfEnergy.matsubara_w(arma::span(0,0),arma::span(0,0),arma::span::all).begin(), sublatt1.SelfEnergy.matsubara_w(arma::span(0,0),arma::span(0,0),arma::span::all).end() );
+    GreenStuff::reset_counter();
+    return SE_iwn_vec;
 }
 #else
 void DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false){

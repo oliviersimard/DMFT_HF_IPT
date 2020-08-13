@@ -255,7 +255,7 @@ if __name__=="__main__":
     color = iter(plt.cm.rainbow(np.linspace(0,1,3)))#len(Us)//U_step_plotting+1
     # extracting U arrays before plotting
     for U in sorted(Us)[::U_step_plotting]:
-        if U==8.0 or U==14.0:
+        if U==3.0 or U==7.0:
             magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
             T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
             axs[1].plot(T_arr,magnetization_arr,ms=ms,marker='v',c=next(color),label=r"${0:.1f}$".format(U))

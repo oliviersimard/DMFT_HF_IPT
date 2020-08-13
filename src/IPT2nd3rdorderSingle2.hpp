@@ -56,6 +56,7 @@ class DMFTproc{
     friend void ::saveEachIt_AFM(const IPT2::DMFTproc& sublatt1, std::ofstream& ofGloc, std::ofstream& ofSE, std::ofstream& ofGloc_tau) noexcept;
     friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
     friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
+    friend std::vector< std::complex<double> > (::DMFTloop(IPT2::DMFTproc& sublatt1, const unsigned int N_it) noexcept(false));
     template<class T>
     friend class ::Susceptibility;
     public:

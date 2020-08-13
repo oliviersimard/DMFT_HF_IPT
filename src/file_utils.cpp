@@ -325,6 +325,76 @@ void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q_jj, std::vect
 
 }
 
+void writeInHDF5File(std::vector< std::complex<double> >& arr_to_save, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false){
+    /*  This method writes in an HDF5 file the data passed in the first entry "GG_iqn_q". The data has to be complex-typed. This function hinges on the
+    the existence of a custom complex structure "cplx_t" to parse in the data:
+    
+        typedef struct cplx_t{ // Custom data holder for the HDF5 handling
+            double re;
+            double im;
+        } cplx_t;
+        
+        Parameters:
+            GG_iqn_q (std::vector< std::complex<double> >&): function mesh over (iqn,q)-space.
+            file (H5::H5File*): pointer to file object.
+            DATA_SET_DIM (const unsigned int&): corresponds to the number of bosonic Matsubara frequencies and therefore to the length of columns in HDF5 file.
+            RANK (const int&): rank of the object to be saved. Should be 1.
+            MEMBER1 (const H5std_string&): name designating the internal metadata to label the first member variable of cplx_t structure.
+            MEMBER2 (const H5std_string&): name designating the internal metadata to label the second member variable of cplx_t structure.
+            DATASET_NAME (const std::string&): name of the dataset to be saved.
+        
+        Returns:
+            (void)
+    */
+    const H5std_string MEMBER1( "RE" );
+    const H5std_string MEMBER2( "IM" );
+    const int RANK = 1;
+    H5::CompType mCmplx_type( sizeof(cplx_t) );
+    mCmplx_type.insertMember( MEMBER1, HOFFSET(cplx_t, re), H5::PredType::NATIVE_DOUBLE);
+    mCmplx_type.insertMember( MEMBER2, HOFFSET(cplx_t, im), H5::PredType::NATIVE_DOUBLE);
+    try{
+        H5::Exception::dontPrint();
+        // Casting all the real values into the following array to get around the custom type design. Also easier to read out using Python.
+        std::vector<cplx_t> custom_cplx_GG_iqn_q(DATA_SET_DIM);
+        std::transform(arr_to_save.begin(),arr_to_save.end(),custom_cplx_GG_iqn_q.begin(),[](std::complex<double> d){ return cplx_t{d.real(),d.imag()}; });
+
+        hsize_t dimsf[1];
+        dimsf[0] = DATA_SET_DIM;
+        H5::DataSpace dataspace( RANK, dimsf );
+
+        /*
+        * Create a group in the file
+        */
+        
+        H5::DataSet* dataset;
+        // dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, std_cmplx_type, dataspace));
+        dataset = new H5::DataSet(file->createDataSet("/"+DATASET_NAME, mCmplx_type, dataspace));
+        // Write data to dataset
+        dataset->write( custom_cplx_GG_iqn_q.data(), mCmplx_type );
+        delete dataset;
+
+    } catch( H5::FileIException error ){
+        //err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown in writeInHDF5File!");
+    }
+    // catch failure caused by the DataSet operations
+    catch( H5::DataSetIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException thrown in writeInHDF5File!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataSpaceIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException thrown in writeInHDF5File!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataTypeIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException thrown in writeInHDF5File!");
+    }
+
+}
+
 void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, H5std_string DATASET_NAME, H5::H5File* file) noexcept(false){
     /* This method saves the denominator of the single ladder contribution inside an HDF5 file for later use - especially in the
     case where one wants to compute the infinite ladder contribution.

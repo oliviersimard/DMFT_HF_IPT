@@ -16,7 +16,7 @@ extern "C" {
 #define SPINDEG 2 // Should be 2, unless bipartite lattice used
 #define VERBOSE 0
 #define MULT_N_TAU 2 // Has to be an even number
-#define AFM
+// #define AFM
 
 // Some declarations
 namespace IPT2{ class DMFTproc; };
@@ -47,6 +47,7 @@ template<typename T> inline void calculateSusceptibilities(T&,const std::string&
 template<typename T> inline void calculateSusceptibilitiesParallel(T,std::string,std::string,bool,bool,double,ThreadFunctor::solver_prototype);
 void DMFTloop(IPT2::DMFTproc&, std::ofstream&, std::ofstream&, std::ofstream&, std::vector< std::string >&, const unsigned int) noexcept(false);
 void DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
+std::vector< std::complex<double> > DMFTloop(IPT2::DMFTproc& sublatt1, const unsigned int N_it) noexcept(false);
 std::ostream& operator<<(std::ostream&, const HF::FunctorBuildGk&);
 struct Data{
     friend class FFTtools;
@@ -94,8 +95,9 @@ inline Data::Data(const Data& obj){}
 
 struct GreenStuff final : Data{ // Non-subclassable
     friend class IPT2::DMFTproc; // Important to access the private static variables from this struct.
-    friend void ::DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
-    friend void ::DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
+    friend std::vector< std::complex<double> > DMFTloop(IPT2::DMFTproc& sublatt1, const unsigned int N_it) noexcept(false);
+    friend void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::ofstream& objSaveStreamSE, std::ofstream& objSaveStreamGW, std::vector< std::string >& vecStr,const unsigned int N_it) noexcept(false);
+    friend void DMFTloopAFM(IPT2::DMFTproc& sublatt1, std::vector<std::ofstream*> vec_sub_1_ofstream, std::vector< std::string >& vecStr, const unsigned int N_it) noexcept(false);
     // Member variables
     arma::Cube<double>& matsubara_t_pos; // Ctor: n_rows, n_cols, n_slices
     arma::Cube<double>& matsubara_t_neg;

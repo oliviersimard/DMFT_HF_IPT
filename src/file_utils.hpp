@@ -54,6 +54,7 @@ int extractIntegerLastWords(std::string str);
 FileData get_data(const std::string& strName, const unsigned int& Ntau) noexcept(false);
 std::vector<std::string> get_info_from_filename(const std::string& strName,const std::vector<std::string>& fetches,const char* separation_char="_") noexcept(false);
 void writeInHDF5File(std::vector< std::complex<double> >& GG_iqn_q_jj, std::vector< std::complex<double> >& GG_iqn_q_szsz, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false);
+void writeInHDF5File(std::vector< std::complex<double> >& arr_to_save, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false);
 arma::Mat< std::complex<double> > readFromHDF5File(H5::H5File* file, const std::string& DATASET_NAME) noexcept(false);
 arma::Mat< std::complex<double> > readFromHDF5FileCube(H5::H5File* file, const std::string& DATASET_NAME, std::complex<double> iqn) noexcept(false);
 void save_matrix_in_HDF5(const arma::Mat< std::complex<double> >& mat_to_save, H5std_string DATASET_NAME, H5::H5File* file) noexcept(false);

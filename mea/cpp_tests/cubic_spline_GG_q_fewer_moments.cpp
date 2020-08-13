@@ -18,9 +18,9 @@ template<typename T, typename... Ts> inline T eps(T,Ts...);
 int main(void){
     
     #ifndef NCA
-    std::string inputFilename("/Volumes/LaCie/Pi_ton_data/data_1D_test_IPT/1D_U_7.000000_beta_6.000000_n_0.500000_N_tau_2048_AFM/Self_energy_1D_U_7.000000_beta_6.000000_n_0.500000_N_tau_2048_AFM_A_Nit_117.dat");
+    std::string inputFilename("/Volumes/LaCie/Pi_ton_data/data_2D_test_IPT/2D_U_7.000000_beta_6.000000_n_0.500000_N_tau_2048_AFM/Self_energy_2D_U_7.000000_beta_6.000000_n_0.500000_N_tau_2048_AFM_A_Nit_26.dat");
     #else
-    std::string inputFilename("/Volumes/LaCie/Pi_ton_data/data_1D_test_IPT/1D_U_10.000000_beta_5.000000_n_0.500000_N_tau_2048_AFM/Self_energy_1D_U_10.000000_beta_5.000000_n_0.500000_N_tau_2048_AFM_A_Nit_16.dat");
+    std::string inputFilename("../../../NCA_OCA/data_2D_test_NCA_damping_0.000000/2D_U_14.000000_beta_3.500000_n_0.500000_Ntau_4096/SE_2D_NCA_AFM_U_14.000000_beta_3.500000_N_tau_4096_h_0.000000_Nit_111.dat");
     #endif
     // Choose whether current-current or spin-spin correlation function is computed.
     std::vector<std::string> results;
@@ -33,7 +33,7 @@ int main(void){
     const unsigned int NCA_Ntau = 2*(unsigned int)atof(results[2].c_str());
     const unsigned int Ntau = 2*1024;
     #endif
-    const unsigned int N_k = 301;
+    const unsigned int N_k = 51;
     const unsigned int N_q = 3;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
@@ -182,7 +182,7 @@ int main(void){
         }
         sum_rule_kx[l] = sum_rule_iqn_0(-1.0*G_k_tau(l,Ntau),k_array[l]);
     }
-    double sum_rule_val = 1.0/(2.0*M_PI)*integralsObj.I1D_VEC(sum_rule_kx,delta,"simpson");
+    double sum_rule_val = 2.0/(2.0*M_PI)*integralsObj.I1D_VEC(sum_rule_kx,delta,"simpson");
 
     std::cout << "The sum rule gives: " << sum_rule_val << "\n";
 
@@ -209,7 +209,7 @@ int main(void){
         }
         sum_rule_kx[l] = integralsObj.I1D_VEC(sum_rule_ky,delta,"simpson");
     }
-    double sum_rule_val = 1.0/(2.0*M_PI)/(2.0*M_PI)*integralsObj.I1D_VEC(sum_rule_kx,delta,"simpson");
+    double sum_rule_val = 2.0/(2.0*M_PI)/(2.0*M_PI)*integralsObj.I1D_VEC(sum_rule_kx,delta,"simpson");
     std::cout << "The sum rule gives: " << sum_rule_val << "\n";
 
     /* TEST G(-tau) */

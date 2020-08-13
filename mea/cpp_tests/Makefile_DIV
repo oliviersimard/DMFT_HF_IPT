@@ -1,0 +1,36 @@
+SRC=$(PWD)/../../src
+OBJ=$(PWD)/obj
+
+CXX=mpic++ -std=c++11 -Wall -g -O3 
+INC=${HOME}/gsl/include -I${HOME}/install/HDF5/1.10.6/include
+LIB=${HOME}/gsl/lib -L${HOME}/install/HDF5/1.10.6/lib
+
+CXXFLAGS=-L$(LIB) -lm -lgsl -lgslcblas -larmadillo -lfftw3 -lhdf5 -lhdf5_hl -lhdf5_cpp -ljson_spirit #-lgtest -lgmock -lpthread
+
+PROG=CPP-DIV
+
+all: $(PROG)
+
+$(PROG): $(OBJ)/green_utils.o $(OBJ)/file_utils.o $(OBJ)/integral_utils.o $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/div_corr.o $(OBJ)/json_utils.o
+	$(CXX) $(OBJ)/IPT2nd3rdorderSingle2.o $(OBJ)/div_corr.o $(OBJ)/green_utils.o $(OBJ)/integral_utils.o $(OBJ)/file_utils.o $(OBJ)/json_utils.o $(CXXFLAGS) -o div.out
+
+$(OBJ)/green_utils.o: $(SRC)/green_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/green_utils.cpp -o $(OBJ)/green_utils.o
+
+$(OBJ)/file_utils.o: $(SRC)/file_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/file_utils.cpp -o $(OBJ)/file_utils.o
+
+$(OBJ)/json_utils.o: $(SRC)/json_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/json_utils.cpp -o $(OBJ)/json_utils.o
+
+$(OBJ)/IPT2nd3rdorderSingle2.o: $(SRC)/IPT2nd3rdorderSingle2.cpp
+	$(CXX) -c -I$(INC) $(SRC)/IPT2nd3rdorderSingle2.cpp -o $(OBJ)/IPT2nd3rdorderSingle2.o
+
+$(OBJ)/div_corr.o: $(PWD)/divergence_susceptibilities.cpp
+	$(CXX) -c -I$(INC) $(PWD)/divergence_susceptibilities.cpp -o $(OBJ)/div_corr.o
+
+$(OBJ)/integral_utils.o: $(SRC)/integral_utils.cpp
+	$(CXX) -c -I$(INC) $(SRC)/integral_utils.cpp -o $(OBJ)/integral_utils.o
+
+clean:
+	rm -f $(OBJ)/* $(PWD)/div.out
