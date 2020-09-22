@@ -13,6 +13,8 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 #define RETURN_NUM_RECV_TO_ROOT 3001
 #define RETURN_TAGS_TO_ROOT 3002
 #define SHIFT_TO_DIFFERENTIATE_TAGS 1000000
+#define RENORMALIZING_FACTOR 1.335  // U=2 --> 1.335, U=3 --> 1.400
+#define RENORMALIZING_FACTOR_IL 1.1 // U=2 --> 1.1, U=3,1 --> 1.0
 
 //static bool slaves_can_write_in_file = false; // This prevents that the slave processes
 static int root_process = 0;
@@ -189,9 +191,9 @@ T IPT2::OneLadder< T >::Gamma(double k_bar, double k_tilde, size_t n_ikn_bar, si
         lower_val += 1.0/(2.0*M_PI)*intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
     }
     
-    lower_val *= _U/_beta;
+    lower_val *= _U/_beta/RENORMALIZING_FACTOR;
     lower_val += 1.0;
-    lower_val = _U/lower_val;
+    lower_val = _U/lower_val/RENORMALIZING_FACTOR;
 
     return lower_val;
 }
@@ -284,7 +286,7 @@ T IPT2::InfiniteLadders< T >::Gamma_correction_denominator(double k_bar, double 
         };
         denom_val += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
     }
-    denom_val *= OneLadder< T >::_U/OneLadder< T >::_beta/(2.0*M_PI);
+    denom_val *= OneLadder< T >::_U/OneLadder< T >::_beta/(2.0*M_PI)/RENORMALIZING_FACTOR_IL;
     denom_val += 1.0;
 
     return 1.0/denom_val;
@@ -321,7 +323,7 @@ T IPT2::InfiniteLadders< T >::Gamma_merged_corr(size_t n_ikn_bar, double k_bar, 
         };
         tot_corr += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
     }
-    tot_corr *= OneLadder< T >::_U/OneLadder< T >::_beta/(2.0*M_PI);
+    tot_corr *= OneLadder< T >::_U/OneLadder< T >::_beta/(2.0*M_PI)/RENORMALIZING_FACTOR_IL;
     
     return tot_corr; 
 }
@@ -388,7 +390,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
                 GG_n_tilde_n_bar(n_tilde,n_bar) = ( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]) - OneLadder< T >::_SE[3*NI/2+n_tilde] ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]-qq) - OneLadder< T >::_SE[3*NI/2+n_tilde-n_em] ) 
-                    )*( 1.0/( OneLadder< T >::_U*1.0/Gamma_n_tilde_n_bar(n_tilde,n_bar) - _denom_corr(n_em,n_bar,n_k_bar) ) 
+                    )*( 1.0/( OneLadder< T >::_U/RENORMALIZING_FACTOR*1.0/Gamma_n_tilde_n_bar(n_tilde,n_bar) - _denom_corr(n_em,n_bar,n_k_bar) ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]) - OneLadder< T >::_SE[3*NI/2+n_bar] ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-qq) - OneLadder< T >::_SE[3*NI/2+n_bar-n_em] ) );
             }
@@ -396,7 +398,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
         
         // summing over the internal ikn_tilde and ikn_bar
         jj_resp_iqn = -2.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar);
-        szsz_resp_iqn = (2.0*OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar);
+        szsz_resp_iqn = (2.0*OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar)/RENORMALIZING_FACTOR_IL;
         MPIData mpi_data_tmp { n_k_tilde, n_k_bar, jj_resp_iqn, szsz_resp_iqn };
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
        

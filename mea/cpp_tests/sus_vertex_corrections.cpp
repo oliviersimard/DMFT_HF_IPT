@@ -29,6 +29,7 @@ int main(int argc, char** argv){
     #endif
     // Has to be a power of two as well: this is no change from IPT.
     assert(Ntau%2==0);
+    const int iqn_div = 4;
     const unsigned int N_q = 5;
     const unsigned int N_k = 17;
     const double beta = atof(results[1].c_str());
@@ -59,15 +60,15 @@ int main(int argc, char** argv){
     H5::H5File* file = nullptr;
     #ifdef INFINITE
     #ifdef NCA
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_NCA_infinite_ladder_sum.hdf5");
+    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_infinite_ladder_sum_iqn_div_"+std::to_string(iqn_div)+"_MAX_DEPTH_"+std::to_string(MAX_DEPTH)+"_Uren_"+std::to_string(RENORMALIZING_FACTOR)+".hdf5");
     #else
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_infinite_ladder_sum.hdf5");
+    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_infinite_ladder_sum_iqn_div_"+std::to_string(iqn_div)+"_MAX_DEPTH_"+std::to_string(MAX_DEPTH)+"_Uren_"+std::to_string(RENORMALIZING_FACTOR)+".hdf5");
     #endif
     #else
     #ifdef NCA
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_NCA_single_ladder_sum.hdf5");
+    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum_iqn_div_"+std::to_string(iqn_div)+"_MAX_DEPTH_"+std::to_string(MAX_DEPTH)+"_Uren_"+std::to_string(RENORMALIZING_FACTOR)+".hdf5");
     #else
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum.hdf5");
+    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum_iqn_div_"+std::to_string(iqn_div)+"_MAX_DEPTH_"+std::to_string(MAX_DEPTH)+"_Uren_"+std::to_string(RENORMALIZING_FACTOR)+".hdf5");
     #endif
     #endif
     const H5std_string FILE_NAME( filename );
@@ -80,9 +81,9 @@ int main(int argc, char** argv){
     const std::string path_to_save_single_ladder_mat("./sl_data/");
     const std::string intermediate_path = "single_ladder_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_n_"+std::to_string(n);
     #ifdef NCA
-    const std::string filename_sl = intermediate_path+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_k)+"_Nq_"+std::to_string(N_q)+"_NCA";
+    const std::string filename_sl = intermediate_path+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_k)+"_Nq_"+std::to_string(N_q)+"_MAX_DEPTH_"+std::to_string(MAX_DEPTH)+"_Uren_"+std::to_string(RENORMALIZING_FACTOR);
     #else
-    const std::string filename_sl = intermediate_path+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_k)+"_Nq_"+std::to_string(N_q);
+    const std::string filename_sl = intermediate_path+"_Ntau_"+std::to_string(Ntau)+"_Nk_"+std::to_string(N_k)+"_Nq_"+std::to_string(N_q)+"_MAX_DEPTH_"+std::to_string(MAX_DEPTH)+"_Uren_"+std::to_string(RENORMALIZING_FACTOR);
     #endif
     const H5std_string FILE_NAME_SL( path_to_save_single_ladder_mat+intermediate_path+"/"+filename_sl+".hdf5" );
     std::cout << "FILE_NAME_SL: " << FILE_NAME_SL << std::endl;
@@ -145,7 +146,7 @@ int main(int argc, char** argv){
     // Bosonic Matsubara array
     std::vector< std::complex<double> > iqn; // for the total susceptibility
     std::vector< std::complex<double> > iqn_tilde; // for the inner loop inside Gamma.
-    for (size_t j=0; j<Ntau/6; j++){ // change Ntau for lower value to decrease time when testing...
+    for (size_t j=0; j<Ntau/static_cast<size_t>(iqn_div); j++){ // change Ntau for lower value to decrease time when testing...
         iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
     }
     const unsigned int DATA_SET_DIM = iqn.size(); // this corresponds to the length of the bosonic Matsubara array
