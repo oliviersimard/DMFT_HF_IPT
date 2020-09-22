@@ -16,7 +16,7 @@ if __name__ == "__main__":
     is_jj = True
     beta = 40.0
     N_k = 252
-    N_tau = 355 ## Should be odd
+    N_tau = 155 ## Should be odd
     MM = N_tau//2 + 1
     # Saving imaginary-time array of the bubble
     k_array, k_step = np.linspace(0,2.0*np.pi,N_k,retstep=True)

@@ -9,7 +9,7 @@ MAX_ITER = 100
 if __name__ == "__main__":
     ############################### PARAMETERS ####################################
     dim=1 # Dimension can either be 1 or 2
-    betamin=30.0; betamax=32.0; betastep=2.0 # Inverse temperature
+    betamin=10.0; betamax=12.0; betastep=2.0 # Inverse temperature
     Umin=3.0; Umax=4.0; Ustep=1.0 # Hubbard U
     Ntau=1024 # Must be even, due to mirroring of the Matsubara frequencies
     mu0=0.0 # Chemical potential for the Weiss Green's function. Relevant only in the PM case
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     h=0.1 # initial spin splitting. Relevant for AFM case.
     type_spline = "cubic" # Type of spline used in the impurity solver
     # Set this parameter to True to set up calculations allowing for AFM. Set to False to compute in PM state only.
-    AFM = True
+    AFM = False
     # Target particle density. Notice that fixing the chemical potentials mu=U/2 and mu0=0 leads the density values slightly different to
     # half-filling at low T. This is more stable when using cubic spline, because fixing chemical potentials leads to half-filling for wider
     # range of parameters.
@@ -64,7 +64,7 @@ if __name__ == "__main__":
                 G01[i,1,1] = 1.0/( iwn + Sublattice._h + mu0 - Hyb1[i,1,1] )
             
             # Constructor of one of the sublattice. It sets the various arrays used in the DMFT procedure.
-            sublatt1=Sublattice(mu,mu0,Hyb1,G01,Gloc,Gloc_tau,SE,SE_tau)
+            sublatt1=Sublattice(mu,mu0,Hyb1,G01,Gloc,Gloc_tau,SE,SE_tau,n_target,n_target)
             
             it=0 # DMFT iteration initialization
             Weiss_tmp = deepcopy(sublatt1._G0)

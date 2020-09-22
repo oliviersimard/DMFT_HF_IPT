@@ -1,4 +1,4 @@
-#include "sus_vertex_corrections_1D_not_flattened.hpp"
+#include "sus_vertex_corrections.hpp"
 
 int main(int argc, char** argv){
     MPI_Init(&argc,&argv);
@@ -8,13 +8,13 @@ int main(int argc, char** argv){
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     
     #ifdef NCA
-    std::string inputFilename("../../../NCA_OCA/data_1D_test_NCA_damping_0.05/1D_U_6.000000_beta_3.200000_n_0.500000_Ntau_4096/SE_1D_NCA_AFM_U_6.000000_beta_3.200000_N_tau_4096_h_0.000000_Nit_67.dat");
+    std::string inputFilename("../../build10/data/1D_U_2.000000_beta_18.000000_n_0.500000_N_tau_2048/Self_energy_1D_U_2.000000_beta_18.000000_n_0.500000_N_tau_2048_Nit_5.dat");
     #else
     std::string inputFilename("../../data/1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_128/Self_energy_1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_128_Nit_25.dat");
     std::string inputFilenameLoad("../../build4/data/1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_512/Self_energy_1D_U_8.000000_beta_7.000000_n_0.500000_N_tau_512");
     #endif 
     // Current-current and spin-spin correlation functions are computed at same time.
-    const bool is_single_ladder_precomputed = true;
+    const bool is_single_ladder_precomputed = false;
     // Fetching results from string
     std::vector<std::string> results;
     std::vector<std::string> fetches = {"U", "beta", "N_tau"};
@@ -25,12 +25,12 @@ int main(int argc, char** argv){
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
     #else
     const size_t NCA_Ntau = 2*(unsigned int)atoi(results[2].c_str()); // size of the full NCA calculation
-    const size_t Ntau = 2*128; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
+    const size_t Ntau = 2*16; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
     #endif
     // Has to be a power of two as well: this is no change from IPT.
     assert(Ntau%2==0);
     const unsigned int N_q = 31;
-    const unsigned int N_k = 3;
+    const unsigned int N_k = 8;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling. Depending whether AFM-PM solution is loaded or not, mu=U/2 in PM only scenario and mu=0.0 in AFM-PM scenario.
@@ -65,17 +65,9 @@ int main(int argc, char** argv){
     #endif
     #else
     #ifdef NCA
-    #ifdef DEBUG
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_NCA_single_ladder_sum_debug.hdf5");
+    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_NCA_single_ladder_sum.hdf5");
     #else
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_NCA_single_ladder_sum_nodebug.hdf5");
-    #endif
-    #else
-    #ifdef DEBUG
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum_debug.hdf5");
-    #else
-    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum_nodebug.hdf5");
-    #endif
+    std::string filename("bb_"+std::to_string(DIM)+"D_U_"+std::to_string(U)+"_beta_"+std::to_string(beta)+"_Ntau_"+std::to_string(Ntau)+"_Nq_"+std::to_string(N_q)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum.hdf5");
     #endif
     #endif
     const H5std_string FILE_NAME( filename );
@@ -239,26 +231,20 @@ int main(int argc, char** argv){
     
     // One-ladder calculations
     #ifndef INFINITE
-    #ifndef DEBUG
     IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,sigma_iwn,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
     #else
-    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
-    #endif 
-    #else
-    #ifndef DEBUG
     IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,sigma_iwn,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
-    #else
-    IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
-    #endif
     if (is_single_ladder_precomputed){
         IPT2::InfiniteLadders< std::complex<double> >::_FILE_NAME = FILE_NAME_SL;
     }
     #endif
-    
+   
     // Setting MPI stuff up
-    constexpr size_t tot_k_size = N_k*N_k;
-    const size_t num_elem_per_proc = (world_size != 1) ? static_cast<size_t>(tot_k_size/world_size) : tot_k_size-1;
-    std::cout << "num_elem_per_proc: " << num_elem_per_proc << "\n";
+    constexpr int tot_k_size = N_k*N_k;
+    const int num_elem_per_proc = (world_size != 1) ? tot_k_size/world_size : tot_k_size-1;
+    int num_elem_remaining = ((double)tot_k_size/(double)world_size-(double)num_elem_per_proc)*world_size;
+    int shift = num_elem_remaining; // to shift the last ranks that do not accomodate the surplus of tasks in order to consider all the processes
+    std::cout << "num_elem_per_proc: " << num_elem_per_proc << " num_elem_remaining: " << num_elem_remaining << "\n";
     MPI_Status status;
     std::vector<MPIData> GG_iqn;
     
@@ -278,10 +264,23 @@ int main(int argc, char** argv){
         }
         std::cout << "world size: " << world_size << "\n";
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
-            start = an_id*num_elem_per_proc + 1;
-            end = (an_id + 1)*num_elem_per_proc;
-            if((tot_k_size - start) < num_elem_per_proc) // Taking care of the remaining data.
-                end = tot_k_size - 1;
+            if (num_elem_remaining<=1){
+                start = an_id*num_elem_per_proc + 1 + ( (num_elem_remaining != 0) ? shift-1 : 0 );
+                if((tot_k_size - start) < num_elem_per_proc){ // Taking care of the case where remaining data is 0.
+                    end = tot_k_size - 1;
+                }else{
+                    end = (an_id + 1)*num_elem_per_proc + ( (num_elem_remaining != 0) ? shift-1 : 0 );
+                }
+            } else{
+                if (an_id==1){
+                    start = an_id*num_elem_per_proc + 1;
+                } else{
+                    start = end+1;
+                }
+                end = start+num_elem_per_proc;
+                num_elem_remaining--;
+            }
+            std::cout << "num_elem_remaining: " << num_elem_remaining << " for an_id: " << an_id << " start: " << start << " end: " << end << std::endl;
             num_elem_to_send = end - start + 1;
             std::cout << "num elem to send for id " << an_id << " is " << num_elem_to_send << "\n";
             ierr = MPI_Send( &num_elem_to_send, 1 , MPI_INT, an_id, SEND_NUM_TO_SLAVES, MPI_COMM_WORLD );
@@ -291,30 +290,14 @@ int main(int argc, char** argv){
         }
         // Root process now deals with its share of the workload
         #ifndef INFINITE
-        #ifdef FULL_FORMULA
-        arma::Cube< std::complex<double> >** CubeToSave = new arma::Cube< std::complex<double> >* [num_elem_per_proc+1];
-        // allocating to save the single ladder data for later use...
-        if (is_single_ladder_precomputed){
-            for (size_t i=0; i<=num_elem_per_proc; i++){
-                CubeToSave[i] = new arma::Cube< std::complex<double> >(Ntau,Ntau,iqn.size()); // memory is not initialized
-            }
-        }
-        #else
         arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_per_proc+1);
         #endif
-        #endif
-        for (size_t i=0; i<=num_elem_per_proc; i++){
+        for (int i=0; i<=num_elem_per_proc; i++){
             auto mpidataObj = vec_to_processes[i];
             clock_t begin = clock();
             try {
                 #ifndef INFINITE
-                #ifdef FULL_FORMULA
-                arma::Cube< std::complex<double> >* mat_slice_ptr = nullptr;
-                if (is_single_ladder_precomputed)
-                    mat_slice_ptr = CubeToSave[i];
-                #else
                 arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
-                #endif
                 GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
                 GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed);
@@ -324,10 +307,11 @@ int main(int argc, char** argv){
                 exit(1);
             }
             clock_t end = clock();
+            std::cout << "num elem to send for id " << world_rank << " is " << num_elem_per_proc+1 << "\n";
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            // std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
             gathered_MPI_data->push_back(std::move(GG_iqn));
-            printf("(%li,%li) calculated by root process\n", mpidataObj.k_bar, mpidataObj.k_tilde);
+            // printf("(%li,%li) calculated by root process\n", mpidataObj.k_bar, mpidataObj.k_tilde);
             #ifndef INFINITE
             if (is_single_ladder_precomputed){ // maybe take this out of the loop
                 try{
@@ -336,40 +320,21 @@ int main(int argc, char** argv){
                     #else
                     H5std_string  DATASET_NAME( std::string("ktildex_")+std::to_string(k_t_b_array[mpidataObj.k_bar])+std::string("ktildey_")+std::to_string(k_t_b_array[mpidataObj.k_tilde]) );
                     #endif
-                    #ifdef FULL_FORMULA
-                    save_matrix_in_HDF5(*CubeToSave[i],iqn,DATASET_NAME,file_sl);
-                    #else
                     save_matrix_in_HDF5(container_sl.slice(i),DATASET_NAME,file_sl);
-                    #endif
                 } catch(const std::runtime_error& err ){
                     std::cerr << err.what() << "\n";
                     exit(1);
                 }
-                #ifdef FULL_FORMULA
-                // deallocating
-                delete CubeToSave[i];
-                #endif
             }
             #endif
         }
-        #ifndef INFINITE
-        #ifdef FULL_FORMULA
-        // deallocating
-        delete [] CubeToSave;
-        #endif 
-        #endif
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         // Fetch data from the slaves
         MPIDataReceive mpi_data_receive;
         int recv_root_num_elem;
         #ifndef INFINITE
-        #ifdef FULL_FORMULA
-        ArmaMPI< std::complex<double> > armaMatObj(Ntau,Ntau,iqn.size());
-        arma::Cube< std::complex<double> > single_ladders_to_save;
-        #else
         ArmaMPI< std::complex<double> > armaMatObj(Ntau,Ntau);
         arma::Mat< std::complex<double> > single_ladders_to_save;
-        #endif
         #endif
         int get_size;
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
@@ -379,7 +344,7 @@ int main(int argc, char** argv){
                 ierr = MPI_Probe(an_id,l+SHIFT_TO_DIFFERENTIATE_TAGS,MPI_COMM_WORLD,&status); // Peeking the data received and comparing to num_elem_to_receive
                 ierr = MPI_Get_count(&status, MPI_Data_struct_t, &get_size);
                 mpi_data_receive.size = (size_t)get_size;
-                std::cout << "size mpi_data_receive: " << mpi_data_receive.size << std::endl;
+                // std::cout << "size mpi_data_receive: " << mpi_data_receive.size << " from id " << an_id << std::endl;
                 mpi_data_receive.data_struct = (MPIData*)malloc(mpi_data_receive.size*sizeof(MPIData));
                 ierr = MPI_Recv((void*)mpi_data_receive.data_struct,mpi_data_receive.size,MPI_Data_struct_t,an_id,l+SHIFT_TO_DIFFERENTIATE_TAGS,MPI_COMM_WORLD,&status);
                 gathered_MPI_data->push_back( std::vector<MPIData>(mpi_data_receive.data_struct,mpi_data_receive.data_struct+mpi_data_receive.size) );
@@ -392,11 +357,7 @@ int main(int argc, char** argv){
                 std::vector<int> returned_tags_from_slaves(recv_root_num_elem);
                 MPI_Recv( (void*)(returned_tags_from_slaves.data()), recv_root_num_elem, MPI_INT, an_id, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
                 for (auto tag : returned_tags_from_slaves){
-                    #ifdef FULL_FORMULA
-                    single_ladders_to_save = armaMatObj.recv_Arma_cube_MPI(tag,an_id);
-                    #else
                     single_ladders_to_save = armaMatObj.recv_Arma_mat_MPI(tag,an_id);
-                    #endif
                     auto n_ks = inverse_Cantor_pairing(tag); // n_k_bar, n_k_tilde
                     std::cout << "n_bar: " << std::get<0>(n_ks) << " and n_tilde: " << std::get<1>(n_ks) << std::endl;
                     try{
@@ -405,11 +366,7 @@ int main(int argc, char** argv){
                         #else
                         H5std_string  DATASET_NAME( std::string("ktildex_")+std::to_string(k_t_b_array[std::get<0>(n_ks)])+std::string("ktildey_")+std::to_string(k_t_b_array[std::get<1>(n_ks)]) );
                         #endif
-                        #ifdef FULL_FORMULA
-                        save_matrix_in_HDF5(single_ladders_to_save,iqn,DATASET_NAME,file_sl);
-                        #else
                         save_matrix_in_HDF5(single_ladders_to_save,DATASET_NAME,file_sl);
-                        #endif
                     } catch( std::runtime_error& err ){
                         std::cerr << err.what() << "\n";
                         exit(1);
@@ -450,30 +407,14 @@ int main(int argc, char** argv){
             root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
         /* Calculate the sum of the portion of the array */
         #ifndef INFINITE
-        #ifdef FULL_FORMULA
-        arma::Cube< std::complex<double> >** CubeToSave = new arma::Cube< std::complex<double> >* [num_elem_per_proc];
-        // allocating to save the single ladder data for later use...
-        if (is_single_ladder_precomputed){
-            for (size_t i=0; i<num_elem_per_proc; i++){
-                CubeToSave[i] = new arma::Cube< std::complex<double> >(Ntau,Ntau,iqn.size()); // memory is not initialized
-            }
-        }
-        #else
         arma::Cube< std::complex<double> > container_sl(Ntau,Ntau,num_elem_to_receive); // n_rows, n_cols, n_slices
-        #endif
         #endif
         for(size_t i = 0; i < num_elem_to_receive; i++) {
             auto mpidataObj = vec_for_slaves[i];
             clock_t begin = clock();
             try{
                 #ifndef INFINITE
-                #ifdef FULL_FORMULA
-                arma::Cube< std::complex<double> >* mat_slice_ptr = nullptr;
-                if (is_single_ladder_precomputed)
-                    mat_slice_ptr = CubeToSave[i];
-                #else
                 arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
-                #endif
                 GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
                 GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed);
@@ -485,9 +426,9 @@ int main(int argc, char** argv){
 
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            // std::cout << "one_ladder_obj number " << i << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
             gathered_MPI_data->push_back(std::move(GG_iqn));
-            printf("(%li, %li) calculated by slave_process %d\n", mpidataObj.k_bar, mpidataObj.k_tilde, world_rank); //, (void*)&vec_for_slaves);
+            // printf("(%li, %li) calculated by slave_process %d\n", mpidataObj.k_bar, mpidataObj.k_tilde, world_rank); //, (void*)&vec_for_slaves);
         }
         ierr = MPI_Barrier(MPI_COMM_WORLD);
         ierr = MPI_Send( &num_elem_to_receive, 1 , MPI_INT, root_process, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD );
@@ -499,19 +440,9 @@ int main(int argc, char** argv){
             // Sending tags to root.
             ierr = MPI_Send( (void*)(one_ladder_obj.tag_vec.data()), num_elem_to_receive, MPI_INT, root_process, RETURN_TAGS_TO_ROOT, MPI_COMM_WORLD );
             for (size_t t=0; t<one_ladder_obj.tag_vec.size(); t++){
-                #ifdef FULL_FORMULA
-                MPI_Send(CubeToSave[t]->memptr(),Ntau*Ntau*iqn.size(),MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
-                // deallocating
-                delete CubeToSave[t];
-                #else
                 MPI_Send(container_sl.slice(t).memptr(),Ntau*Ntau,MPI_CXX_DOUBLE_COMPLEX,root_process,one_ladder_obj.tag_vec[t],MPI_COMM_WORLD);
-                #endif
             }
         }
-        #ifdef FULL_FORMULA
-        // deallocating
-        delete [] CubeToSave;
-        #endif
         #endif
     }
 
@@ -526,11 +457,7 @@ int main(int argc, char** argv){
     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
         // Building the lattice Green's function from the local DMFT self-energy
         for (size_t l=0; l<q_tilde_array.size(); l++){
-            #ifdef DEBUG
-            G_k_bar_q_tilde_iwn(l,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(k_bar-q_tilde_array[l]) - splInlineObj.calculateSpline(iwn[n_bar].imag()) );
-            #else
             G_k_bar_q_tilde_iwn(l,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(k_bar-q_tilde_array[l]) - sigma_iwn[3*iwn.size()/2+n_bar] );
-            #endif
         }
     }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-buildDir="build10"
+buildDir="build1"
 dir="${PWD}/obj"   #This directory will contain the objects of the different translation units
 dirTest="${PWD}/test/obj" #This directory will also contain the object files, but the ones of the test.cpp main translation unit.
 dirData="${PWD}/data" #This directory will store the different results produced by the program. As for the obj directories, this directory should remain in place after creation.

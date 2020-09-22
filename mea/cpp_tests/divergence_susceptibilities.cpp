@@ -1,9 +1,20 @@
 #include "sus_vertex_corrections.hpp"
 #include "../../src/json_utils.hpp"
 
+typedef struct Div{
+    double beta;
+    double dnom_re;
+} Div;
+
+void writeInHDF5File(std::vector< Div >& arr_to_save, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false);
 std::complex<double> get_denom(const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_tilde, size_t n_bar, size_t k_t_b, double mu) noexcept;
+#if DIM == 1
 std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar, double kpp, double qq, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false);
 std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, double k_bar, size_t n_iqn, double qq, double mu, double U, double beta) noexcept(false);
+#elif DIM == 2
+std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, double k_bar_x,double k_bar_y, size_t n_iqn, double qq_x, double qq_y, double mu, double U, double beta) noexcept(false);
+std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar_x, double k_bar_y, double kpp_x, double kpp_y, double qq_x, double qq_y, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false);
+#endif
 void save_matrix_in_HDF5(const arma::Cube< std::complex<double> >& cube_to_save, const std::vector<double>& k_arr, H5std_string DATASET_NAME, H5::H5File* file) noexcept(false);
 std::vector< std::complex<double> > DMFTNCA(arma::Cube<double>& Hyb, std::vector<double>& SE_0, arma::Cube<double>& SE_1, std::vector<double>& SE_2, std::vector<double>& G_0, arma::Cube<double>& G_1, std::vector<double>& G_2,
     std::vector<double>& dG_0, arma::Cube<double>& dG_1, std::vector<double>& dG_2, arma::Cube< std::complex<double> >& SE_iwn, arma::Cube< std::complex<double> >& Gloc_iwn,
@@ -41,7 +52,8 @@ int main(int argc, char** argv){
     #elif DIM == 3
     const double Hyb_c=6.0;
     #endif
-
+    const double dividing_factor = 1.4;
+    const double dividing_factor_corr = 1.00;
     #ifndef NCA
     // Saving on memory doing so. For DMFT loop, no parallelization is needed.
     arma::Cube<double> weiss_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
@@ -72,21 +84,21 @@ int main(int argc, char** argv){
     #ifdef NCA
     std::string filename("div/div_"+std::to_string(DIM)+"D_U_"+std::to_string(U_init)+"_"+std::to_string(U_step)+"_"+std::to_string(U_max)+"_beta_"+std::to_string(beta_init)+"_"+std::to_string(beta_step)+"_"+std::to_string(beta_max)+"_Ntau_"+std::to_string(N_tau)+"_Nk_"+std::to_string(N_k)+"_NCA_infinite_ladder_sum.hdf5");
     #else
-    std::string filename("div/div_"+std::to_string(DIM)+"D_U_"+std::to_string(U_init)+"_"+std::to_string(U_step)+"_"+std::to_string(U_max)+"_beta_"+std::to_string(beta_init)+"_"+std::to_string(beta_step)+"_"+std::to_string(beta_max)+"_Ntau_"+std::to_string(N_tau)+"_Nk_"+std::to_string(N_k)+"_infinite_ladder_sum.hdf5");
+    std::string filename("div/div_"+std::to_string(DIM)+"D_U_"+std::to_string(U_init)+"_"+std::to_string(U_step)+"_"+std::to_string(U_max)+"_beta_"+std::to_string(beta_init)+"_"+std::to_string(beta_step)+"_"+std::to_string(beta_max)+"_Ntau_"+std::to_string(N_tau)+"_Nk_"+std::to_string(N_k)+"_DIV_"+std::to_string(dividing_factor)+"_DIVCORR_"+std::to_string(dividing_factor_corr)+"_infinite_ladder_sum.hdf5");
     #endif
     #else
     #ifdef NCA
     std::string filename("div/div_"+std::to_string(DIM)+"D_U_"+std::to_string(U_init)+"_"+std::to_string(U_step)+"_"+std::to_string(U_max)+"_beta_"+std::to_string(beta_init)+"_"+std::to_string(beta_step)+"_"+std::to_string(beta_max)+"_Ntau_"+std::to_string(N_tau)+"_Nk_"+std::to_string(N_k)+"_NCA_single_ladder_sum.hdf5");
     #else
-    std::string filename("div/div_"+std::to_string(DIM)+"D_U_"+std::to_string(U_init)+"_"+std::to_string(U_step)+"_"+std::to_string(U_max)+"_beta_"+std::to_string(beta_init)+"_"+std::to_string(beta_step)+"_"+std::to_string(beta_max)+"_Ntau_"+std::to_string(N_tau)+"_Nk_"+std::to_string(N_k)+"_single_ladder_sum.hdf5");
+    std::string filename("div/div_"+std::to_string(DIM)+"D_U_"+std::to_string(U_init)+"_"+std::to_string(U_step)+"_"+std::to_string(U_max)+"_beta_"+std::to_string(beta_init)+"_"+std::to_string(beta_step)+"_"+std::to_string(beta_max)+"_Ntau_"+std::to_string(N_tau)+"_Nk_"+std::to_string(N_k)+"_DIV_"+std::to_string(dividing_factor)+"_single_ladder_sum.hdf5");
     #endif
     #endif
     const H5std_string FILE_NAME( filename );
     // The different processes cannot create more than once the file to be written in.
     file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
-    std::vector< std::complex<double> > beta_arr;
+    std::vector< Div > div_arr;
     for (double U=U_init; U<=U_max; U+=U_step){
-        for (double beta=beta_init; beta<=beta_max; beta+=beta_step){
+        for (double beta=beta_init; beta<=beta_max; beta+=( (beta>=30.0) ? 4.0 : beta_step ) ){
             const double delta_tau = beta/(double)(2*N_tau);
             // Bosonic Matsubara array
             for (size_t j=0; j<N_tau/2; j++){ // change Ntau for lower value to decrease time when testing...
@@ -128,75 +140,31 @@ int main(int argc, char** argv){
             #else
             auto sigma_iwn = DMFTNCA(Hyb,SE_0,SE_1,SE_2,G_0,G_1,G_2,dG_0,dG_1,dG_2,SE_iwn,Gloc_iwn,U,beta,Hyb_c,alpha,delta_tau,N_tau);
             #endif
-            #if DIM == 1
-            // Should be a loop over the external momentum from this point on...
-            // arma::Cube< std::complex<double> > denom_sl(iwn.size(),iwn.size(),k_t_b_array.size());
-
-            // // Computing the derivatives for given (k_tilde,k_bar) tuple. Used inside the cubic spline algorithm...
-            // for (size_t n_tilde=0; n_tilde<iwn.size(); n_tilde++){
-            //     std::cout << "n_tilde: " << n_tilde << std::endl;
-            //     for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
-            //         for (size_t l=0; l<k_t_b_array.size(); l++){
-            //             denom_sl(n_tilde,n_bar,l) = get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,l,mu)/beta*U;
-            //         }
-            //     }
-            // }
-            // H5std_string DATASET_NAME("div_sus");
-            // save_matrix_in_HDF5(denom_sl,k_t_b_array,DATASET_NAME,file);
 
             // N_tau/4 corresponds to the lowest positive fermionic Matsubara freq.
             const unsigned int n_bar = N_tau/4, n_tilde = N_tau/4;
             #ifndef INFINITE
-            auto val_denom = get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta*U;
+            auto val_denom = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
             #else
-            auto val_denom_sl = get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta*U;
-            auto val_denom_corr = Gamma_merged_corr(iwn,iqn,sigma_iwn,n_bar,k_t_b_array[N_k-1],0,0.0,mu,U,beta);
+            #if DIM == 1
+            auto val_denom_sl = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
+            auto val_denom_corr = Gamma_merged_corr(iwn,iqn,sigma_iwn,n_bar,k_t_b_array[N_k-1],0,0.0,mu,U/dividing_factor_corr,beta);
+            #elif DIM == 2
+            auto val_denom_sl = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
+            auto val_denom_corr = Gamma_merged_corr(iwn,iqn,sigma_iwn,n_bar,k_t_b_array[N_k-1],k_t_b_array[N_k-1],0,0.0,0.0,mu,U/dividing_factor,beta);
+            #endif
             auto val_denom = val_denom_sl-val_denom_corr;
             #endif
-            beta_arr.push_back(val_denom);
+            div_arr.push_back( Div{1.0/beta,val_denom.real()} );
 
-            #elif DIM == 2
-            // Should be a loop over the external momentum from this point on...
-            arma::Cube< std::complex<double> > G_k_bar_q_tilde_iwn(k_t_b_array.size(),k_t_b_array.size(),iwn.size());
-            arma::Cube<double> G_k_bar_q_tilde_tau(k_t_b_array.size(),k_t_b_array.size(),Ntau+1);
 
-            // Computing the derivatives for given (k_tilde,k_bar) tuple. Used inside the cubic spline algorithm...
-            for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
-                // Building the lattice Green's function from the local DMFT self-energy
-                for (size_t l=0; l<k_t_b_array.size(); l++){
-                    for (size_t m=0; m<k_t_b_array.size(); m++){
-                        G_k_bar_q_tilde_iwn.at(l,m,n_bar) = 1.0/( ( iwn[n_bar] ) + mu - epsilonk(k_t_b_array[l]+k_bar,k_t_b_array[m]+k_bar) - splInlineObj.calculateSpline(iwn[n_bar].imag()) );
-                    }
-                }
-            }
-
-            for (size_t n_bar=0; n_bar<iwn.size(); n_bar++){
-                for (size_t l=0; l<k_t_b_array.size(); l++){
-                    for (size_t m=0; m<k_t_b_array.size(); m++){
-                        // Substracting the tail of the Green's function
-                        G_k_bar_q_tilde_iwn.at(l,m,n_bar) -= 1.0/(iwn[n_bar]) + epsilonk(k_t_b_array[l]+k_bar,k_t_b_array[m]+k_bar)/iwn[n_bar]/iwn[n_bar]; //+ ( U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]) )/iwn[j]/iwn[j]/iwn[j];
-                    }
-                }
-            }
-
-            // FFT of G(iwn) --> G(tau)
-            for (size_t l=0; l<q_tilde_array.size(); l++){
-                for (size_t m=0; m<q_tilde_array.size(); m++){
-                    std::vector< std::complex<double> > G_iwn_k_slice(G_k_bar_q_tilde_iwn(arma::span(l,l),arma::span(m,m),arma::span::all).begin(),G_k_bar_q_tilde_iwn(arma::span(l,l),arma::span(m,m),arma::span::all).end());
-                    FFT_k_bar_q_tilde_tau = IPT2::get_iwn_to_tau(G_iwn_k_slice,beta); // beta_arr.back() is beta
-                    for (size_t i=0; i<beta_array.size(); i++){
-                        G_k_bar_q_tilde_tau(l,m,i) = FFT_k_bar_q_tilde_tau[i] - 0.5 - 0.25*(beta-2.0*beta_array[i])*epsilonk(q_tilde_array[l]+k_bar,q_tilde_array[m]+k_bar); //+ 0.25*beta_array[i]*(beta-beta_array[i])*(U*U/4.0 + epsilonk(q_tilde_array[l])*epsilonk(q_tilde_array[l]));
-                    }
-                }
-            }
-            #endif
             iqn.clear();
             iqn_tilde.clear();
             iwnArr_l.clear(); // Clearing to not append at each iteration over previous set.
         }
         H5std_string DATASET_NAME("U_"+std::to_string(U));
-        writeInHDF5File(beta_arr,file,beta_arr.size(),DATASET_NAME);
-        beta_arr.clear();
+        writeInHDF5File(div_arr,file,div_arr.size(),DATASET_NAME);
+        div_arr.clear();
     }
 
     delete file;
@@ -207,17 +175,29 @@ int main(int argc, char** argv){
 
 std::complex<double> get_denom(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_tilde, size_t n_bar, size_t n_k_t_b, double mu) noexcept{
     std::complex<double> tmp_val{0};
+    #if DIM == 1
     std::function<std::complex<double>(double)> k_integrand;
+    #elif DIM == 2
+    std::function<std::complex<double>(double,double)> k_integrand;
+    #endif
     const Integrals intObj;
     for (size_t ii=0; ii<iqn_tilde.size(); ii++){
+        #if DIM == 1
         k_integrand = [&](double k){
             return 1.0/( ( iwn[n_bar] - iqn_tilde[ii] ) + mu - epsilonk(k+k_arr[n_k_t_b]) - SE[(2*iwn.size()-1)+n_bar-ii] )*1.0/( ( iwn[n_tilde] - iqn_tilde[ii] ) + mu - epsilonk(k) - SE[(2*iwn.size()-1)+n_tilde-ii] );
         };
         tmp_val += 1.0/(2.0*M_PI)*intObj.gauss_quad_1D(k_integrand,0.0,2.0*M_PI);
+        #elif DIM == 2
+        k_integrand = [&](double kx,double ky){
+            return 1.0/( ( iwn[n_bar] - iqn_tilde[ii] ) + mu - epsilonk(kx+k_arr[n_k_t_b],ky+k_arr[n_k_t_b]) - SE[(2*iwn.size()-1)+n_bar-ii] )*1.0/( ( iwn[n_tilde] - iqn_tilde[ii] ) + mu - epsilonk(kx,ky) - SE[(2*iwn.size()-1)+n_tilde-ii] );
+        };
+        tmp_val += 1.0/(2.0*M_PI)/(2.0*M_PI)*intObj.gauss_quad_2D(k_integrand,0.0,2.0*M_PI,0.0,2.0*M_PI);
+        #endif
     }
     return tmp_val;
 }
 
+#if DIM == 1
 std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar, double kpp, double qq, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false){
     std::complex<double> denom_val{0.0};
     const Integrals intObj;
@@ -261,6 +241,120 @@ std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >
     tot_corr *= U/beta/(2.0*M_PI);
     
     return tot_corr; 
+}
+# elif DIM == 2
+std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar_x, double k_bar_y, double kpp_x, double kpp_y, double qq_x, double qq_y, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false){
+    std::complex<double> denom_val{0.0};
+    const Integrals intObj;
+    const size_t NI = iwn.size();
+    std::function<std::complex<double>(double,double)> int_k_2D;
+    std::complex<double> ikpppn, ikn_bar = iwn[n_ikn_bar], ikppn = iwn[n_ikppn];
+    for (size_t n_ppp=0; n_ppp<iwn.size(); n_ppp++){
+        ikpppn = iwn[n_ppp];
+        int_k_2D = [&](double k_ppp_x, double k_ppp_y){
+            return ( 1.0 / ( ikpppn+ikppn-ikn_bar + mu - epsilonk(k_ppp_x+kpp_x-k_bar_x,k_ppp_y+kpp_y-k_bar_y) - SE[3*NI/2+n_ppp+n_ikppn-n_ikn_bar] ) 
+                )*( 1.0 / ( ikpppn + mu - epsilonk(k_ppp_x,k_ppp_y) - SE[3*NI/2+n_ppp] ) 
+                );
+        };
+        denom_val += intObj.gauss_quad_2D(int_k_2D,0.0,2.0*M_PI,0.0,2.0*M_PI);
+    }
+    denom_val *= U/beta/(2.0*M_PI)/(2.0*M_PI);
+    denom_val += 1.0;
+
+    return 1.0/denom_val;
+}
+
+std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, double k_bar_x,double k_bar_y, size_t n_iqn, double qq_x, double qq_y, double mu, double U, double beta) noexcept(false){
+    // This function method is an implicit function of k_bar and ikn_bar
+    std::complex<double> tot_corr{0.0};
+    const Integrals intObj;
+    // const double delta = 2.0*M_PI/(double)(OneLadder< T >::_splInlineobj._k_array.size()-1);
+    const size_t NI = iwn.size();
+    std::function<std::complex<double>(double,double)> int_k_2D;
+    std::complex<double> iqqn = iqn[n_iqn], ikppn;
+    for (size_t n_pp=0; n_pp<NI; n_pp++){
+        std::cout << n_pp << std::endl;
+        ikppn = iwn[n_pp];
+        int_k_2D = [&](double k_pp_x, double k_pp_y){
+            return ( 1.0/( ikppn + mu - epsilonk(k_pp_x,k_pp_y) - SE[3*NI/2+n_pp] )
+                )*Gamma_correction_denominator(iwn,SE,k_bar_x,k_bar_y,k_pp_x,k_pp_y,qq_x,qq_y,n_ikn_bar,n_pp,mu,U,beta
+                )*( 1.0/( ikppn - iqqn + mu - epsilonk(k_pp_x-qq_x,k_pp_y-qq_y) - SE[3*NI/2+n_pp-n_iqn] )
+                );
+        };
+        tot_corr += intObj.gauss_quad_2D(int_k_2D,0.0,2.0*M_PI,0.0,2.0*M_PI);
+    }
+    tot_corr *= U/beta/(2.0*M_PI)/(2.0*M_PI);
+    
+    return tot_corr; 
+}
+#endif
+
+
+void writeInHDF5File(std::vector< Div >& arr_to_save, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false){
+    /*  This method writes in an HDF5 file the data passed in the first entry "GG_iqn_q". The data has to be complex-typed. This function hinges on the
+    the existence of a custom complex structure "cplx_t" to parse in the data:
+    
+        typedef struct cplx_t{ // Custom data holder for the HDF5 handling
+            double re;
+            double im;
+        } cplx_t;
+        
+        Parameters:
+            GG_iqn_q (std::vector< std::complex<double> >&): function mesh over (iqn,q)-space.
+            file (H5::H5File*): pointer to file object.
+            DATA_SET_DIM (const unsigned int&): corresponds to the number of bosonic Matsubara frequencies and therefore to the length of columns in HDF5 file.
+            RANK (const int&): rank of the object to be saved. Should be 1.
+            MEMBER1 (const H5std_string&): name designating the internal metadata to label the first member variable of cplx_t structure.
+            MEMBER2 (const H5std_string&): name designating the internal metadata to label the second member variable of cplx_t structure.
+            DATASET_NAME (const std::string&): name of the dataset to be saved.
+        
+        Returns:
+            (void)
+    */
+    const H5std_string MEMBER1( "MEM1" );
+    const H5std_string MEMBER2( "MEM2" );
+    const int RANK = 1;
+    H5::CompType m_type( sizeof(Div) );
+    m_type.insertMember( MEMBER1, HOFFSET(Div, beta), H5::PredType::NATIVE_DOUBLE);
+    m_type.insertMember( MEMBER2, HOFFSET(Div, dnom_re), H5::PredType::NATIVE_DOUBLE);
+    try{
+        H5::Exception::dontPrint();
+
+        hsize_t dimsf[1];
+        dimsf[0] = DATA_SET_DIM;
+        H5::DataSpace dataspace( RANK, dimsf );
+
+        /*
+        * Create a group in the file
+        */
+        
+        H5::DataSet* dataset;
+        // dataset = new H5::DataSet(file->createDataSet(DATASET_NAME, std_cmplx_type, dataspace));
+        dataset = new H5::DataSet(file->createDataSet("/"+DATASET_NAME, m_type, dataspace));
+        // Write data to dataset
+        dataset->write( arr_to_save.data(), m_type );
+        delete dataset;
+
+    } catch( H5::FileIException error ){
+        //err.printErrorStack();
+        throw std::runtime_error("H5::FileIException thrown in writeInHDF5File!");
+    }
+    // catch failure caused by the DataSet operations
+    catch( H5::DataSetIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSetIException thrown in writeInHDF5File!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataSpaceIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataSpaceIException thrown in writeInHDF5File!");
+    }
+    // catch failure caused by the DataSpace operations
+    catch( H5::DataTypeIException error ){
+        //error.printErrorStack();
+        throw std::runtime_error("H5::DataTypeIException thrown in writeInHDF5File!");
+    }
+
 }
 
 

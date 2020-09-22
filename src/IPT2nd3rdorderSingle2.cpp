@@ -582,10 +582,12 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
             };
             sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(2.*M_PI)*integralsObj.I1D(G_latt,-M_PI,M_PI,iwnArr_l[j],"simpson",1e-5,50);
             #elif DIM == 2
-            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt = [&](double kx, double ky, std::complex<double> iwn){
-                return 1.0/(iwn + sublatt1.WeissGreen.get_mu() - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            std::function<std::complex<double>(double,double)> int_2D_solver;
+            double mu = sublatt1.WeissGreen.get_mu();
+            int_2D_solver = [&](double kx, double ky){
+                return 1.0/(iwnArr_l[j] + mu - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.I2D(G_latt,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j]);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.gauss_quad_2D(int_2D_solver,0.0,2.0*M_PI,0.0,2.0*M_PI);
             #elif DIM == 3
             std::function<std::complex<double>(double,double,double)> int_3D_solver;
             // const double delta_k = 2.0*M_PI/(GreenStuff::N_k-1);
@@ -603,7 +605,7 @@ void DMFTloop(IPT2::DMFTproc& sublatt1, std::ofstream& objSaveStreamGloc, std::o
         if (iter>2){
             for (size_t j=0; j<iwnArr_l.size(); j++) G0_diff+=std::abs(WeissGreenTmpA.slice(j)(0,0)-sublatt1.WeissGreen.matsubara_w.slice(j)(0,0));
             std::cout << "G0_diff: " << G0_diff << std::endl;
-            if (G0_diff<0.0001 && std::abs(n-sublatt1.n)<ROOT_FINDING_TOL && std::abs(n0-sublatt1.n)<ROOT_FINDING_TOL) converged=true; 
+            if (G0_diff<0.0005 && std::abs(n-sublatt1.n)<ROOT_FINDING_TOL && std::abs(n0-sublatt1.n)<ROOT_FINDING_TOL) converged=true; 
         }
         if (iter>2){ // Assess the convergence process 
             for (size_t j=0; j<iwnArr_l.size(); j++){
@@ -696,10 +698,12 @@ std::vector< std::complex<double> > DMFTloop(IPT2::DMFTproc& sublatt1, const uns
             };
             sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1.0/(2.0*M_PI)*integralsObj.gauss_quad_1D(int_1D_solver,0.0,2.0*M_PI);
             #elif DIM == 2
-            std::function<std::complex<double>(double,double,std::complex<double>)> G_latt = [&](double kx, double ky, std::complex<double> iwn){
-                return 1.0/(iwn + sublatt1.WeissGreen.get_mu() - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
+            std::function<std::complex<double>(double,double)> int_2D_solver;
+            double mu = sublatt1.WeissGreen.get_mu();
+            int_2D_solver = [&](double kx, double ky){
+                return 1.0/(iwnArr_l[j] + mu - epsilonk(kx,ky) - sublatt1.SelfEnergy.matsubara_w.slice(j)(0,0));
             };
-            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.I2D(G_latt,-M_PI,M_PI,-M_PI,M_PI,iwnArr_l[j]);
+            sublatt1.LocalGreen.matsubara_w.slice(j)(0,0)=1./(4.*M_PI*M_PI)*integralsObj.gauss_quad_2D(int_2D_solver,0.0,2.0*M_PI,0.0,2.0*M_PI);
             #elif DIM == 3
             std::function<std::complex<double>(double,double,double)> int_3D_solver;
             // const double delta_k = 2.0*M_PI/(GreenStuff::N_k-1);

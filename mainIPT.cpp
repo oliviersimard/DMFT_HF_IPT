@@ -160,7 +160,9 @@ int main(int argc, char** argv){
                 /* Performs the complete DMFT calculations if directory doesn't already exist */
                 #ifndef DEBUG
                 struct stat infoDir;
-                int message = stat( (pathToDirLoad+customDirName).c_str(), &infoDir );
+                std::cout << "PATH: " << (pathToDirLoad+customDirName).c_str() << std::endl;
+                int message = lstat( (pathToDirLoad+customDirName).c_str(), &infoDir );
+                std::cout << "message error: " << infoDir.st_mode << "  " << S_ISDIR(infoDir.st_mode) << std::endl;
                 if ( !(infoDir.st_mode & S_IFDIR) && message!=0 ){ // If the directory doesn't already exist in ../data/ ...
                     #ifndef AFM
                     DMFTloop(EqDMFTA,objSaveStreamGloc,objSaveStreamSE,objSaveStreamGW,vecFiles,N_it);

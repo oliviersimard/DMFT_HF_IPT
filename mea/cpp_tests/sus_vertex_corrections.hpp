@@ -17,7 +17,7 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 //static bool slaves_can_write_in_file = false; // This prevents that the slave processes
 static int root_process = 0;
 
-// #define INFINITE
+#define INFINITE
 
 typedef struct{
     size_t k_tilde;
@@ -26,8 +26,16 @@ typedef struct{
     std::complex<double> cplx_data_szsz;
 } MPIData;
 
+typedef struct{
+    size_t n_iqn;
+    size_t n_ikn_bar;
+    size_t n_k_bar;
+    std::complex<double> cplx_denom_corr;
+} MPIDataCorr;
+
+template<class T>
 struct MPIDataReceive{
-    MPIData* data_struct;
+    T* data_struct;
     size_t size;
 };
 
@@ -40,6 +48,7 @@ namespace IPT2{
     inline double velocity(double k) noexcept;
     void set_vector_processes(std::vector<MPIData>*,unsigned int N_q) noexcept;
     void create_mpi_data_struct(MPI_Datatype& custom_type);
+    void create_mpi_data_struct_corr(MPI_Datatype& custom_type);
     void create_mpi_data_struct_cplx(MPI_Datatype& custom_type);
 
     template< class T >
@@ -100,18 +109,20 @@ namespace IPT2{
                 std::cout << "InfiniteLadder U: " << OneLadder< T >::_U << " and InfiniteLadder beta: " << OneLadder< T >::_beta << std::endl;
             }
             std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, bool is_simple_ladder_precomputed=false, double qq=0.0) const noexcept(false);
+            T Gamma_merged_corr(size_t n_ikn_bar, double k_bar, size_t n_iqn, double qq) const noexcept(false);
             static std::string _FILE_NAME;
+            static arma::Cube< T > _denom_corr;
 
         private:
             using OneLadder< T >::getGreen;
             using OneLadder< T >::Gamma;
             T Gamma_correction_denominator(double k_bar, double kpp, double qq, size_t n_ikn_bar, size_t n_ikppn) const noexcept(false);
-            T Gamma_merged_corr(size_t n_ikn_bar, double k_bar, size_t n_iqn, double qq) const noexcept(false);
             
             
     };
 
     template< class T > std::string InfiniteLadders< T >::_FILE_NAME = std::string("");
+    template< class T > arma::Cube< T > InfiniteLadders< T >::_denom_corr = arma::Cube< T >();
 
 }
 
@@ -232,8 +243,8 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
         }
         
         // summing over the internal ikn_tilde and ikn_bar
-        jj_resp_iqn = -1.0*velocity(_k_t_b[n_k_tilde])*velocity(_k_t_b[n_k_bar])*(4.0/_beta/_beta)*arma::accu(GG_n_tilde_n_bar);
-        szsz_resp_iqn = (4.0/_beta/_beta)*arma::accu(GG_n_tilde_n_bar);
+        jj_resp_iqn = -1.0*velocity(_k_t_b[n_k_tilde])*velocity(_k_t_b[n_k_bar])*(2.0/_beta/_beta)*arma::accu(GG_n_tilde_n_bar);
+        szsz_resp_iqn = (2.0/_beta/_beta)*arma::accu(GG_n_tilde_n_bar);
         // ADDED A FACTOR OF 2 FOR THE SPIN BELOW
         MPIData mpi_data_tmp { n_k_tilde, n_k_bar, jj_resp_iqn, szsz_resp_iqn }; // summing over the internal ikn_tilde and ikn_bar
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
@@ -299,12 +310,13 @@ T IPT2::InfiniteLadders< T >::Gamma_merged_corr(size_t n_ikn_bar, double k_bar, 
     // const double delta = 2.0*M_PI/(double)(OneLadder< T >::_splInlineobj._k_array.size()-1);
     const size_t NI = OneLadder< T >::_splInlineobj._iwn_array.size();
     std::function<T(double)> int_k_1D;
-    T iqn = OneLadder< T >::_iqn[n_iqn];
+    T iqn = OneLadder< T >::_iqn[n_iqn], ikppn;
     for (size_t n_pp=0; n_pp<NI; n_pp++){
+        ikppn = OneLadder< T >::_splInlineobj._iwn_array[n_pp];
         int_k_1D = [&](double k_pp){
-            return ( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_pp] + OneLadder< T >::_mu - epsilonk(k_pp) - OneLadder< T >::_SE[3*NI/2+n_pp] )
+            return ( 1.0/( ikppn + OneLadder< T >::_mu - epsilonk(k_pp) - OneLadder< T >::_SE[3*NI/2+n_pp] )
                 )*Gamma_correction_denominator(k_bar,k_pp,qq,n_ikn_bar,n_pp
-                )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_pp]-iqn + OneLadder< T >::_mu - epsilonk(k_pp-qq) - OneLadder< T >::_SE[3*NI/2+n_pp-n_iqn] )
+                )*( 1.0/( ikppn-iqn + OneLadder< T >::_mu - epsilonk(k_pp-qq) - OneLadder< T >::_SE[3*NI/2+n_pp-n_iqn] )
                 );
         };
         tot_corr += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
@@ -368,28 +380,23 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     }
     for (size_t n_em=0; n_em<OneLadder< T >::_iqn.size(); n_em++){
         begin = clock();
-
-        for (size_t n_bar=0; n_bar<NI; n_bar++){
-            // clock_t begin = clock();
-            ikn_bar_corr[n_bar] = Gamma_merged_corr(n_bar,OneLadder< T >::_k_t_b[n_k_bar],n_em,qq);
-            // clock_t end = clock();
-            // double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            // std::cout << "infinite ladder loop n_bar: " << n_bar << " done in " << elapsed_secs << " secs.." << "\n";
-        }
+        // for (size_t n_bar=0; n_bar<NI; n_bar++){
+        //     ikn_bar_corr[n_bar] = Gamma_merged_corr(n_bar,OneLadder< T >::_k_t_b[n_k_bar],n_em,qq);
+        // }
         
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
                 GG_n_tilde_n_bar(n_tilde,n_bar) = ( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]) - OneLadder< T >::_SE[3*NI/2+n_tilde] ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]-qq) - OneLadder< T >::_SE[3*NI/2+n_tilde-n_em] ) 
-                    )*( 1.0/( OneLadder< T >::_U*1.0/Gamma_n_tilde_n_bar(n_tilde,n_bar) - ikn_bar_corr[n_bar] ) 
+                    )*( 1.0/( OneLadder< T >::_U*1.0/Gamma_n_tilde_n_bar(n_tilde,n_bar) - _denom_corr(n_em,n_bar,n_k_bar) ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]) - OneLadder< T >::_SE[3*NI/2+n_bar] ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-qq) - OneLadder< T >::_SE[3*NI/2+n_bar-n_em] ) );
             }
         }
         
         // summing over the internal ikn_tilde and ikn_bar
-        jj_resp_iqn = -4.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar);
-        szsz_resp_iqn = (4.0*OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar);
+        jj_resp_iqn = -2.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar);
+        szsz_resp_iqn = (2.0*OneLadder< T >::_U/OneLadder< T >::_beta/OneLadder< T >::_beta)*arma::accu(GG_n_tilde_n_bar);
         MPIData mpi_data_tmp { n_k_tilde, n_k_bar, jj_resp_iqn, szsz_resp_iqn };
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
        
@@ -846,6 +853,25 @@ namespace IPT2{
         MPI_Type_create_struct(2,lengths,offsets,types,&tmp_type);
         // Proper padding
         MPI_Type_create_resized(tmp_type, 0, sizeof(cplx_t), &custom_type);
+        MPI_Type_commit(&custom_type);
+    }
+
+    void create_mpi_data_struct_corr(MPI_Datatype& custom_type){
+        /* This function build a new MPI datatype by reference to deal with the struct MPIDataCorr that is used to send across the different 
+        processes.
+
+            Parameters:
+                custom_type (MPI_Datatype&): MPI datatype to be created based upon MPIDataCorr struct.
+            
+            Returns:
+                (void): committed MPI datatype.
+        */
+        int lengths[4]={ 1, 1, 1, 1 };
+        MPI_Aint offsets[4]={ offsetof(MPIDataCorr,n_iqn), offsetof(MPIDataCorr,n_ikn_bar), offsetof(MPIDataCorr,n_k_bar), offsetof(MPIDataCorr,cplx_denom_corr) };
+        MPI_Datatype types[4]={ MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_UNSIGNED_LONG, MPI_CXX_DOUBLE_COMPLEX }, tmp_type;
+        MPI_Type_create_struct(4,lengths,offsets,types,&tmp_type);
+        // Proper padding
+        MPI_Type_create_resized(tmp_type, 0, sizeof(MPIDataCorr), &custom_type);
         MPI_Type_commit(&custom_type);
     }
 }

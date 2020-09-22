@@ -175,31 +175,39 @@ def get_according_to_condition(path : str, funct) -> tuple:
     
     return params_respecting_condiction, dim_int, dict_to_store_magnetization_for_Us_as_function_beta, Us, betas
 
-def get_pts_close_to_num(arr, num):
+def get_pts_close_to_num_old(arr, num):
     idx_val_tuple = min(enumerate(arr), key=lambda x: abs(x[1]-num))
     return idx_val_tuple
+
+def get_pts_close_to_num(arr, num):
+    idx_val_tuple = min(enumerate(arr), key=lambda x: abs(x[1][1]-num))[0]
+    return idx_val_tuple, arr[idx_val_tuple]
 
 if __name__=="__main__":
 
     parser = OptionParser()
 
-    parser.add_option("--data", dest="path", default=u"./data_test_IPT")
+    parser.add_option("--dataIPT", dest="pathIPT", default=u"./data_test_IPT")
+    # parser.add_option("--dataNCA", dest="pathNCA", default=u"./data_test_IPT")
     (options, args) = parser.parse_args()
 
-    path = str(options.path)
-
+    path = str(options.pathIPT)
+    # pathNCA = str(options.pathNCA)
     # if the files are all scattered in the target directory, the files are rearranged. Otherwise, it is passed.
     rearrange_files_into_dir(path)
+    # rearrange_files_into_dir(pathNCA)
 
     params_respecting_condiction, dim_int, dict_to_store_magnetization_for_Us_as_function_beta, Us, betas = get_according_to_condition(path,AFM_phase_boundary_condition)
+    # params_respecting_condictionNCA, dim_intNCA, dict_to_store_magnetization_for_Us_as_function_betaNCA, UsNCA, betasNCA = get_according_to_condition(pathNCA,AFM_phase_boundary_condition)
 
     # sorting the dictionary according to U and beta (ascending order first)
     list_magnetization_for_Us_as_function_beta = sorted(dict_to_store_magnetization_for_Us_as_function_beta.items(),key=operator.itemgetter(0,1))
+    # list_magnetization_for_Us_as_function_betaNCA = sorted(dict_to_store_magnetization_for_Us_as_function_betaNCA.items(),key=operator.itemgetter(0,1))
     
     ######################################################################################### <------------------------ delimitation calc
     # getting the delimitations
     # sl
-    filename_div_sl = "./cpp_tests/div/div_1D_U_1.000000_1.000000_10.000000_beta_1.000000_0.500000_250.000000_Ntau_512_Nk_51_single_ladder_sum.hdf5"
+    filename_div_sl = "./cpp_tests/div/div_1D_U_1.000000_0.500000_9.000000_beta_1.000000_0.250000_300.000000_Ntau_2048_Nk_51_single_ladder_sum.hdf5"
     betas = findall(r"beta_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)",filename_div_sl)[0]
     beta_init = float(betas[0]); beta_step = float(betas[1]); beta_max = float(betas[2])
     beta_arr = np.arange(beta_init,beta_max+beta_step,step=beta_step)
@@ -211,16 +219,41 @@ if __name__=="__main__":
     dict_U_div_T = {}
     for i,key in enumerate(list_keys):
         Uss_sl.append(float(findall(r"(?<=U_)(\d*\.\d+|\d+)",key)[0]))
-        U_slice_for_betas = list(hf.get(key)['RE'])
+        U_slice_for_betas = list(hf.get(key))
         idx_closest, val_closest = get_pts_close_to_num(U_slice_for_betas,-1.0)
-        print(idx_closest, " and the value at that index: ", U_slice_for_betas[idx_closest])
-        if np.isclose(-1.0,val_closest,atol=5e-2): # making sure it actually crosses -1.0
-            dict_U_div_T[Uss_sl[i]] = 1.0/beta_arr[idx_closest]
+        
+        other_idx=0
+        if val_closest[1]>-1.0 and idx_closest!=(len(U_slice_for_betas)-1):
+            other_idx=idx_closest+1
+        else:
+            other_idx=idx_closest-1
+
+        print("sl: ",Uss_sl[-1]," idx closest: ", idx_closest, " val closest: ", val_closest, " other idx: ", other_idx, " other val: ", U_slice_for_betas[other_idx])
+        if np.isclose(-1.0,val_closest[1],atol=2e-1): # making sure it actually crosses -1.0
+            dict_U_div_T[Uss_sl[i]] = (val_closest[0]+U_slice_for_betas[other_idx][0])/2.0
     
     Uss_sl = list(dict_U_div_T.keys())
     Tss_sl = list(dict_U_div_T.values())
+    hf.close()
+    # NCA sl
+    # filename_div_sl_NCA = "./cpp_tests/div/div_1D_U_2.000000_1.000000_7.000000_beta_1.000000_0.250000_50.000000_Ntau_4096_Nk_51_NCA_single_ladder_sum.hdf5"
+    # arr_Ts = np.arange(1.0,20.0,0.25)
+    # hf = h5py.File(filename_div_sl_NCA,"r")
+    # list_keys = list(hf.keys())
+    # # extracting the Us from the keys
+    # Us_NCA_sl = []
+    # dict_U_div_T_NCA_sl = {}
+    # for i,key in enumerate(list_keys):
+    #     Us_NCA_sl.append(float(findall(r"(?<=U_)(\d*\.\d+|\d+)",key)[0]))
+    #     U_slice_for_betas = list(hf.get(key))
+    #     idx_closest, val_closest = get_pts_close_to_num(U_slice_for_betas,-1.0)
+    #     dict_U_div_T_NCA_sl[Us_NCA_sl[i]] = 1.0/(arr_Ts[idx_closest])
+    
+    # Uss_sl_NCA = list(dict_U_div_T_NCA_sl.keys())
+    # Tss_sl_NCA = list(dict_U_div_T_NCA_sl.values())
+    # hf.close()
     # il
-    filename_div_il = "./cpp_tests/div/div_1D_U_1.000000_1.000000_8.000000_beta_1.000000_0.250000_50.000000_Ntau_256_Nk_51_infinite_ladder_sum.hdf5"
+    filename_div_il = "./cpp_tests/div/div_1D_U_1.000000_1.000000_10.000000_beta_1.000000_1.000000_200.000000_Ntau_256_Nk_51_infinite_ladder_sum.hdf5"
     betas = findall(r"beta_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)",filename_div_il)[0]
     beta_init = float(betas[0]); beta_step = float(betas[1]); beta_max = float(betas[2])
     beta_arr = np.arange(beta_init,beta_max+beta_step,step=beta_step)
@@ -232,121 +265,126 @@ if __name__=="__main__":
     dict_U_div_T = {}
     for i,key in enumerate(list_keys):
         Uss_il.append(float(findall(r"(?<=U_)(\d*\.\d+|\d+)",key)[0]))
-        U_slice_for_betas = list(hf.get(key)['RE'])
+        U_slice_for_betas = list(hf.get(key))
         idx_closest, val_closest = get_pts_close_to_num(U_slice_for_betas,-1.0)
-        print(idx_closest, " and the value at that index: ", U_slice_for_betas[idx_closest])
-        if np.isclose(-1.0,val_closest,atol=5e-2): # making sure it actually crosses -1.0
-            dict_U_div_T[Uss_il[i]] = 1.0/beta_arr[idx_closest]
+        
+        other_idx=0
+        if val_closest[1]>-1.0 and idx_closest!=(len(U_slice_for_betas)-1):
+            other_idx=idx_closest+1
+        else:
+            other_idx=idx_closest-1
+
+        print("il: ",Uss_il[-1]," idx closest: ", idx_closest, " val closest: ", val_closest, " other idx: ", other_idx, " other val: ", U_slice_for_betas[other_idx])
+        if np.isclose(-1.0,val_closest[1],atol=3e-1): # making sure it actually crosses -1.0
+            dict_U_div_T[Uss_il[i]] = (val_closest[0]+U_slice_for_betas[other_idx][0])/2.0
     
     Uss_il = list(dict_U_div_T.keys())
     Tss_il = list(dict_U_div_T.values())
+    hf.close()
     ######################################################################################### <------------------------ delimitation calc
 
     ######################### plotting ##########################
     ms = 3.5
     # The top panel plot shows the phase boundary
-    fig, axs = plt.subplots(nrows=1,ncols=2,sharey=False)
-    fig.subplots_adjust(wspace=0.25)
-    axs[0].grid()
+    fig, axs = plt.subplots(nrows=1,ncols=1,sharex=True,sharey=True)
+    fig.subplots_adjust(hspace=0.05)
+    axs.grid()
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
 
     # ordering to plot with lines
     params_respecting_condiction = sorted(params_respecting_condiction,key=operator.itemgetter(1))
     T_arr = list( map( lambda x: 1.0/x[0], params_respecting_condiction ) )
     U_arr = list( map( lambda x: x[1], params_respecting_condiction ) )
 
-    if dim_int==0:
-        axs[0].set_title(r"AFM-PM phase boundary in $\infty$ dimension")
-    else:
-        axs[0].set_title(r"AFM-PM phase boundary in {0:d}D".format(dim_int))
+    # if dim_int==0:
+    #     axs.set_title(r"AFM-PM phase boundary in $\infty$ dimension")
+    # else:
+    #     axs.set_title(r"AFM-PM phase boundary in {0:d}D".format(dim_int))
     # axs[0].scatter(U_arr,T_arr,marker='o',c="red",s=10.0)
-    axs[0].plot(U_arr[::],T_arr[::],marker='o',ms=ms,c="red",linewidth=0.5)
+    axs.plot(U_arr[::],T_arr[::],marker='o',ms=ms,c="red",linewidth=0.5,label="DMFT+IPT")
+    with open("DMFT_IPT_PHASE_BOUNDARY.dat","w") as f:
+        for i in range(len(U_arr)):
+            f.write("{0:.5f}\t\t{1:.5f}\n".format(1.0/T_arr[i],U_arr[i]))
+    f.close()
     ################################################################################################# <------------------------ delimitation calc
-    axs[0].plot(Uss_sl,Tss_sl,marker='o',ms=ms,c="black",linewidth=0.5)
-    axs[0].plot(Uss_il,Tss_il,marker='<',ms=ms,c="blue",linewidth=0.5)
+    axs.plot(Uss_sl,Tss_sl,marker='o',ms=ms,c="black",linewidth=0.5,label="single-ladder")
+    with open("IPT_SL_BOUNDARY.dat","w") as f:
+        for i in range(len(Uss_sl)):
+            f.write("{0:.5f}\t\t{1:.5f}\n".format(1.0/Tss_sl[i],Uss_sl[i]))
+    f.close()
+    axs.plot(Uss_il,Tss_il,marker='<',ms=ms,c="blue",linewidth=0.5,label="infinite-ladder")
+    with open("IPT_IL_BOUNDARY.dat","w") as f:
+        for i in range(len(Uss_il)):
+            f.write("{0:.5f}\t\t{1:.5f}\n".format(1.0/Tss_il[i],Uss_il[i]))
+    f.close()
     ################################################################################################# <------------------------ delimitation calc
-    axs[0].set_xlabel(r"$U$")
-    axs[0].set_ylabel(r"$T (1/\beta)$")
-    axs[0].set_xlim(left=0.0,right=max(Us)+1.0)
+    # axs[0].set_ylabel(r"$T (1/\beta)$")
+    axs.set_xlim(left=0.0,right=10.0+1.0)
     # axs[0].set_ylim(bottom=min(T_arr)-0.02,top=max(T_arr)+0.02)
     ################################################################################################# <------------------------ delimitation calc
-    axs[0].set_ylim(bottom=min(Tss_sl)-0.02,top=0.4+0.02)
+    axs.set_ylim(bottom=min(Tss_sl)-0.02,top=0.4+0.02)
     ################################################################################################# <------------------------ delimitation calc
 
-    axs[0].text(0.30,0.10,"AFM",transform=axs[0].transAxes,size=20,weight=20)
-    axs[0].text(0.65,0.75,"PM",transform=axs[0].transAxes,size=20,weight=20)
+    axs.text(0.80,0.05,"AFM",transform=axs.transAxes,size=15,weight=15)
+    axs.text(0.60,0.75,"PM",transform=axs.transAxes,size=15,weight=15)
     # Arrows that show the U values probed in vicinity of phase boundary (1D NCA)
     len_arrow_x = 0.015
     if dim_int==1 and "NCA" not in path:
         # axs[0].annotate(r"",xy=(3.0,0.116),xytext=(3.0,0.116+len_arrow_x),arrowprops=dict(arrowstyle="->"))
         # axs[0].annotate(r"",xy=(7.0,0.164),xytext=(7.0,0.164+len_arrow_x),arrowprops=dict(arrowstyle="->"))
-        axs[0].text(2.0, 0.2, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].text(2.0, 0.18, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].text(2.0, 0.16, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].axvspan(1.9, 2.1, color='grey', alpha=0.5, lw=0)
+        axs.text(1.0, 0.040, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.text(1.0, 0.020, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.text(1.0, 0.0135, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.axvspan(0.9, 1.1, color='grey', alpha=0.5, lw=0)
 
-        axs[0].text(3.0, 0.4, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].text(3.0, 0.33, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].text(3.0, 0.2857, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].axvspan(2.9, 3.1, color='grey', alpha=0.5, lw=0)
+        axs.text(2.0, 0.055, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.text(2.0, 0.083, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.text(2.0, 0.111, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.axvspan(1.9, 2.1, color='grey', alpha=0.5, lw=0)
 
-        axs[0].text(5.0, 0.4, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].text(5.0, 0.33, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].text(5.0, 0.2857, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
-        axs[0].axvspan(4.9, 5.1, color='grey', alpha=0.5, lw=0)
+        axs.text(3.0, 0.1333, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.text(3.0, 0.1538, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.text(3.0, 0.1818, r'$\bullet$',c='green', fontsize=8, horizontalalignment='center')
+        axs.axvspan(2.9, 3.1, color='grey', alpha=0.5, lw=0)
         #axs[0].annotate(r"",xy=(15.0,0.068),xytext=(15.0,0.068+len_arrow_x),arrowprops=dict(arrowstyle="->"))
     elif dim_int==2 and "NCA" not in path:
-        axs[0].annotate(r"",xy=(3.0,0.157),xytext=(3.0,0.157+len_arrow_x),arrowprops=dict(arrowstyle="->"))
-        axs[0].annotate(r"",xy=(7.0,0.295),xytext=(7.0,0.295+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        axs.annotate(r"",xy=(3.0,0.157),xytext=(3.0,0.157+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        axs.annotate(r"",xy=(7.0,0.295),xytext=(7.0,0.295+len_arrow_x),arrowprops=dict(arrowstyle="->"))
         #axs[0].annotate(r"",xy=(14.0,0.148),xytext=(14.0,0.148+len_arrow_x),arrowprops=dict(arrowstyle="->"))
     elif dim_int==1 and "NCA" in path:
         #axs[0].annotate(r"",xy=(4.0,0.295),xytext=(4.0,0.295+len_arrow_x),arrowprops=dict(arrowstyle="->"))
-        axs[0].annotate(r"",xy=(8.0,0.228),xytext=(8.0,0.228+len_arrow_x),arrowprops=dict(arrowstyle="->"))
-        axs[0].annotate(r"",xy=(14.0,0.143),xytext=(14.0,0.143+len_arrow_x),arrowprops=dict(arrowstyle="->"))
-
-    # The lower panel shows the evolution of the magntization as a function of temperature for different values of U
-    axs[1].grid()
-    #axs[1].tick_params(axis='y',left=False)
-    axs[1].set_ylabel(r"$n_{\uparrow}-n_{\downarrow}$")
-    axs[1].set_xlabel(r"$T (1/\beta)$")
-    axs[1].set_xlim(0.0,0.4)
-    axs[1].set_ylim(0.0,1.0)
-
-    axs[1].yaxis.set_minor_locator(AutoMinorLocator())
-    axs[1].yaxis.set_major_locator(MultipleLocator(0.1))
-    axs[1].xaxis.set_minor_locator(AutoMinorLocator())
-    #axs[1].xaxis.set_major_locator(MultipleLocator(0.025))
-    axs[1].tick_params(axis='both', which='major', direction='out', length=3.5, width=1.0)
-    axs[1].tick_params(axis='y', which='minor', direction='in', length=2.0, width=1.0)
-    if dim_int==0:
-        axs[1].set_title(r"Magnetization vs T in $\infty$ dimension")
-    else:
-        axs[1].set_title(r"Magnetization vs T in {0:d}D".format(dim_int))
-    U_thres = max(Us)
-    U_step_plotting = 1
-    color = iter(plt.cm.rainbow(np.linspace(0,1,3)))#len(Us)//U_step_plotting+1
-    # extracting U arrays before plotting
-    for U in sorted(Us)[::U_step_plotting]:
-        if U==2.0 or U==3.0 or U=5.0:
-            magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-            T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-            axs[1].plot(T_arr,magnetization_arr,ms=ms,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
-        # elif U>U_thres and U<=10.0:
-        #     magnetization_arr = np.array([m[1][0] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-        #     T_arr = np.array([1.0/m[0][1] for m in list_magnetization_for_Us_as_function_beta if m[0][0]==U],dtype=float)
-        #     axs[1].plot(T_arr[:29],magnetization_arr[:29],ms=3.5,marker='v',c=next(color),label=r"${0:.1f}$".format(U))
+        axs.annotate(r"",xy=(8.0,0.228),xytext=(8.0,0.228+len_arrow_x),arrowprops=dict(arrowstyle="->"))
+        axs.annotate(r"",xy=(14.0,0.143),xytext=(14.0,0.143+len_arrow_x),arrowprops=dict(arrowstyle="->"))
     
-    axs[1].legend()
+    axs.set_xlabel(r"$U$")
+    axs.set_ylabel(r"$T (1/\beta)$")
+    axs.legend()
+    # The lower panel shows the evolution of the magntization as a function of temperature for different values of U
+    # axs[1].grid()
+    # #axs[1].tick_params(axis='y',left=False)
+    # axs[1].set_xlabel(r"$U$")
+
+    # axs[1].yaxis.set_minor_locator(AutoMinorLocator())
+    # axs[1].yaxis.set_major_locator(MultipleLocator(0.1))
+    # axs[1].xaxis.set_minor_locator(AutoMinorLocator())
+    # #axs[1].xaxis.set_major_locator(MultipleLocator(0.025))
+    # axs[1].tick_params(axis='both', which='major', direction='out', length=3.5, width=1.0)
+    # axs[1].tick_params(axis='y', which='minor', direction='in', length=2.0, width=1.0)
+
+    # # ordering to plot with lines
+    # params_respecting_condictionNCA = sorted(params_respecting_condictionNCA,key=operator.itemgetter(1))
+    # T_arr_NCA = list( map( lambda x: 1.0/x[0], params_respecting_condictionNCA ) )
+    # U_arr_NCA = list( map( lambda x: x[1], params_respecting_condictionNCA ) )
+    # axs[1].plot(U_arr_NCA[::],T_arr_NCA[::],marker='d',ms=ms,c="red",linewidth=0.5,label="DMFT+NCA")
+    # # axs[1].plot(Uss_sl_NCA,Tss_sl_NCA,marker='o',ms=ms,c="black",linewidth=0.5,label="single-ladder")
+    # axs[1].legend()
 
     fig.set_size_inches(17/2.54,12/2.54)
     if dim_int==0:
         fig.savefig("Figure_phase_diagram_infinite_dimension.pdf")
     else:
-        if "NCA" in path:
-            plt.suptitle("NCA",fontsize=15)
-            fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D_NCA.pdf")
-        else:
-            plt.suptitle("IPT",fontsize=15)
-            fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D.pdf")
+        fig.savefig("Figure_phase_diagram_{0:d}".format(dim_int)+"D.pdf")
     
     plt.show()
     
