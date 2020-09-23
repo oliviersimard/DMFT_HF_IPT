@@ -25,13 +25,13 @@ int main(int argc, char** argv){
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
     #else
     const size_t NCA_Ntau = 2*(unsigned int)atoi(results[2].c_str()); // size of the full NCA calculation
-    const size_t Ntau = 2*128; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
+    const size_t Ntau = 2*8; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
     #endif
     // Has to be a power of two as well: this is no change from IPT.
     assert(Ntau%2==0);
     const int iqn_div = 4;
-    const unsigned int N_q = 5;
-    const unsigned int N_k = 17;
+    const unsigned int N_q = 3;
+    const unsigned int N_k = 7;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling. Depending whether AFM-PM solution is loaded or not, mu=U/2 in PM only scenario and mu=0.0 in AFM-PM scenario.
@@ -243,9 +243,10 @@ int main(int argc, char** argv){
     int start, end, num_elem_to_send, num_elem_to_receive, ierr, recv_root_num_elem, get_size, num_elem_remaining, shift;
     MPI_Status status;
 
+    double k_bar;
     #ifdef INFINITE
     
-    double k_bar, qq;
+    double qq;
     // Precompute the correction in the denominator
     MPI_Datatype MPI_DataCorr_struct_t;
     IPT2::create_mpi_data_struct_corr(MPI_DataCorr_struct_t);
@@ -277,19 +278,20 @@ int main(int argc, char** argv){
             num_elem_to_send = end - start + 1;
             std::cout << "num elem to send for id " << an_id << " is " << num_elem_to_send << "\n";
             ierr = MPI_Send( &num_elem_to_send, 1 , MPI_INT, an_id, SEND_NUM_TO_SLAVES, MPI_COMM_WORLD );
+            ierr = MPI_Send( &start, 1 , MPI_INT, an_id, SEND_NUM_START_TO_SLAVES, MPI_COMM_WORLD );
             ierr = MPI_Send( (void*)(k_t_b_array.data()+start), num_elem_to_send, MPI_DOUBLE,
                     an_id, SEND_DATA_TAG, MPI_COMM_WORLD );
         }
         // computing
         for (size_t i=0; i<=num_elem_per_proc_precomp; i++){
             k_bar = k_t_b_array[i];
+            // std::cout << "k_bar: " << k_bar << " world_rank " << world_rank << std::endl;
             qq = 0.0;
             clock_t begin = clock();
             try {
                 for (size_t n_iqn=0; n_iqn<iqn.size(); n_iqn++){
                     std::cout << "n_iqn: " << n_iqn << std::endl;
                     for (size_t n_ikn_bar=0; n_ikn_bar<iwn.size(); n_ikn_bar++){
-                        std::cout << "n_ikn_bar: " << n_ikn_bar << std::endl;
                         denom_corr.emplace_back( MPIDataCorr{ n_iqn, n_ikn_bar, i, inf_ladder_obj.Gamma_merged_corr(n_ikn_bar, k_bar, n_iqn, qq) } );
                     }
                 }
@@ -301,7 +303,7 @@ int main(int argc, char** argv){
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "infinite_ladder_obj number " << i+1 << "/" << num_elem_per_proc_precomp+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
         }
-        ierr = MPI_Barrier(MPI_COMM_WORLD);
+        // ierr = MPI_Barrier(MPI_COMM_WORLD); <----------------------------------------------
         // collecting from the slave processes
         MPIDataReceive<MPIDataCorr> mpi_datacorr_receive;
         for (int an_id=1; an_id<world_size; an_id++){ // This loop is skipped if world_size=1
@@ -316,28 +318,30 @@ int main(int argc, char** argv){
             }
             free(mpi_datacorr_receive.data_struct);
         }
+        // unpacking denom_corr into denom_corr_tensor
         // Broadcasting the data from the root process for the correction to the denominator
+        assert(denom_corr_bcast.size()==denom_corr.size());
         std::cout << "BCAST Before " << denom_corr.size() << " " << denom_corr_bcast.size() << std::endl;
-        MPI_Bcast( (void*)(denom_corr_bcast.data()), (int)denom_corr.size(), MPI_DataCorr_struct_t, root_process, MPI_COMM_WORLD );
-        // ierr = MPI_Barrier(MPI_COMM_WORLD);
-        std::cout << "BCAST After" << std::endl;
+        denom_corr_bcast = std::move(denom_corr);
 
     } else{
 
         ierr = MPI_Recv( &num_elem_to_receive, 1, MPI_INT, 
             root_process, SEND_NUM_TO_SLAVES, MPI_COMM_WORLD, &status);
+        ierr = MPI_Recv( &start, 1 , MPI_INT, root_process, SEND_NUM_START_TO_SLAVES, MPI_COMM_WORLD, &status);
         std::vector<double> vec_for_slaves(num_elem_to_receive);
         ierr = MPI_Recv( (void*)(vec_for_slaves.data()), num_elem_to_receive, MPI_DOUBLE, 
             root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
 
         for(size_t i = 0; i < num_elem_to_receive; i++) { // this corresponds to k_bar points
             k_bar = vec_for_slaves[i];
+            // std::cout << "k_bar: " << k_bar << " world_rank " << world_rank << std::endl;
             qq = 0.0;
             clock_t begin = clock();
             try {
                 for (size_t n_iqn=0; n_iqn<iqn.size(); n_iqn++){
                     for (size_t n_ikn_bar=0; n_ikn_bar<iwn.size(); n_ikn_bar++){
-                        denom_corr.emplace_back( MPIDataCorr{ n_iqn, n_ikn_bar, i, inf_ladder_obj.Gamma_merged_corr(n_ikn_bar, k_bar, n_iqn, qq) } );
+                        denom_corr.emplace_back( MPIDataCorr{ n_iqn, n_ikn_bar, start+i, inf_ladder_obj.Gamma_merged_corr(n_ikn_bar, k_bar, n_iqn, qq) } );
                     }
                 }
             } catch(const std::invalid_argument& err){
@@ -349,12 +353,17 @@ int main(int argc, char** argv){
             std::cout << "infinite_ladder_obj number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
         }
         num_elem_to_receive *= (int)iqn.size()*(int)iwn.size();
-        ierr = MPI_Barrier(MPI_COMM_WORLD);
+        // ierr = MPI_Barrier(MPI_COMM_WORLD); <-------------------------------------------------
         ierr = MPI_Send( &num_elem_to_receive, 1 , MPI_INT, root_process, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD );
         ierr = MPI_Send( (void*)(denom_corr.data()), (int)denom_corr.size(), MPI_DataCorr_struct_t, root_process, world_rank+SHIFT_TO_DIFFERENTIATE_TAGS, MPI_COMM_WORLD);
     }
-    // unpacking denom_corr into denom_corr_tensor
+    MPI_Bcast( (void*)(denom_corr_bcast.data()), (int)denom_corr_bcast.size(), MPI_DataCorr_struct_t, root_process, MPI_COMM_WORLD );
     // ierr = MPI_Barrier(MPI_COMM_WORLD);
+    std::cout << "BCAST After" << std::endl;
+    // for (auto el : denom_corr_bcast){
+    //     std::cout << " world_rank: " << world_rank << " " << el.n_iqn << " " << el.n_ikn_bar << " " << el.n_k_bar << " " << el.cplx_denom_corr << std::endl;
+    // }
+
     for (auto el : denom_corr){
         IPT2::InfiniteLadders< std::complex<double> >::_denom_corr(el.n_iqn,el.n_ikn_bar,el.n_k_bar) = el.cplx_denom_corr;
     }

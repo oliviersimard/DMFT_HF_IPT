@@ -9,6 +9,7 @@ https://www.hdfgroup.org/downloads/hdf5/source-code/
 
 #define SEND_DATA_TAG 2000
 #define SEND_NUM_TO_SLAVES 2001
+#define SEND_NUM_START_TO_SLAVES 4001
 #define RETURN_DATA_TAG 3000
 #define RETURN_NUM_RECV_TO_ROOT 3001
 #define RETURN_TAGS_TO_ROOT 3002

@@ -202,10 +202,10 @@ if __name__=="__main__":
                 norm_chi_q_w_szsz[j] = chi_q_w_szsz_im[j]/om
 
         ##
-        plt.plot(qn_array,list(map(lambda x: x.real, sum_chi_q_iqn_jj)),marker='*',c="red")
-        with open(options.data+"_iqn_jj","w") as f:
+        plt.plot(qn_array,list(map(lambda x: x.real, sum_chi_q_iqn_szsz)),marker='*',c="red")
+        with open(options.data+"_iqn_szsz","w") as f:
             for i in range(len(qn_array)):
-                f.write("{0:.8f}\t{1:.8f}\t{2:.8f}\n".format(qn_array[i].real,sum_chi_q_iqn_jj[i].real,sum_chi_q_iqn_jj[i].imag))
+                f.write("{0:.8f}\t{1:.8f}\t{2:.8f}\n".format(qn_array[i].real,sum_chi_q_iqn_szsz[i].real,sum_chi_q_iqn_szsz[i].imag))
         f.close()
         with h5py.File(options.data+".pade_wmax_{0}_m_{1}_eta_{2}".format(wmax,TAILCUT,ETA),"a") as hfpade:
             grp = hfpade.create_group("susc")
