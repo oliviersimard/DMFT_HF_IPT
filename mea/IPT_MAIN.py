@@ -11,7 +11,7 @@ if __name__ == "__main__":
     dim=1 # Dimension can either be 1 or 2
     betamin=10.0; betamax=12.0; betastep=2.0 # Inverse temperature
     Umin=3.0; Umax=4.0; Ustep=1.0 # Hubbard U
-    Ntau=1024 # Must be even, due to mirroring of the Matsubara frequencies
+    Ntau=2048 # Must be even, due to mirroring of the Matsubara frequencies
     mu0=0.0 # Chemical potential for the Weiss Green's function. Relevant only in the PM case
     Nk=401 # k-space grid
     h=0.1 # initial spin splitting. Relevant for AFM case.
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     # Target particle density. Notice that fixing the chemical potentials mu=U/2 and mu0=0 leads the density values slightly different to
     # half-filling at low T. This is more stable when using cubic spline, because fixing chemical potentials leads to half-filling for wider
     # range of parameters.
-    n_target = 0.5
+    n_target = 0.54
     ############################### PARAMETERS ####################################
 
     if dim==1:
@@ -86,7 +86,7 @@ if __name__ == "__main__":
                         is_converged = check_converged_AFM(Weiss_tmp,sublatt1._G0,it)
                 else:
                     # PM case
-                    sublatt1.update_densities(it,n_target) # To disable chemical potential root finding, comment this line
+                    # sublatt1.update_densities(it,n_target) # To disable chemical potential root finding, comment this line (when doping and using Broyden's method for instance)
                     sublatt1.DMFT(dim,type_spline)
                     sublatt1.dbl_occupancy() # Computes the double occupancy
                     sublatt1.save_Gloc(it,dim,type_spline)

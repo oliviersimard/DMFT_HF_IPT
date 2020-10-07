@@ -650,10 +650,10 @@ class Sublattice(object):
         self.update_self_energy_doped(type_spline)
         # computing the physical particle density
         for i,iwn in enumerate(Sublattice._iwn_arr):
-            self._Gloc[i,0,0] = 1.0/( iwn + self._mu - self._Hyb[i,0,0] - self._SE[i,0,0] ) - 1.0/( iwn + self._mu - Sublattice._hyb_c/iwn - Sublattice._U*(1.0-self._n_up) - (Sublattice._U**2*self._n_up*(1.0-self._n_up))/(iwn) ) # 1.0/iwn
-        self._Gloc_tau[:,0,0] = get_iwn_to_tau_hyb(self._Gloc[:,0,0],Sublattice._beta,self._mu-Sublattice._U*(1.0-self._n_up),Sublattice._hyb_c+Sublattice._U**2*self._n_up*(1.0-self._n_up)) #cs.get_iwn_to_tau(G_imp_iwn[:,0,0],Sublattice._beta)#
-        # for j in range(len(Sublattice._tau_arr)):
-        #     self._Gimp_tau[j,0,0] += -0.5
+            self._Gloc[i,0,0] = 1.0/( iwn + self._mu - self._Hyb[i,0,0] - self._SE[i,0,0] ) - 1.0/iwn# 1.0/( iwn + self._mu - Sublattice._hyb_c/iwn - Sublattice._U*(self._n_up) - (Sublattice._U**2*self._n_up*(1.0-self._n_up))/(iwn) ) # 1.0/iwn
+        self._Gloc_tau[:,0,0] = cs.get_iwn_to_tau(self._Gloc[:,0,0],Sublattice._beta) #get_iwn_to_tau_hyb(self._Gloc[:,0,0],Sublattice._beta,self._mu-Sublattice._U*(self._n_up),Sublattice._hyb_c+Sublattice._U**2*self._n_up*(1.0-self._n_up)) #
+        for j in range(len(Sublattice._tau_arr)):
+            self._Gloc_tau[j,0,0] += -0.5
         self._n_up = -1.0*self._Gloc_tau[-1,0,0]
         print("impurity n_up: ", self._n_up)
         if dim==1:

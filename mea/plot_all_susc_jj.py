@@ -33,19 +33,19 @@ if __name__=="__main__":
 
     filename_bare_1_jj_2 = figure_directory+"bb_1D_U_2.000000_beta_9.000000_Ntau_4096_Nk_301.hdf5_to_philipp_jj_dos.dat"
     filename_corr_1_jj_2 = figure_directory_added+"bb_1D_U_2.000000_beta_9.000000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_jj_dos.dat"
-    filename_corr_inf_1_jj_2 = figure_directory_pade+"bb_1D_U_2.000000_beta_9.000000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_jj_pade"
+    filename_corr_inf_1_jj_2 = figure_directory_added+"bb_1D_U_2.000000_beta_9.000000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.335000_jj_dos.dat"
     filename_bare_1_szsz_2 = figure_directory+"bb_1D_U_2.000000_beta_9.000000_Ntau_4096_Nk_301.hdf5_to_philipp_cut_dos.dat"
     filename_corr_1_szsz_2 = figure_directory_added+"bb_1D_U_2.000000_beta_9.000000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_szsz_dos.dat"
-    filename_corr_inf_1_szsz_2 = figure_directory_pade+"bb_1D_U_2.000000_beta_9.000000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_szsz_pade"
+    filename_corr_inf_1_szsz_2 = figure_directory_added+"bb_1D_U_2.000000_beta_9.000000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.335000_szsz_dos.dat"
 
     U_corr_1_2 = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",filename_corr_1_jj_2)[0]); beta_corr_1_2 = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",filename_corr_1_jj_2)[0])
 
     filename_bare_1_jj_3 = figure_directory+"bb_1D_U_3.000000_beta_5.500000_Ntau_4096_Nk_301.hdf5_to_philipp_jj_cut_dos.dat"
     filename_corr_1_jj_3 = figure_directory_added+"bb_1D_U_3.000000_beta_5.500000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_jj_dos.dat"
-    filename_corr_inf_1_jj_3 = figure_directory_pade+""
+    filename_corr_inf_1_jj_3 = figure_directory_added+"bb_1D_U_3.000000_beta_5.500000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.400000_jj_dos.dat"
     filename_bare_1_szsz_3 = figure_directory+"bb_1D_U_3.000000_beta_5.500000_Ntau_4096_Nk_301.hdf5_to_philipp_cut_dos.dat"
     filename_corr_1_szsz_3 = figure_directory_added+"bb_1D_U_3.000000_beta_5.500000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_szsz_dos.dat"
-    filename_corr_inf_1_szsz_3 = figure_directory_pade+""
+    filename_corr_inf_1_szsz_3 = figure_directory_added+"bb_1D_U_3.000000_beta_5.500000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.400000_szsz_dos.dat"
 
     U_corr_1_3 = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",filename_corr_1_jj_3)[0]); beta_corr_1_3 = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",filename_corr_1_jj_3)[0])
 
@@ -63,19 +63,19 @@ if __name__=="__main__":
 
     filename_bare_2_jj_2 = figure_directory+"bb_1D_U_2.000000_beta_12.000000_Ntau_4096_Nk_301.hdf5_to_philipp_jj_dos.dat"
     filename_corr_2_jj_2 = figure_directory_added+"bb_1D_U_2.000000_beta_12.000000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_jj_dos.dat"
-    filename_corr_inf_2_jj_2 = figure_directory_pade+"bb_1D_U_2.000000_beta_12.000000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_jj_pade"
+    filename_corr_inf_2_jj_2 = figure_directory_added+"bb_1D_U_2.000000_beta_12.000000_Ntau_256_Nq_27_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.335000_jj_dos.dat"
     filename_bare_2_szsz_2 = figure_directory+"bb_1D_U_2.000000_beta_12.000000_Ntau_4096_Nk_301.hdf5_to_philipp_cut_dos.dat"
     filename_corr_2_szsz_2 = figure_directory_added+"bb_1D_U_2.000000_beta_12.000000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_szsz_dos.dat"
-    filename_corr_inf_2_szsz_2 = figure_directory_pade+"bb_1D_U_2.000000_beta_12.000000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_szsz_pade"
+    filename_corr_inf_2_szsz_2 = figure_directory_added+"bb_1D_U_2.000000_beta_12.000000_Ntau_256_Nq_27_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.335000_szsz_dos.dat"
 
     U_corr_2_2 = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",filename_corr_2_jj_2)[0]); beta_corr_2_2 = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",filename_corr_2_jj_2)[0])
 
     filename_bare_2_jj_3 = figure_directory+"bb_1D_U_3.000000_beta_6.500000_Ntau_4096_Nk_301.hdf5_to_philipp_jj_cut_dos.dat"
     filename_corr_2_jj_3 = figure_directory_added+"bb_1D_U_3.000000_beta_6.500000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_jj_dos.dat"
-    filename_corr_inf_2_jj_3 = figure_directory_pade+"bb_1D_U_3.000000_beta_6.500000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_jj_pade"
+    filename_corr_inf_2_jj_3 = figure_directory_added+"bb_1D_U_3.000000_beta_6.500000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.400000_jj_dos.dat"
     filename_bare_2_szsz_3 = figure_directory+"bb_1D_U_3.000000_beta_6.500000_Ntau_4096_Nk_301.hdf5_to_philipp_cut_dos.dat"
     filename_corr_2_szsz_3 = figure_directory_added+"bb_1D_U_3.000000_beta_6.500000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_szsz_dos.dat"
-    filename_corr_inf_2_szsz_3 = figure_directory_pade+"bb_1D_U_3.000000_beta_6.500000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_szsz_pade"
+    filename_corr_inf_2_szsz_3 = figure_directory_added+"bb_1D_U_3.000000_beta_6.500000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.400000_szsz_dos.dat"
 
     U_corr_2_3 = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",filename_corr_2_jj_3)[0]); beta_corr_2_3 = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",filename_corr_2_jj_3)[0])
     
@@ -93,19 +93,19 @@ if __name__=="__main__":
 
     filename_bare_3_jj_2 = figure_directory+"bb_1D_U_2.000000_beta_18.000000_Ntau_4096_Nk_401.hdf5_to_philipp_jj_dos.dat"
     filename_corr_3_jj_2 = figure_directory_added+"bb_1D_U_2.000000_beta_18.000000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_jj_dos.dat"
-    filename_corr_inf_3_jj_2 = figure_directory_pade+"bb_1D_U_2.000000_beta_18.000000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_jj_pade"
+    filename_corr_inf_3_jj_2 = figure_directory_added+"bb_1D_U_2.000000_beta_18.000000_Ntau_256_Nq_27_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.335000_jj_dos.dat"
     filename_bare_3_szsz_2 = figure_directory+"bb_1D_U_2.000000_beta_18.000000_Ntau_4096_Nk_401.hdf5_to_philipp_cut_dos.dat"
     filename_corr_3_szsz_2 = figure_directory_added+"bb_1D_U_2.000000_beta_18.000000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_szsz_dos.dat"
-    filename_corr_inf_3_szsz_2 = figure_directory_pade+"bb_1D_U_2.000000_beta_18.000000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_szsz_pade"
+    filename_corr_inf_3_szsz_2 = figure_directory_added+"bb_1D_U_2.000000_beta_18.000000_Ntau_256_Nq_27_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.335000_szsz_dos.dat"
 
     U_corr_3_2 = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",filename_corr_3_jj_2)[0]); beta_corr_3_2 = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",filename_corr_3_jj_2)[0])
 
     filename_bare_3_jj_3 = figure_directory+"bb_1D_U_3.000000_beta_7.500000_Ntau_4096_Nk_301.hdf5_to_philipp_jj_cut_dos.dat"
     filename_corr_3_jj_3 = figure_directory_added+"bb_1D_U_3.000000_beta_7.500000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_jj_dos.dat"
-    filename_corr_inf_3_jj_3 = figure_directory_pade+"bb_1D_U_3.000000_beta_7.500000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_jj_pade"
+    filename_corr_inf_3_jj_3 = figure_directory_added+"bb_1D_U_3.000000_beta_7.500000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.400000_jj_dos.dat"
     filename_bare_3_szsz_3 = figure_directory+"bb_1D_U_3.000000_beta_7.500000_Ntau_4096_Nk_301.hdf5_to_philipp_cut_dos.dat"
     filename_corr_3_szsz_3 = figure_directory_added+"bb_1D_U_3.000000_beta_7.500000_Ntau_256_Nq_33_Nk_27_single_ladder_sum_szsz_dos.dat"
-    filename_corr_inf_3_szsz_3 = figure_directory_pade+"bb_1D_U_3.000000_beta_7.500000_Ntau_256_Nq_33_Nk_15_infinite_ladder_sum_iqn_div_2_szsz_pade"
+    filename_corr_inf_3_szsz_3 = figure_directory_added+"bb_1D_U_3.000000_beta_7.500000_Ntau_256_Nq_21_Nk_27_infinite_ladder_sum_iqn_div_4_MAX_DEPTH_7_Uren_1.400000_szsz_dos.dat"
 
     U_corr_3_3 = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",filename_corr_3_jj_3)[0]); beta_corr_3_3 = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",filename_corr_3_jj_3)[0])
 
@@ -165,25 +165,25 @@ if __name__=="__main__":
     omega_infinite_corr_jj_2, infinite_corr_susceptibility_jj_2 = np.loadtxt(filename_corr_inf_2_jj,unpack=True)
     omega_infinite_corr_jj_3, infinite_corr_susceptibility_jj_3 = np.loadtxt(filename_corr_inf_3_jj,unpack=True)
 
-    omega_infinite_corr_jj_1_2, infinite_corr_susceptibility_jj_1_2 = np.loadtxt(filename_corr_inf_1_jj_2,usecols=(0,2),unpack=True)
-    omega_infinite_corr_jj_2_2, infinite_corr_susceptibility_jj_2_2 = np.loadtxt(filename_corr_inf_2_jj_2,usecols=(0,2),unpack=True)
-    omega_infinite_corr_jj_3_2, infinite_corr_susceptibility_jj_3_2 = np.loadtxt(filename_corr_inf_3_jj_2,usecols=(0,2),unpack=True)
+    omega_infinite_corr_jj_1_2, infinite_corr_susceptibility_jj_1_2 = np.loadtxt(filename_corr_inf_1_jj_2,unpack=True)
+    omega_infinite_corr_jj_2_2, infinite_corr_susceptibility_jj_2_2 = np.loadtxt(filename_corr_inf_2_jj_2,unpack=True)
+    omega_infinite_corr_jj_3_2, infinite_corr_susceptibility_jj_3_2 = np.loadtxt(filename_corr_inf_3_jj_2,unpack=True)
 
-    #omega_infinite_corr_jj_1_3, infinite_corr_susceptibility_jj_1_3 = np.loadtxt(filename_corr_inf_1_jj_3,usecols=(0,2),unpack=True)
-    omega_infinite_corr_jj_2_3, infinite_corr_susceptibility_jj_2_3 = np.loadtxt(filename_corr_inf_2_jj_3,usecols=(0,2),unpack=True)
-    omega_infinite_corr_jj_3_3, infinite_corr_susceptibility_jj_3_3 = np.loadtxt(filename_corr_inf_3_jj_3,usecols=(0,2),unpack=True)
+    omega_infinite_corr_jj_1_3, infinite_corr_susceptibility_jj_1_3 = np.loadtxt(filename_corr_inf_1_jj_3,unpack=True)
+    omega_infinite_corr_jj_2_3, infinite_corr_susceptibility_jj_2_3 = np.loadtxt(filename_corr_inf_2_jj_3,unpack=True)
+    omega_infinite_corr_jj_3_3, infinite_corr_susceptibility_jj_3_3 = np.loadtxt(filename_corr_inf_3_jj_3,unpack=True)
 
     omega_infinite_corr_szsz_1, infinite_corr_susceptibility_szsz_1 = np.loadtxt(filename_corr_inf_1_szsz,unpack=True)
     omega_infinite_corr_szsz_2, infinite_corr_susceptibility_szsz_2 = np.loadtxt(filename_corr_inf_2_szsz,unpack=True)
     omega_infinite_corr_szsz_3, infinite_corr_susceptibility_szsz_3 = np.loadtxt(filename_corr_inf_3_szsz,unpack=True)
 
-    omega_infinite_corr_szsz_1_2, infinite_corr_susceptibility_szsz_1_2 = np.loadtxt(filename_corr_inf_1_szsz_2,usecols=(0,2),unpack=True)
-    omega_infinite_corr_szsz_2_2, infinite_corr_susceptibility_szsz_2_2 = np.loadtxt(filename_corr_inf_2_szsz_2,usecols=(0,2),unpack=True)
-    omega_infinite_corr_szsz_3_2, infinite_corr_susceptibility_szsz_3_2 = np.loadtxt(filename_corr_inf_3_szsz_2,usecols=(0,2),unpack=True)
+    omega_infinite_corr_szsz_1_2, infinite_corr_susceptibility_szsz_1_2 = np.loadtxt(filename_corr_inf_1_szsz_2,unpack=True)
+    omega_infinite_corr_szsz_2_2, infinite_corr_susceptibility_szsz_2_2 = np.loadtxt(filename_corr_inf_2_szsz_2,unpack=True)
+    omega_infinite_corr_szsz_3_2, infinite_corr_susceptibility_szsz_3_2 = np.loadtxt(filename_corr_inf_3_szsz_2,unpack=True)
 
-    # omega_infinite_corr_szsz_1_3, infinite_corr_susceptibility_szsz_1_3 = np.loadtxt(filename_corr_inf_1_szsz_3,usecols=(0,2),unpack=True)
-    omega_infinite_corr_szsz_2_3, infinite_corr_susceptibility_szsz_2_3 = np.loadtxt(filename_corr_inf_2_szsz_3,usecols=(0,2),unpack=True)
-    omega_infinite_corr_szsz_3_3, infinite_corr_susceptibility_szsz_3_3 = np.loadtxt(filename_corr_inf_3_szsz_3,usecols=(0,2),unpack=True)
+    omega_infinite_corr_szsz_1_3, infinite_corr_susceptibility_szsz_1_3 = np.loadtxt(filename_corr_inf_1_szsz_3,unpack=True)
+    omega_infinite_corr_szsz_2_3, infinite_corr_susceptibility_szsz_2_3 = np.loadtxt(filename_corr_inf_2_szsz_3,unpack=True)
+    omega_infinite_corr_szsz_3_3, infinite_corr_susceptibility_szsz_3_3 = np.loadtxt(filename_corr_inf_3_szsz_3,unpack=True)
     
     # ########################################################### Plotting ###########################################################
     # jj
@@ -289,7 +289,7 @@ if __name__=="__main__":
     #
     bottom_panel_middle = fig_jj.add_subplot(grid[2,1],sharex=top_panel_middle)
     bottom_panel_middle.grid()
-    bottom_panel_middle.set_ylim(bottom=0.0,top=1.1)
+    bottom_panel_middle.set_ylim(bottom=0.0,top=2.1)
     # bottom_panel_left.set_title(r"Infinite-ladder correction to $\langle j_xj_x\rangle$")
     bottom_panel_middle.text(0.20,0.60,"il correction",transform=bottom_panel_middle.transAxes,size=10,weight='bold')
     bottom_panel_middle.set_xlabel(r"$\omega$",labelpad=-0.4)
@@ -300,9 +300,9 @@ if __name__=="__main__":
     bottom_panel_middle.xaxis.grid(True, which='minor',linestyle='--')
     #bottom_panel_middle.set_ylabel(r"$\operatorname{Re}\sigma_{jj}(\omega,\mathbf{q}=\mathbf{0})$")
 
-    bottom_panel_middle.plot(omega_infinite_corr_jj_1_2,infinite_corr_susceptibility_jj_1_2,marker='o',ms=2.0,c="red",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
-    bottom_panel_middle.plot(omega_infinite_corr_jj_2_2,infinite_corr_susceptibility_jj_2_2,marker='o',ms=2.0,c="blue",label="_nolegend_")
-    bottom_panel_middle.plot(omega_infinite_corr_jj_3_2,infinite_corr_susceptibility_jj_3_2,marker='o',ms=2.0,c="green",label="_nolegend_")
+    bottom_panel_middle.plot(omega_infinite_corr_jj_1_2,-1.0*infinite_corr_susceptibility_jj_1_2,marker='o',ms=2.0,c="red",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
+    bottom_panel_middle.plot(omega_infinite_corr_jj_2_2,-1.0*infinite_corr_susceptibility_jj_2_2,marker='o',ms=2.0,c="blue",label="_nolegend_")
+    bottom_panel_middle.plot(omega_infinite_corr_jj_3_2,-1.0*infinite_corr_susceptibility_jj_3_2,marker='o',ms=2.0,c="green",label="_nolegend_")
 
     # U=3.0
     top_panel_right = fig_jj.add_subplot(grid[0,2])
@@ -342,7 +342,7 @@ if __name__=="__main__":
     #
     bottom_panel_right = fig_jj.add_subplot(grid[2,2],sharex=top_panel_right)
     bottom_panel_right.grid()
-    bottom_panel_right.set_ylim(bottom=0.0,top=1.8)
+    bottom_panel_right.set_ylim(bottom=0.0,top=6.5)
     # bottom_panel_left.set_title(r"Infinite-ladder correction to $\langle j_xj_x\rangle$")
     bottom_panel_right.text(0.20,0.60,"il correction",transform=bottom_panel_right.transAxes,size=10,weight='bold')
     bottom_panel_right.set_xlabel(r"$\omega$",labelpad=-0.4)
@@ -352,9 +352,9 @@ if __name__=="__main__":
     bottom_panel_right.xaxis.set_minor_locator(AutoMinorLocator(n=2))
     bottom_panel_right.xaxis.grid(True, which='minor',linestyle='--')
 
-    # bottom_panel_right.plot(omega_infinite_corr_jj_1,infinite_corr_susceptibility_jj_1,marker='o',ms=2.0,c="red",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
-    bottom_panel_right.plot(omega_infinite_corr_jj_2_3,infinite_corr_susceptibility_jj_2_3,marker='o',ms=2.0,c="darkblue",label="_nolegend_")
-    bottom_panel_right.plot(omega_infinite_corr_jj_3_3,infinite_corr_susceptibility_jj_3_3,marker='o',ms=2.0,c="darkgreen",label="_nolegend_")
+    bottom_panel_right.plot(omega_infinite_corr_jj_1_3,-1.0*infinite_corr_susceptibility_jj_1_3,marker='o',ms=2.0,c="maroon",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
+    bottom_panel_right.plot(omega_infinite_corr_jj_2_3,-1.0*infinite_corr_susceptibility_jj_2_3,marker='o',ms=2.0,c="darkblue",label="_nolegend_")
+    bottom_panel_right.plot(omega_infinite_corr_jj_3_3,-1.0*infinite_corr_susceptibility_jj_3_3,marker='o',ms=2.0,c="darkgreen",label="_nolegend_")
 
     #plt.show()
     plt.gcf().set_size_inches(18.5/2.54,12/2.54)
@@ -478,9 +478,9 @@ if __name__=="__main__":
     bottom_panel_middle.xaxis.grid(True, which='minor',linestyle='--')
     #bottom_panel_middle.set_ylabel(r"$\operatorname{Re}\sigma_{jj}(\omega,\mathbf{q}=\mathbf{0})$")
 
-    bottom_panel_middle.plot(omega_infinite_corr_szsz_1_2,infinite_corr_susceptibility_szsz_1_2,marker='o',ms=2.0,c="red",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
-    bottom_panel_middle.plot(omega_infinite_corr_szsz_2_2,infinite_corr_susceptibility_szsz_2_2,marker='o',ms=2.0,c="blue",label="_nolegend_")
-    bottom_panel_middle.plot(omega_infinite_corr_szsz_3_2,infinite_corr_susceptibility_szsz_3_2,marker='o',ms=2.0,c="green",label="_nolegend_")
+    bottom_panel_middle.plot(omega_infinite_corr_szsz_1_2,-1.0*infinite_corr_susceptibility_szsz_1_2,marker='o',ms=2.0,c="red",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
+    bottom_panel_middle.plot(omega_infinite_corr_szsz_2_2,-1.0*infinite_corr_susceptibility_szsz_2_2,marker='o',ms=2.0,c="blue",label="_nolegend_")
+    bottom_panel_middle.plot(omega_infinite_corr_szsz_3_2,-1.0*infinite_corr_susceptibility_szsz_3_2,marker='o',ms=2.0,c="green",label="_nolegend_")
 
     # U=3.0
     top_panel_right = fig_szsz.add_subplot(grid[0,2])
@@ -520,7 +520,7 @@ if __name__=="__main__":
     #
     bottom_panel_right = fig_szsz.add_subplot(grid[2,2],sharex=top_panel_right)
     bottom_panel_right.grid()
-    bottom_panel_right.set_ylim(bottom=0.0,top=1.0)
+    bottom_panel_right.set_ylim(bottom=0.0,top=1.5)
     # bottom_panel_left.set_title(r"Infinite-ladder correction to $\langle j_xj_x\rangle$")
     bottom_panel_right.text(0.20,0.60,"il correction",transform=bottom_panel_right.transAxes,size=10,weight='bold')
     bottom_panel_right.set_xlabel(r"$\omega$",labelpad=-0.4)
@@ -530,9 +530,9 @@ if __name__=="__main__":
     bottom_panel_right.xaxis.set_minor_locator(AutoMinorLocator(n=2))
     bottom_panel_right.xaxis.grid(True, which='minor',linestyle='--')
 
-    # bottom_panel_right.plot(omega_infinite_corr_jj_1,infinite_corr_susceptibility_jj_1,marker='o',ms=2.0,c="red",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
-    bottom_panel_right.plot(omega_infinite_corr_jj_2_3,infinite_corr_susceptibility_jj_2_3,marker='o',ms=2.0,c="darkblue",label="_nolegend_")
-    bottom_panel_right.plot(omega_infinite_corr_jj_3_3,infinite_corr_susceptibility_jj_3_3,marker='o',ms=2.0,c="darkgreen",label="_nolegend_")
+    bottom_panel_right.plot(omega_infinite_corr_szsz_1_3,-1.0*infinite_corr_susceptibility_szsz_1_3,marker='o',ms=2.0,c="maroon",label="_nolegend_")#,label=r"$\mathbf{q}$=%.2f" % (0.0))
+    bottom_panel_right.plot(omega_infinite_corr_szsz_2_3,-1.0*infinite_corr_susceptibility_szsz_2_3,marker='o',ms=2.0,c="darkblue",label="_nolegend_")
+    bottom_panel_right.plot(omega_infinite_corr_szsz_3_3,-1.0*infinite_corr_susceptibility_szsz_3_3,marker='o',ms=2.0,c="darkgreen",label="_nolegend_")
 
 
     #plt.show()

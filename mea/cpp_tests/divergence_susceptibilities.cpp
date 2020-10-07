@@ -10,7 +10,8 @@ void writeInHDF5File(std::vector< Div >& arr_to_save, H5::H5File* file, const un
 std::complex<double> get_denom(const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_tilde, size_t n_bar, size_t k_t_b, double mu) noexcept;
 #if DIM == 1
 std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar, double kpp, double qq, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false);
-std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, double k_bar, size_t n_iqn, double qq, double mu, double U, double beta) noexcept(false);
+std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, size_t n_ikn_tilde, double k_bar, double k_tilde, size_t n_iqn, double qq, double mu, double U, double beta) noexcept(false);
+std::complex<double> Gamma_correction_denominator_extra_term(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<std::complex<double>>& SE, const std::vector<double>& k_arr, double k_tilde, double kpp, double qq, size_t n_ikn_tilde, size_t n_ikppn, size_t n_iqn, double mu, double U, double beta) noexcept(false);
 #elif DIM == 2
 std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, double k_bar_x,double k_bar_y, size_t n_iqn, double qq_x, double qq_y, double mu, double U, double beta) noexcept(false);
 std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar_x, double k_bar_y, double kpp_x, double kpp_y, double qq_x, double qq_y, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false);
@@ -52,7 +53,7 @@ int main(int argc, char** argv){
     #elif DIM == 3
     const double Hyb_c=6.0;
     #endif
-    const double dividing_factor = 1.4;
+    const double dividing_factor = 1.0;
     const double dividing_factor_corr = 1.00;
     #ifndef NCA
     // Saving on memory doing so. For DMFT loop, no parallelization is needed.
@@ -98,7 +99,7 @@ int main(int argc, char** argv){
     file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     std::vector< Div > div_arr;
     for (double U=U_init; U<=U_max; U+=U_step){
-        for (double beta=beta_init; beta<=beta_max; beta+=( (beta>=30.0) ? 4.0 : beta_step ) ){
+        for (double beta=beta_init; beta<=beta_max; beta+=( (beta>=20.0) ? 2.0 : beta_step ) ){
             const double delta_tau = beta/(double)(2*N_tau);
             // Bosonic Matsubara array
             for (size_t j=0; j<N_tau/2; j++){ // change Ntau for lower value to decrease time when testing...
@@ -136,6 +137,29 @@ int main(int argc, char** argv){
             //     outS << iwnArr_l[ii].imag() << " " << sigma_iwn[ii].imag() << "\n";
             // }
             // outS.close();
+            // std::ofstream outP("lol_test.dat",std::ios::out);
+            // std::complex<double> denom_val{0.0};
+            // const Integrals intObj;
+            // const size_t NI = iwn.size();
+            // std::function<std::complex<double>(double)> int_k_1D;
+            // const size_t n_ikn_tilde = N_tau/4, n_ikppn = N_tau/4, n_iqn = 0;
+            // std::complex<double> iqppn, ikn_tilde = iwn[n_ikn_tilde], ikppn = iwn[n_ikppn], iiqn = iqn[n_iqn];
+            // for (size_t n_k_tilde=0; n_k_tilde<k_t_b_array.size(); n_k_tilde++){
+            //     for (size_t n_k_pp=0; n_k_pp<k_t_b_array.size(); n_k_pp++){
+            //         for (size_t n_q_pp=0; n_q_pp<iqn_tilde.size(); n_q_pp++){
+            //             iqppn = iqn_tilde[n_q_pp];
+            //             int_k_1D = [&](double q_pp){
+            //                 return 1.0/( ( ikn_tilde - iqppn + iiqn ) + mu - epsilonk(k_t_b_array[n_k_tilde]+0.0-q_pp) - sigma_iwn[(2*NI-1)+n_ikn_tilde+n_iqn-n_q_pp] 
+            //                 )*1.0/( ( ikppn - iqppn ) + mu - epsilonk(k_t_b_array[n_k_pp]-q_pp) - sigma_iwn[(2*NI-1)+n_ikppn-n_q_pp] );
+            //             };
+            //             denom_val += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
+            //         }
+            //         denom_val *= U/beta/(2.0*M_PI);
+            //         outP << denom_val.real() << " ";
+            //     }
+            //     outP << "\n";
+            // }
+            // outP.close();
             // exit(0);
             #else
             auto sigma_iwn = DMFTNCA(Hyb,SE_0,SE_1,SE_2,G_0,G_1,G_2,dG_0,dG_1,dG_2,SE_iwn,Gloc_iwn,U,beta,Hyb_c,alpha,delta_tau,N_tau);
@@ -147,13 +171,13 @@ int main(int argc, char** argv){
             auto val_denom = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
             #else
             #if DIM == 1
-            auto val_denom_sl = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
-            auto val_denom_corr = Gamma_merged_corr(iwn,iqn,sigma_iwn,n_bar,k_t_b_array[N_k-1],0,0.0,mu,U/dividing_factor_corr,beta);
+            // auto val_denom_sl = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
+            auto val_denom = Gamma_merged_corr(iqn_tilde,iwn,iqn,k_t_b_array,sigma_iwn,n_bar,n_tilde,k_t_b_array[N_k/4],k_t_b_array[3*N_k/4],0,0.0,mu,U/dividing_factor_corr,beta); // N_k/4, 3*N_k/4
             #elif DIM == 2
             auto val_denom_sl = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
             auto val_denom_corr = Gamma_merged_corr(iwn,iqn,sigma_iwn,n_bar,k_t_b_array[N_k-1],k_t_b_array[N_k-1],0,0.0,0.0,mu,U/dividing_factor,beta);
             #endif
-            auto val_denom = val_denom_sl-val_denom_corr;
+            //auto val_denom = val_denom_sl-val_denom_corr;
             #endif
             div_arr.push_back( Div{1.0/beta,val_denom.real()} );
 
@@ -219,7 +243,27 @@ std::complex<double> Gamma_correction_denominator(const std::vector< std::comple
     return 1.0/denom_val;
 }
 
-std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, double k_bar, size_t n_iqn, double qq, double mu, double U, double beta) noexcept(false){
+std::complex<double> Gamma_correction_denominator_extra_term(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<std::complex<double>>& SE, const std::vector<double>& k_arr, double k_tilde, double kpp, double qq, size_t n_ikn_tilde, size_t n_ikppn, size_t n_iqn, double mu, double U, double beta) noexcept(false){
+    std::complex<double> denom_val{0.0};
+    const Integrals intObj;
+    const size_t NI = iwn.size();
+    std::function<std::complex<double>(double)> int_k_1D;
+    std::complex<double> iqppn, ikn_tilde = iwn[n_ikn_tilde], ikppn = iwn[n_ikppn], iiqn = iqn[n_iqn];
+    for (size_t n_q_pp=0; n_q_pp<iqn_tilde.size(); n_q_pp++){
+        iqppn = iqn_tilde[n_q_pp];
+        int_k_1D = [&](double q_pp){
+            return 1.0/( ( ikn_tilde - iqppn + iiqn ) + mu - epsilonk(k_arr[n_ikn_tilde]+qq-q_pp) - SE[(2*NI-1)+n_ikn_tilde+n_iqn-n_q_pp] 
+            )*1.0/( ( ikppn - iqppn ) + mu - epsilonk(kpp-q_pp) - SE[(2*NI-1)+n_ikppn-n_q_pp] );
+        };
+        denom_val += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
+    }
+    denom_val *= U/beta/(2.0*M_PI);
+    denom_val += 1.0;
+
+    return denom_val;
+}
+
+std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, size_t n_ikn_tilde, double k_bar, double k_tilde, size_t n_iqn, double qq, double mu, double U, double beta) noexcept(false){
     // This function method is an implicit function of k_bar and ikn_bar
     std::complex<double> tot_corr{0.0};
     const Integrals intObj;
@@ -234,7 +278,7 @@ std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >
             return ( 1.0/( ikppn + mu - epsilonk(k_pp) - SE[3*NI/2+n_pp] )
                 )*Gamma_correction_denominator(iwn,SE,k_bar,k_pp,qq,n_ikn_bar,n_pp,mu,U,beta
                 )*( 1.0/( ikppn - iqqn + mu - epsilonk(k_pp-qq) - SE[3*NI/2+n_pp-n_iqn] )
-                );
+                )*Gamma_correction_denominator_extra_term(iqn_tilde,iwn,iqn,SE,k_arr,k_tilde,k_pp,qq,n_ikn_tilde,n_pp,n_iqn,mu,U,beta);
         };
         tot_corr += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
     }

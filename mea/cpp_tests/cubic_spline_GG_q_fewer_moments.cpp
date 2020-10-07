@@ -18,7 +18,7 @@ template<typename T, typename... Ts> inline T eps(T,Ts...);
 int main(void){
     
     #ifndef NCA
-    std::string inputFilename("../../build10/data/1D_U_3.000000_beta_6.500000_n_0.500000_N_tau_2048/Self_energy_1D_U_3.000000_beta_6.500000_n_0.500000_N_tau_2048_Nit_6.dat");
+    std::string inputFilename("../../build/data/2D_U_2.000000_beta_7.000000_n_0.500000_N_tau_1024/Self_energy_2D_U_2.000000_beta_7.000000_n_0.500000_N_tau_1024_Nit_4.dat");
     #else
     std::string inputFilename("../../../NCA_OCA/data_2D_test_NCA_damping_0.000000/2D_U_14.000000_beta_3.500000_n_0.500000_Ntau_4096/SE_2D_NCA_AFM_U_14.000000_beta_3.500000_N_tau_4096_h_0.000000_Nit_111.dat");
     #endif
@@ -33,7 +33,7 @@ int main(void){
     const unsigned int NCA_Ntau = 2*(unsigned int)atof(results[2].c_str());
     const unsigned int Ntau = 2*1024;
     #endif
-    const unsigned int N_k = 301;
+    const unsigned int N_k = 51;
     const unsigned int N_q = 3;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
@@ -395,8 +395,8 @@ int main(void){
                 }
                 std::vector< std::complex<double> > GG_iqn_tmp_jj(tmp_int_iqn_k_jj(j,arma::span::all).begin(),tmp_int_iqn_k_jj(j,arma::span::all).end());
                 std::vector< std::complex<double> > GG_iqn_tmp_szsz(tmp_int_iqn_k_szsz(j,arma::span::all).begin(),tmp_int_iqn_k_szsz(j,arma::span::all).end());
-                GG_iqn_q_jj[j] = 2.0*2.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_tmp_jj),delta,"simpson");
-                GG_iqn_q_szsz[j] = 2.0*2.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_tmp_szsz),delta,"simpson");
+                GG_iqn_q_jj[j] = 2.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_tmp_jj),delta,"simpson");
+                GG_iqn_q_szsz[j] = 2.0/(2.0*M_PI)*integralsObj.I1D_VEC(std::move(GG_iqn_tmp_szsz),delta,"simpson");
             }
 
             std::string DATASET_NAME("qx_"+std::to_string(q_array[emx])+"_qy_"+std::to_string(q_array[emy]));

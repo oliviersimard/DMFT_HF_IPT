@@ -77,6 +77,7 @@ if __name__=="__main__":
     parser = OptionParser()
     AVERAGE_OR_SIMPS = "AVERAGE" ## can be "AVERAGE" or "SIMPS". The choice selects the inetagration scheme.
     DIM = 1 # can be 1 or 2
+    SAVE_PADE = False # to enable the PADE analytical continuation to be saved...
     parser.add_option("--data", dest="data", default="data.in")
 
     if not is_ready_to_plot:
@@ -95,7 +96,7 @@ if __name__=="__main__":
         if "_infinite_" in options.data or "_2D_" in options.data:
             Ntau = Ntau//4
         else:
-            Ntau = Ntau
+            Ntau = Ntau//2
         U = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",options.data)[0])
 
         print("beta: ", beta, " and Ntau: ", Ntau, " and U: ", U)
@@ -202,18 +203,24 @@ if __name__=="__main__":
                 norm_chi_q_w_szsz[j] = chi_q_w_szsz_im[j]/om
 
         ##
-        plt.plot(qn_array,list(map(lambda x: x.real, sum_chi_q_iqn_szsz)),marker='*',c="red")
+        plt.plot(qn_array,list(map(lambda x: x.real, sum_chi_q_iqn_jj)),marker='*',c="red",label="jj")
+        plt.plot(qn_array,list(map(lambda x: x.real, sum_chi_q_iqn_szsz)),marker='*',c="blue",label="szsz")
         with open(options.data+"_iqn_szsz","w") as f:
             for i in range(len(qn_array)):
                 f.write("{0:.8f}\t{1:.8f}\t{2:.8f}\n".format(qn_array[i].real,sum_chi_q_iqn_szsz[i].real,sum_chi_q_iqn_szsz[i].imag))
         f.close()
-        with h5py.File(options.data+".pade_wmax_{0}_m_{1}_eta_{2}".format(wmax,TAILCUT,ETA),"a") as hfpade:
-            grp = hfpade.create_group("susc")
-            # jj dataset
-            grp.create_dataset("jj", (Nreal,), dtype=float, data=norm_chi_q_w_jj)
-            # szsz dataset
-            grp.create_dataset("szsz", (Nreal,), dtype=float, data=norm_chi_q_w_szsz)
-        hfpade.close()
-
+        with open(options.data+"_iqn_jj","w") as f:
+            for i in range(len(qn_array)):
+                f.write("{0:.8f}\t{1:.8f}\t{2:.8f}\n".format(qn_array[i].real,sum_chi_q_iqn_jj[i].real,sum_chi_q_iqn_jj[i].imag))
+        f.close()
+        if SAVE_PADE:
+            with h5py.File(options.data+".pade_wmax_{0}_m_{1}_eta_{2}".format(wmax,TAILCUT,ETA),"a") as hfpade:
+                grp = hfpade.create_group("susc")
+                # jj dataset
+                grp.create_dataset("jj", (Nreal,), dtype=float, data=norm_chi_q_w_jj)
+                # szsz dataset
+                grp.create_dataset("szsz", (Nreal,), dtype=float, data=norm_chi_q_w_szsz)
+            hfpade.close()
+        plt.legend()
         plt.show()
         plt.clf()

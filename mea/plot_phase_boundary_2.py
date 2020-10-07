@@ -232,8 +232,47 @@ if __name__=="__main__":
         if np.isclose(-1.0,val_closest[1],atol=2e-1): # making sure it actually crosses -1.0
             dict_U_div_T[Uss_sl[i]] = (val_closest[0]+U_slice_for_betas[other_idx][0])/2.0
     
-    Uss_sl = list(dict_U_div_T.keys())
-    Tss_sl = list(dict_U_div_T.values())
+    Uss_sl = np.array(list(dict_U_div_T.keys()))
+    Tss_sl = np.array(list(dict_U_div_T.values()))
+    hf.close()
+
+    filename_div_sl_2 = "./cpp_tests/div/div_1D_U_3.000000_0.250000_5.000000_beta_1.000000_0.050000_5.000000_Ntau_2048_Nk_51_DIV_1.000000_single_ladder_sum.hdf5"
+    betas_2 = findall(r"beta_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)",filename_div_sl_2)[0]
+    Us_2 = findall(r"U_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)_(\d*\.\d+|\d+)",filename_div_sl_2)[0]
+    beta_init_2 = float(betas_2[0]); beta_step_2 = float(betas_2[1]); beta_max_2 = float(betas_2[2])
+    beta_arr_2 = np.arange(beta_init_2,beta_max_2+beta_step_2,step=beta_step_2)
+    U_init_2 = float(Us_2[0]); U_max_2 = float(Us_2[2])
+
+    hf = h5py.File(filename_div_sl_2,"r")
+    list_keys = list(hf.keys())
+    # extracting the Us from the keys
+    Uss_sl_2 = []
+    dict_U_div_T_2 = {}
+    for i,key in enumerate(list_keys):
+        Uss_sl_2.append(float(findall(r"(?<=U_)(\d*\.\d+|\d+)",key)[0]))
+        U_slice_for_betas = list(hf.get(key))
+        idx_closest, val_closest = get_pts_close_to_num(U_slice_for_betas,-1.0)
+        
+        other_idx=0
+        if val_closest[1]>-1.0 and idx_closest!=(len(U_slice_for_betas)-1):
+            other_idx=idx_closest+1
+        else:
+            other_idx=idx_closest-1
+
+        print("sl: ",Uss_sl_2[-1]," idx closest: ", idx_closest, " val closest: ", val_closest, " other idx: ", other_idx, " other val: ", U_slice_for_betas[other_idx])
+        if np.isclose(-1.0,val_closest[1],atol=2e-1): # making sure it actually crosses -1.0
+            dict_U_div_T_2[Uss_sl_2[i]] = (val_closest[0]+U_slice_for_betas[other_idx][0])/2.0
+    
+    idx_U_min_val_to_replace = np.where(Uss_sl==U_init_2)[0][0]
+    idx_U_max_val_to_replace = np.where(Uss_sl==U_max_2)[0][0]
+
+    print("INDEXES: ", idx_U_min_val_to_replace, " ", idx_U_max_val_to_replace)
+
+    Uss_sl_2 = np.array(list(dict_U_div_T_2.keys()))
+    Tss_sl_2 = np.array(list(dict_U_div_T_2.values()))
+    # to include a region where enhanced precision in needed
+    Uss_sl = list(Uss_sl[:idx_U_min_val_to_replace])+list(Uss_sl_2)+list(Uss_sl[idx_U_max_val_to_replace+1:])
+    Tss_sl = list(Tss_sl[:idx_U_min_val_to_replace])+list(Tss_sl_2)+list(Tss_sl[idx_U_max_val_to_replace+1:])
     hf.close()
     # NCA sl
     # filename_div_sl_NCA = "./cpp_tests/div/div_1D_U_2.000000_1.000000_7.000000_beta_1.000000_0.250000_50.000000_Ntau_4096_Nk_51_NCA_single_ladder_sum.hdf5"
