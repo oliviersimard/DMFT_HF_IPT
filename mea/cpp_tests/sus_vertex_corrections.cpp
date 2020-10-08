@@ -27,13 +27,13 @@ int main(int argc, char** argv){
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
     #else
     const size_t NCA_Ntau = 2*(unsigned int)atoi(results[2].c_str()); // size of the full NCA calculation
-    const size_t Ntau = 2*8; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
+    const size_t Ntau = 2*16; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
     #endif
     // Has to be a power of two as well: this is no change from IPT.
     assert(Ntau%2==0);
-    const int iqn_div = 4;
-    const unsigned int N_q = 5;
-    const unsigned int N_k = 5;
+    const int iqn_div = 2;
+    const unsigned int N_q = 7;
+    const unsigned int N_k = 7;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling. Depending whether AFM-PM solution is loaded or not, mu=U/2 in PM only scenario and mu=0.0 in AFM-PM scenario.
@@ -182,7 +182,7 @@ int main(int argc, char** argv){
     size_t iii = 0;
     for (size_t j=0; j<iwn.size(); j++){
         // ofNCA << (iwn[iii]-iwn[j]+iqn[12]).imag() << "  " << sigma_iwn[(2*iwn.size()-1)+iii-j+12].real() << "  " << sigma_iwn[(2*iwn.size()-1)+iii-j+12].imag() << "\n";
-        ofNCA << (iwn[j]+iqn[iii]).imag() << "  " << sigma_iwn[(5*Ntau/2)+j+iii].real() << "  " << sigma_iwn[(5*Ntau/2)+j+iii].imag() << "\n";
+        ofNCA << (iwn[j]+iqn[iii]).imag() << "  " << sigma_iwn[(7*Ntau/2)+j+iii].real() << "  " << sigma_iwn[(7*Ntau/2)+j+iii].imag() << "\n";
     }
     ofNCA.close();
     for (size_t j=0; j<iwn.size(); j++){
@@ -250,7 +250,7 @@ int main(int argc, char** argv){
             }
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "infinite_ladder_obj number " << i+1 << "/" << num_elem_per_proc_precomp+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            std::cout << "ladder_corr_obj number " << i+1 << "/" << num_elem_per_proc_precomp+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
         }
         // ierr = MPI_Barrier(MPI_COMM_WORLD); <----------------------------------------------
         // collecting from the slave processes
@@ -285,7 +285,7 @@ int main(int argc, char** argv){
             }
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "infinite_ladder_obj number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            std::cout << "ladder_corr_obj number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
         }
         num_elem_to_receive *= (int)iqn_big_array.size();
         // ierr = MPI_Barrier(MPI_COMM_WORLD); <-------------------------------------------------
@@ -327,7 +327,7 @@ int main(int argc, char** argv){
             }
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "infinite_ladder_obj number " << i+1 << "/" << num_elem_per_proc_precomp+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            std::cout << "lambda_even_obj number " << i+1 << "/" << num_elem_per_proc_precomp+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
         }
         // ierr = MPI_Barrier(MPI_COMM_WORLD); <----------------------------------------------
         // collecting from the slave processes
@@ -359,7 +359,7 @@ int main(int argc, char** argv){
             }
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "infinite_ladder_obj number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            std::cout << "lambda_even_obj number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
         }
         num_elem_to_receive *= (int)iqn.size()*(int)iwn.size();
         // ierr = MPI_Barrier(MPI_COMM_WORLD); <-------------------------------------------------
@@ -466,7 +466,7 @@ int main(int argc, char** argv){
             }
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "one_ladder_obj number " << i+1 << "/" << num_elem_per_proc+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            std::cout << "number " << i+1 << "/" << num_elem_per_proc+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
             gathered_MPI_data->push_back(std::move(GG_iqn));
             // printf("(%li,%li) calculated by root process\n", mpidataObj.k_bar, mpidataObj.k_tilde);
             #ifndef INFINITE
@@ -580,7 +580,7 @@ int main(int argc, char** argv){
 
             clock_t end = clock();
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "one_ladder_obj number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+            std::cout << "number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
             gathered_MPI_data->push_back(std::move(GG_iqn));
             // printf("(%li, %li) calculated by slave_process %d\n", mpidataObj.k_bar, mpidataObj.k_tilde, world_rank); //, (void*)&vec_for_slaves);
         }

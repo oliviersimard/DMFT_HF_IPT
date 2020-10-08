@@ -395,16 +395,17 @@ T IPT2::InfiniteLadders< T >::chi_corr(size_t n_ikn_tilde, size_t n_k_tilde, siz
     T iqpn = OneLadder< T >::_iqn_tilde[n_iqpn], iqqn = OneLadder< T >::_iqn[n_iqn];
     double qpp, qp=OneLadder< T >::_k_t_b[n_qp], k_tilde=OneLadder< T >::_k_t_b[n_k_tilde];//, k_bar=OneLadder< T >::_k_t_b[n_k_bar];
     const int ladder_shift_simple = ((int)OneLadder< T >::_iqn_big_array.size()/2-(int)NI/2)+1;
-    const int ladder_shift_complex = ((int)OneLadder< T >::_iqn_big_array.size()/2+(int)NI)+2;
+    const int ladder_shift_complex = ((int)OneLadder< T >::_iqn_big_array.size()/2-(int)NI)+2;
     for (size_t n_iqppn=0; n_iqppn<OneLadder< T >::_iqn_tilde.size(); n_iqppn++){
         iqppn = OneLadder< T >::_iqn_tilde[n_iqppn];
         for (size_t n_qpp=0; n_qpp<OneLadder< T >::_k_t_b.size(); n_qpp++){
+            //std::cout << (int)ladder_shift_complex+(int)n_ikn_tilde+(int)n_iqn+(int)n_iqpn+(int)n_iqppn+(int)n_ikn_bar << " " << k_resizing((int)n_k_tilde-(int)n_qp-(int)n_qpp-(int)n_k_bar) << std::endl;
             qpp = OneLadder< T >::_k_t_b[n_qpp];
             int_k_1D[n_qpp] = ( 1.0 / ( ikn_tilde+iqqn-iqpn + OneLadder< T >::_mu - epsilonk(k_tilde+qq-qp) - OneLadder< T >::_SE[(SE_multiple_matsubara_Ntau/2*NI-1)+n_ikn_tilde+n_iqn-n_iqpn] ) 
             )*( 1.0 / ( ikn_tilde-iqpn + OneLadder< T >::_mu - epsilonk(k_tilde-qp) - OneLadder< T >::_SE[(SE_multiple_matsubara_Ntau/2*NI-1)+n_ikn_tilde-n_iqpn] ) 
             )*_ladder_larger(n_iqppn+ladder_shift_simple,n_qpp)*( 1.0 / ( ikn_tilde+iqqn-iqpn-iqppn + OneLadder< T >::_mu - epsilonk(k_tilde+qq-qp-qpp) - OneLadder< T >::_SE[(SE_multiple_matsubara_Ntau/2*NI+NI/2-2)+n_ikn_tilde+n_iqn-n_iqpn-n_iqppn] ) 
             )*( 1.0 / ( ikn_tilde-iqpn-iqppn + OneLadder< T >::_mu - epsilonk(k_tilde-qp-qpp) - OneLadder< T >::_SE[(SE_multiple_matsubara_Ntau/2*NI+NI/2-2)+n_ikn_tilde-n_iqpn-n_iqppn] ) 
-            )*_ladder_larger(ladder_shift_complex+n_ikn_tilde+n_iqn-n_iqpn-n_iqppn-n_ikn_bar,k_resizing((int)n_k_tilde-(int)n_qp-(int)n_qpp-(int)n_k_bar));
+            )*_ladder_larger(ladder_shift_complex-n_ikn_tilde-n_iqn+n_iqpn+n_iqppn+n_ikn_bar,k_resizing((int)n_k_tilde-(int)n_qp-(int)n_qpp-(int)n_k_bar));
         }
         val += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_k_1D,delta,"simpson");
     }
@@ -422,12 +423,14 @@ T IPT2::InfiniteLadders< T >::ladder_merged_with_chi_corr(size_t n_ikn_tilde, si
     double delta = 2.0*M_PI/(double)(OneLadder< T >::_k_t_b.size()-1);
     const size_t NI = OneLadder< T >::_splInlineobj._iwn_array.size();
     const int ladder_shift = ((int)OneLadder< T >::_iqn_big_array.size()/2-(int)NI/2)+1;
+    
     for (size_t n_iqpn=0; n_iqpn<OneLadder< T >::_iqn_tilde.size(); n_iqpn++){
         for (size_t n_qp=0; n_qp<OneLadder< T >::_k_t_b.size(); n_qp++){
             int_k_1D[n_qp] = _ladder_larger(n_iqpn+ladder_shift,n_qp)*chi_corr(n_ikn_tilde,n_k_tilde,n_ikn_bar,n_k_bar,n_iqpn,n_qp,n_iqn,qq);
         }
         val += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_k_1D,delta,"simpson");
     }
+    
     val *= 1.0/OneLadder< T >::_beta;
 
     return val;
@@ -530,10 +533,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     // Here should have the choice the load the precomputed single ladder denominator or not to save time...
     const size_t NI = OneLadder< T >::_splInlineobj._iwn_array.size();
     const size_t starting_point_SE = ((double)SE_multiple_matsubara_Ntau/2.0-1.0/2.0)*(int)NI;
-    
-    // For each ikn_bar value, one has to complete the summation over kpp and ikppn by calling Gamma_merged_corr
-    // ikn_bar-diagonal summation over the correction term degrees of freedom
-    std::vector< T > ikn_bar_corr(NI);
+
     // Single ladder and its corrections
     arma::Mat< T > GG_n_tilde_n_bar_even(NI,NI), GG_n_tilde_n_bar_odd(NI,NI);
     T jj_resp_iqn{0.0}, szsz_resp_iqn{0.0};
@@ -542,32 +542,28 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     for (size_t n_em=0; n_em<OneLadder< T >::_iqn.size(); n_em++){
         begin = clock();
-        std::cout << "world_rank " << world_rank << " issued " << n_em << std::endl;
+        //std::cout << "world_rank " << world_rank << " issued " << n_em << std::endl;
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
                 GG_n_tilde_n_bar_odd(n_tilde,n_bar) = ( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]) - OneLadder< T >::_SE[starting_point_SE+n_tilde] ) 
-                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]-qq) - OneLadder< T >::_SE[starting_point_SE+n_tilde-n_em] ) 
+                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]+OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]+qq) - OneLadder< T >::_SE[starting_point_SE+n_tilde+n_em] ) 
                     )*ladder_merged_with_chi_corr(n_tilde,n_k_tilde,n_bar,n_k_bar,n_em,qq
-                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]) - OneLadder< T >::_SE[starting_point_SE+n_bar] ) 
-                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-qq) - OneLadder< T >::_SE[starting_point_SE+n_bar-n_em] ) );
+                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]) - OneLadder< T >::_SE[starting_point_SE+n_bar] ) 
+                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]+qq) - OneLadder< T >::_SE[starting_point_SE+n_bar+n_em] ) );
                 
-                GG_n_tilde_n_bar_even(n_tilde,n_bar) = ( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]) - OneLadder< T >::_SE[starting_point_SE+n_tilde] ) 
-                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]-qq) - OneLadder< T >::_SE[starting_point_SE+n_tilde-n_em] ) 
-                    )*ladder_merged_with_chi_corr(n_tilde,n_k_tilde,n_bar,n_k_bar,n_em,qq
-                    )*_lambda_even(n_em,n_bar,n_k_bar)*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]+OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]) - OneLadder< T >::_SE[starting_point_SE+n_bar] ) 
-                    )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-qq) - OneLadder< T >::_SE[starting_point_SE+n_bar-n_em] ) );
+                GG_n_tilde_n_bar_even(n_tilde,n_bar) = GG_n_tilde_n_bar_odd(n_tilde,n_bar)*_lambda_even(n_em,n_bar,n_k_bar);
             }
         }
         
         // summing over the internal ikn_tilde and ikn_bar
         jj_resp_iqn = -2.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(1.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(arma::accu(GG_n_tilde_n_bar_even)+arma::accu(GG_n_tilde_n_bar_odd));
-        szsz_resp_iqn = (2.0*1.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(arma::accu(GG_n_tilde_n_bar_odd)-arma::accu(GG_n_tilde_n_bar_even));
+        szsz_resp_iqn = (2.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(arma::accu(GG_n_tilde_n_bar_odd)-arma::accu(GG_n_tilde_n_bar_even));
         MPIData mpi_data_tmp { n_k_tilde, n_k_bar, jj_resp_iqn, szsz_resp_iqn };
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
        
         end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "infinite ladder loop n_em: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
+        std::cout << "n_em: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
     }
 
     return GG_iqn;
