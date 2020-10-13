@@ -1,6 +1,9 @@
 #include "sus_vertex_corrections.hpp"
 #include "../../src/json_utils.hpp"
 
+static const int Ntau_division_factor = 8;
+static arma::Mat< std::complex<double> > _ladder;
+
 typedef struct Div{
     double beta;
     double dnom_re;
@@ -9,9 +12,10 @@ typedef struct Div{
 void writeInHDF5File(std::vector< Div >& arr_to_save, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false);
 std::complex<double> get_denom(const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& iwn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_tilde, size_t n_bar, size_t k_t_b, double mu) noexcept;
 #if DIM == 1
-std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar, double kpp, double qq, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false);
-std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, size_t n_ikn_tilde, double k_bar, double k_tilde, size_t n_iqn, double qq, double mu, double U, double beta) noexcept(false);
-std::complex<double> Gamma_correction_denominator_extra_term(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<std::complex<double>>& SE, const std::vector<double>& k_arr, double k_tilde, double kpp, double qq, size_t n_ikn_tilde, size_t n_ikppn, size_t n_iqn, double mu, double U, double beta) noexcept(false);
+std::complex<double> ladder(size_t n_iqpn, double qp, double mu, double beta, double U, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& SE, int SE_shift) noexcept;
+std::complex<double> ladder_2(std::complex<double> iqqn, double k, int n_iqqn, double mu, double beta, double U, const std::vector<std::complex<double>>& iwn, const std::vector<std::complex<double>>& SE) noexcept;
+std::complex<double> chi_corr(size_t n_ikn_tilde, size_t k_tilde, size_t n_ikn_bar, size_t k_bar, size_t n_iqpn, size_t n_qp, size_t n_iqn, double qq, double mu, double beta, double U, const std::vector<std::complex<double>>& SE, const std::vector<std::complex<double>>& iqn_tilde, const std::vector<std::complex<double>>& iwn, const std::vector<std::complex<double>>& iqn, const std::vector<double>& k_arr) noexcept;
+std::complex<double> ladder_merged_with_chi_corr(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, size_t n_ikn_tilde, size_t n_k_bar, size_t n_k_tilde, size_t n_iqn, double qq, double mu, double U, double beta) noexcept;
 #elif DIM == 2
 std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, double k_bar_x,double k_bar_y, size_t n_iqn, double qq_x, double qq_y, double mu, double U, double beta) noexcept(false);
 std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar_x, double k_bar_y, double kpp_x, double kpp_y, double qq_x, double qq_y, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false);
@@ -54,7 +58,7 @@ int main(int argc, char** argv){
     const double Hyb_c=6.0;
     #endif
     const double dividing_factor = 1.0;
-    const double dividing_factor_corr = 1.00;
+    const double dividing_factor_corr = 1.0;
     #ifndef NCA
     // Saving on memory doing so. For DMFT loop, no parallelization is needed.
     arma::Cube<double> weiss_green_A_matsubara_t_pos(2,2,2*N_tau+1,arma::fill::zeros), weiss_green_A_matsubara_t_neg(2,2,2*N_tau+1,arma::fill::zeros); 
@@ -78,7 +82,7 @@ int main(int argc, char** argv){
     arma::Cube< std::complex<double> > SE_iwn(2,2,2*N_tau,arma::fill::zeros), Gloc_iwn(2,2,2*N_tau,arma::fill::zeros);
     std::vector< std::complex<double> > G_up_iwn(2*N_tau), Hyb_up_iwn(2*N_tau), G_down_iwn(2*N_tau), Hyb_down_iwn(2*N_tau);
     #endif
-    std::vector< std::complex<double> > iqn, iqn_tilde, iwn(N_tau/2); // for the inner loop inside Gamma.
+    std::vector< std::complex<double> > iqn, iqn_tilde, iwn(2*N_tau/Ntau_division_factor), iqn_tilde_big; // for the inner loop inside Gamma.
     // HDF5 business
     H5::H5File* file = nullptr;
     #ifdef INFINITE
@@ -99,23 +103,22 @@ int main(int argc, char** argv){
     file = new H5::H5File( FILE_NAME, H5F_ACC_TRUNC );
     std::vector< Div > div_arr;
     for (double U=U_init; U<=U_max; U+=U_step){
-        for (double beta=beta_init; beta<=beta_max; beta+=( (beta>=20.0) ? 2.0 : beta_step ) ){
+        for (double beta=beta_init; beta<=beta_max; beta+=( (beta>=40.0) ? 2.0 : beta_step ) ){
             const double delta_tau = beta/(double)(2*N_tau);
             // Bosonic Matsubara array
             for (size_t j=0; j<N_tau/2; j++){ // change Ntau for lower value to decrease time when testing...
                 iqn.push_back( std::complex<double>( 0.0, (2.0*j)*M_PI/beta ) );
             }
-            for (signed int j=(-(signed int)N_tau/4)+1; j<(signed int)N_tau/4; j++){ // Bosonic frequencies.
+            for (signed int j=(-(signed int)N_tau/Ntau_division_factor)+1; j<(signed int)N_tau/Ntau_division_factor; j++){ // Bosonic frequencies.
                 iqn_tilde.push_back( std::complex<double>( 0.0, (2.0*(double)j)*M_PI/beta ) );
             }
-            // // Fermionic Matsubara array
-            // for (signed int j=(-(signed int)N_tau/4); j<(signed int)N_tau/4; j++){ // Fermionic frequencies.
-            //     iwn.push_back( std::complex<double>( 0.0, (2.0*(double)j+1.0)*M_PI/beta ) );
-            // }
             for (signed int j=(-(signed int)N_tau); j<(signed int)N_tau; j++){ // Fermionic frequencies.
                 iwnArr_l.push_back( std::complex<double>( 0.0, (2.0*(double)j+1.0)*M_PI/beta ) );
             }
-            std::transform(iwnArr_l.data()+iwnArr_l.size()/2-N_tau/4,iwnArr_l.data()+iwnArr_l.size()/2+N_tau/4,iwn.data(),[](std::complex<double> d){ return d; });
+            for (signed int j=(-3*(signed int)N_tau/4)+1; j<3*(signed int)N_tau/4; j++){ // Fermionic frequencies.
+                iqn_tilde_big.push_back( std::complex<double>( 0.0, (2.0*(double)j)*M_PI/beta ) );
+            }
+            std::transform(iwnArr_l.data()+iwnArr_l.size()/2-N_tau/Ntau_division_factor,iwnArr_l.data()+iwnArr_l.size()/2+N_tau/Ntau_division_factor,iwn.data(),[](std::complex<double> d){ return d; });
 
             const double mu = U/2.0; // Half-filling.
             #ifndef NCA
@@ -166,13 +169,20 @@ int main(int argc, char** argv){
             #endif
 
             // N_tau/4 corresponds to the lowest positive fermionic Matsubara freq.
-            const unsigned int n_bar = N_tau/4, n_tilde = N_tau/4;
+            const unsigned int n_bar = N_tau/Ntau_division_factor, n_tilde = N_tau/Ntau_division_factor;
             #ifndef INFINITE
             auto val_denom = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
             #else
             #if DIM == 1
+            _ladder = arma::Mat<std::complex<double>>(iqn_tilde_big.size(),k_t_b_array.size());
             // auto val_denom_sl = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
-            auto val_denom = Gamma_merged_corr(iqn_tilde,iwn,iqn,k_t_b_array,sigma_iwn,n_bar,n_tilde,k_t_b_array[N_k/4],k_t_b_array[3*N_k/4],0,0.0,mu,U/dividing_factor_corr,beta); // N_k/4, 3*N_k/4
+            std::cout << "iqn size: " << iqn.size() << " iqn_tilde size " << iqn_tilde.size() << " SE size " << sigma_iwn.size() << " _ladder n_rows " << _ladder.n_rows << std::endl;
+            for (size_t n_iqpn=0; n_iqpn<iqn_tilde_big.size(); n_iqpn++){
+                for (size_t n_qp=0; n_qp<k_t_b_array.size(); n_qp++){
+                    _ladder(n_iqpn,n_qp) = ladder(n_iqpn,k_t_b_array[n_qp],mu,beta,U,iwn,iqn_tilde_big,sigma_iwn,3*(int)N_tau/4-1);
+                }
+            }
+            auto val_denom = ladder_merged_with_chi_corr(iqn_tilde,iwn,iqn,k_t_b_array,sigma_iwn,n_bar,n_tilde,N_k/4,3*N_k/4,0,0.0,mu,U/dividing_factor_corr,beta); // N_k/4, 3*N_k/4
             #elif DIM == 2
             auto val_denom_sl = U/dividing_factor*get_denom(iqn_tilde,iwn,k_t_b_array,sigma_iwn,n_tilde,n_bar,N_k-1,mu)/beta;
             auto val_denom_corr = Gamma_merged_corr(iwn,iqn,sigma_iwn,n_bar,k_t_b_array[N_k-1],k_t_b_array[N_k-1],0,0.0,0.0,mu,U/dividing_factor,beta);
@@ -184,6 +194,7 @@ int main(int argc, char** argv){
 
             iqn.clear();
             iqn_tilde.clear();
+            iqn_tilde_big.clear();
             iwnArr_l.clear(); // Clearing to not append at each iteration over previous set.
         }
         H5std_string DATASET_NAME("U_"+std::to_string(U));
@@ -222,70 +233,112 @@ std::complex<double> get_denom(const std::vector< std::complex<double> >& iqn_ti
 }
 
 #if DIM == 1
-std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar, double kpp, double qq, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false){
-    std::complex<double> denom_val{0.0};
+std::complex<double> ladder(size_t n_iqpn, double qp, double mu, double beta, double U, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& SE, int SE_shift) noexcept{
+    std::complex<double> lower_val{0.0};
     const Integrals intObj;
-    const size_t NI = iwn.size();
-    std::function<std::complex<double>(double)> int_k_1D;
-    std::complex<double> ikpppn, ikn_bar = iwn[n_ikn_bar], ikppn = iwn[n_ikppn];
-    for (size_t n_ppp=0; n_ppp<iwn.size(); n_ppp++){
-        ikpppn = iwn[n_ppp];
-        int_k_1D = [&](double k_ppp){
-            return ( 1.0 / ( ikpppn+ikppn-ikn_bar + mu - epsilonk(k_ppp+kpp-k_bar) - SE[3*NI/2+n_ppp+n_ikppn-n_ikn_bar] ) 
-                )*( 1.0 / ( ikpppn + mu - epsilonk(k_ppp) - SE[3*NI/2+n_ppp] ) 
-                );
+    const size_t NI = iwn.size(); // corresponds to half the size of the SE array
+    std::function< std::complex<double>(double) > int_k_1D;
+    std::complex<double> iqpn = iqn_tilde[n_iqpn], ikpn;
+    const size_t starting_point_SE = ((double)Ntau_division_factor/2.0-1.0/2.0)*(int)NI;
+    //const size_t q_starting_point_SE = ((double)Ntau_division_factor/2.0)*(int)NI - 1;
+    for (size_t n_ikpn=0; n_ikpn<NI; n_ikpn++){
+        ikpn = iwn[n_ikpn];
+        int_k_1D = [&](double k){
+            return ( 1.0 / ( ikpn + mu - epsilonk(k) - SE[starting_point_SE+n_ikpn] ) 
+            )*( 1.0 / ( ikpn-iqpn + mu - epsilonk(k-qp) - SE[starting_point_SE+SE_shift+n_ikpn-n_iqpn] ) 
+            );
         };
-        denom_val += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
+        lower_val += 1.0/(2.0*M_PI)*intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
     }
-    denom_val *= U/beta/(2.0*M_PI);
-    denom_val += 1.0;
-
-    return 1.0/denom_val;
-}
-
-std::complex<double> Gamma_correction_denominator_extra_term(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<std::complex<double>>& SE, const std::vector<double>& k_arr, double k_tilde, double kpp, double qq, size_t n_ikn_tilde, size_t n_ikppn, size_t n_iqn, double mu, double U, double beta) noexcept(false){
-    std::complex<double> denom_val{0.0};
-    const Integrals intObj;
-    const size_t NI = iwn.size();
-    std::function<std::complex<double>(double)> int_k_1D;
-    std::complex<double> iqppn, ikn_tilde = iwn[n_ikn_tilde], ikppn = iwn[n_ikppn], iiqn = iqn[n_iqn];
-    for (size_t n_q_pp=0; n_q_pp<iqn_tilde.size(); n_q_pp++){
-        iqppn = iqn_tilde[n_q_pp];
-        int_k_1D = [&](double q_pp){
-            return 1.0/( ( ikn_tilde - iqppn + iiqn ) + mu - epsilonk(k_arr[n_ikn_tilde]+qq-q_pp) - SE[(2*NI-1)+n_ikn_tilde+n_iqn-n_q_pp] 
-            )*1.0/( ( ikppn - iqppn ) + mu - epsilonk(kpp-q_pp) - SE[(2*NI-1)+n_ikppn-n_q_pp] );
-        };
-        denom_val += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
-    }
-    denom_val *= U/beta/(2.0*M_PI);
-    denom_val += 1.0;
-
-    return denom_val;
-}
-
-std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, size_t n_ikn_tilde, double k_bar, double k_tilde, size_t n_iqn, double qq, double mu, double U, double beta) noexcept(false){
-    // This function method is an implicit function of k_bar and ikn_bar
-    std::complex<double> tot_corr{0.0};
-    const Integrals intObj;
-    // const double delta = 2.0*M_PI/(double)(OneLadder< T >::_splInlineobj._k_array.size()-1);
-    const size_t NI = iwn.size();
-    std::function<std::complex<double>(double)> int_k_1D;
-    std::complex<double> iqqn = iqn[n_iqn], ikppn;
-    for (size_t n_pp=0; n_pp<NI; n_pp++){
-        std::cout << n_pp << std::endl;
-        ikppn = iwn[n_pp];
-        int_k_1D = [&](double k_pp){
-            return ( 1.0/( ikppn + mu - epsilonk(k_pp) - SE[3*NI/2+n_pp] )
-                )*Gamma_correction_denominator(iwn,SE,k_bar,k_pp,qq,n_ikn_bar,n_pp,mu,U,beta
-                )*( 1.0/( ikppn - iqqn + mu - epsilonk(k_pp-qq) - SE[3*NI/2+n_pp-n_iqn] )
-                )*Gamma_correction_denominator_extra_term(iqn_tilde,iwn,iqn,SE,k_arr,k_tilde,k_pp,qq,n_ikn_tilde,n_pp,n_iqn,mu,U,beta);
-        };
-        tot_corr += intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
-    }
-    tot_corr *= U/beta/(2.0*M_PI);
     
-    return tot_corr; 
+    lower_val *= U/beta;
+    lower_val += 1.0;
+    lower_val = U/lower_val;
+
+    return lower_val;
+};
+
+std::complex<double> ladder_2(std::complex<double> iqqn, double k, int n_iqqn, double mu, double beta, double U, const std::vector<std::complex<double>>& iwn, const std::vector<std::complex<double>>& SE) noexcept{
+    std::complex<double> lower_val{0.0};
+    const Integrals intObj;
+    const size_t NI = iwn.size(); // corresponds to half the size of the SE array
+    const size_t starting_point_SE = ((double)Ntau_division_factor/2.0-1.0/2.0)*(int)NI;
+    const size_t q_starting_point_SE = ((double)Ntau_division_factor/2.0+1.0/2.0)*(int)NI - 2;
+    std::function<std::complex<double>(double)> int_k_1D;
+    std::complex<double> ikpn;
+    for (size_t n_ikpn=0; n_ikpn<NI; n_ikpn++){
+        ikpn = iwn[n_ikpn];
+        int_k_1D = [&](double kk){
+            return ( 1.0 / ( ikpn + mu - epsilonk(kk) - SE[starting_point_SE+n_ikpn] ) 
+            )*( 1.0 / ( ikpn-iqqn + mu - epsilonk(kk-k) - SE[q_starting_point_SE+n_ikpn-n_iqqn] ) 
+            );
+        };
+        lower_val += 1.0/(2.0*M_PI)*intObj.gauss_quad_1D(int_k_1D,0.0,2.0*M_PI);
+    }
+    
+    lower_val *= U/beta;
+    lower_val += 1.0;
+    lower_val = U/lower_val;
+
+    return lower_val;
+};
+
+std::complex<double> chi_corr(size_t n_ikn_tilde, size_t n_k_tilde, size_t n_ikn_bar, size_t n_k_bar, size_t n_iqpn, size_t n_qp, size_t n_iqn, double qq, double mu, double beta, double U, const std::vector<std::complex<double>>& SE, const std::vector<std::complex<double>>& iqn_tilde, const std::vector<std::complex<double>>& iwn, const std::vector<std::complex<double>>& iqn, const std::vector<double>& k_arr) noexcept{
+    std::complex<double> val{0.0};
+    const Integrals intObj;
+    const int size_k_arr = static_cast<int>(k_arr.size());
+    auto k_resizing = [size_k_arr](int n_k_val) -> int {if (n_k_val>=0) return n_k_val%(size_k_arr-1); else return (size_k_arr-1)+n_k_val%(size_k_arr-1);};
+    double delta = 2.0*M_PI/(double)(size_k_arr-1);
+    const size_t NI = iwn.size();
+    std::vector< std::complex<double> > int_k_1D(size_k_arr);
+    std::complex<double> ikn_tilde = iwn[n_ikn_tilde], iqppn;//, ikn_bar = iwn[n_ikn_bar];
+    std::complex<double> iqpn = iqn_tilde[n_iqpn], iqqn = iqn[n_iqn];
+    double qpp, qp=k_arr[n_qp], k_tilde=k_arr[n_k_tilde];//, k_bar=k_arr[n_k_bar];
+    for (size_t n_iqppn=0; n_iqppn<iqn_tilde.size(); n_iqppn++){
+        iqppn = iqn_tilde[n_iqppn];
+        for (size_t n_qpp=0; n_qpp<k_arr.size(); n_qpp++){
+            //std::cout << (int)ladder_shift_complex+(int)n_ikn_tilde+(int)n_iqn+(int)n_iqpn+(int)n_iqppn+(int)n_ikn_bar << " " << k_resizing((int)n_k_tilde-(int)n_qp-(int)n_qpp-(int)n_k_bar) << std::endl;
+            qpp = k_arr[n_qpp];
+            // int_k_1D[n_qpp] = ( 1.0 / ( ikn_tilde+iqqn-iqpn + mu - epsilonk(k_tilde+qq-qp) - SE[(Ntau_division_factor/2*NI-1)+n_ikn_tilde+n_iqn-n_iqpn] ) 
+            // )*( 1.0 / ( ikn_tilde-iqpn + mu - epsilonk(k_tilde-qp) - SE[(Ntau_division_factor/2*NI-1)+n_ikn_tilde-n_iqpn] ) 
+            // )*ladder(n_iqppn,k_arr[n_qpp],mu,beta,U,iwn,iqn_tilde,SE,(int)NI/2-1)*( 1.0 / ( ikn_tilde+iqqn-iqpn-iqppn + mu - epsilonk(k_tilde+qq-qp-qpp) - SE[(Ntau_division_factor/2*NI+NI/2-2)+n_ikn_tilde+n_iqn-n_iqpn-n_iqppn] ) 
+            // )*( 1.0 / ( ikn_tilde-iqpn-iqppn + mu - epsilonk(k_tilde-qp-qpp) - SE[(Ntau_division_factor/2*NI+NI/2-2)+n_ikn_tilde-n_iqpn-n_iqppn] ) 
+            // )*ladder_2(ikn_tilde+iqqn-iqpn-iqppn-ikn_bar,-(int)n_ikn_tilde-(int)n_iqn+(int)n_iqpn+(int)n_iqppn+(int)n_ikn_bar,k_tilde-qp-qpp-k_bar,mu,beta,U,iwn,SE);
+            int_k_1D[n_qpp] = ( 1.0 / ( ikn_tilde+iqqn-iqpn + mu - epsilonk(k_tilde+qq-qp) - SE[(Ntau_division_factor/2*NI-1)+n_ikn_tilde+n_iqn-n_iqpn] ) 
+            )*( 1.0 / ( ikn_tilde-iqpn + mu - epsilonk(k_tilde-qp) - SE[(Ntau_division_factor/2*NI-1)+n_ikn_tilde-n_iqpn] ) 
+            )*_ladder( n_iqppn+((int)_ladder.n_rows/2-(int)NI/2)+1, n_qpp )*( 1.0 / ( ikn_tilde+iqqn-iqpn-iqppn + mu - epsilonk(k_tilde+qq-qp-qpp) - SE[(Ntau_division_factor/2*NI+NI/2-2)+n_ikn_tilde+n_iqn-n_iqpn-n_iqppn] ) 
+            )*( 1.0 / ( ikn_tilde-iqpn-iqppn + mu - epsilonk(k_tilde-qp-qpp) - SE[(Ntau_division_factor/2*NI+NI/2-2)+n_ikn_tilde-n_iqpn-n_iqppn] ) 
+            )*_ladder( ((int)_ladder.n_rows/2-(int)NI)+2-(int)n_ikn_tilde-(int)n_iqn+(int)n_iqpn+(int)n_iqppn+(int)n_ikn_bar, k_resizing((int)n_k_tilde-(int)n_qp-(int)n_qpp-(int)n_k_bar) );
+        }
+        val += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_k_1D,delta,"simpson");
+    }
+    val *= -1.0/beta;
+    val += 1.0;
+
+    return 1.0/val;
 }
+
+std::complex<double> ladder_merged_with_chi_corr(const std::vector< std::complex<double> >& iqn_tilde, const std::vector< std::complex<double> >& iwn, const std::vector< std::complex<double> >& iqn, const std::vector<double>& k_arr, const std::vector< std::complex<double> >& SE, size_t n_ikn_bar, size_t n_ikn_tilde, size_t n_k_bar, size_t n_k_tilde, size_t n_iqn, double qq, double mu, double U, double beta) noexcept{
+    std::complex<double> val{0.0};
+    Integrals intObj;
+    std::vector< std::complex<double> > int_k_1D(k_arr.size());
+    double delta = 2.0*M_PI/(double)(k_arr.size()-1);
+    const size_t NI = iwn.size();
+    std::cout << "NI: " << NI << std::endl;
+    std::cout << "N_k: " << k_arr.size() << std::endl;
+    for (size_t n_iqpn=0; n_iqpn<iqn_tilde.size(); n_iqpn++){
+        std::cout << "n_iqpn: " << n_iqpn << std::endl;
+        for (size_t n_qp=0; n_qp<k_arr.size(); n_qp++){
+            //std::cout << "n_qp: " << n_qp << std::endl;
+            int_k_1D[n_qp] = _ladder( n_iqpn+((int)_ladder.n_rows/2-(int)NI/2)+1, n_qp )*chi_corr(n_ikn_tilde,n_k_tilde,n_ikn_bar,n_k_bar,n_iqpn,n_qp,n_iqn,qq,mu,beta,U,SE,iqn_tilde,iwn,iqn,k_arr);
+        }
+        val += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_k_1D,delta,"simpson");
+    }
+    
+    val *= 1.0/beta;
+
+    return val;
+};
 # elif DIM == 2
 std::complex<double> Gamma_correction_denominator(const std::vector< std::complex<double> >& iwn, const std::vector<std::complex<double>>& SE, double k_bar_x, double k_bar_y, double kpp_x, double kpp_y, double qq_x, double qq_y, size_t n_ikn_bar, size_t n_ikppn, double mu, double U, double beta) noexcept(false){
     std::complex<double> denom_val{0.0};
@@ -332,7 +385,6 @@ std::complex<double> Gamma_merged_corr(const std::vector< std::complex<double> >
     return tot_corr; 
 }
 #endif
-
 
 void writeInHDF5File(std::vector< Div >& arr_to_save, H5::H5File* file, const unsigned int& DATA_SET_DIM, const std::string& DATASET_NAME) noexcept(false){
     /*  This method writes in an HDF5 file the data passed in the first entry "GG_iqn_q". The data has to be complex-typed. This function hinges on the

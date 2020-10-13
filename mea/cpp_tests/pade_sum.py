@@ -9,7 +9,7 @@ from scipy.integrate import simps
 from operator import itemgetter
 
 ETA = 0.001
-TAILCUT = 50
+TAILCUT = 2
 
 def get_derivative(p1 : float, p2 : float, p3 : float, p4 : float, delta_x : float) -> float:
     """p1, p2, p3 and p4 are the neighbouring points to the target points at which the derivative is looked for. delta_x is supposed to
@@ -75,7 +75,7 @@ if __name__=="__main__":
     type_of_plot = {"plot_3D" : 0, "plot_2D_colormap" : 1}
     is_this_plot = 2
     parser = OptionParser()
-    AVERAGE_OR_SIMPS = "AVERAGE" ## can be "AVERAGE" or "SIMPS". The choice selects the inetagration scheme.
+    AVERAGE_OR_SIMPS = "SIMPS" ## can be "AVERAGE" or "SIMPS". The choice selects the inetagration scheme.
     DIM = 1 # can be 1 or 2
     SAVE_PADE = False # to enable the PADE analytical continuation to be saved...
     parser.add_option("--data", dest="data", default="data.in")
@@ -94,7 +94,7 @@ if __name__=="__main__":
         beta = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",options.data)[0])
         Ntau = int(findall(r"(?<=Ntau_)(\d+)",options.data)[0])
         if "_infinite_" in options.data or "_2D_" in options.data:
-            Ntau = Ntau//4
+            Ntau = Ntau//1
         else:
             Ntau = Ntau//2
         U = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",options.data)[0])

@@ -27,13 +27,13 @@ int main(int argc, char** argv){
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
     #else
     const size_t NCA_Ntau = 2*(unsigned int)atoi(results[2].c_str()); // size of the full NCA calculation
-    const size_t Ntau = 2*64; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
+    const size_t Ntau = 2*16; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
     #endif
     // Has to be a power of two as well: this is no change from IPT.
     assert(Ntau%2==0);
     const int iqn_div = 2;
-    const unsigned int N_q = 15;
-    const unsigned int N_k = 15;
+    const unsigned int N_q = 7;
+    const unsigned int N_k = 7;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling. Depending whether AFM-PM solution is loaded or not, mu=U/2 in PM only scenario and mu=0.0 in AFM-PM scenario.
@@ -214,7 +214,7 @@ int main(int argc, char** argv){
     double k_bar;
     #ifdef INFINITE
     
-    double qp;
+    double qq, qp;
     // Precompute the different components in the correction
     const int num_elem_per_proc_precomp = (world_size != 1) ? N_k/world_size : N_k-1;
     /********** Sending first the q points to different processes to precompute the single ladder **********/
@@ -299,6 +299,104 @@ int main(int argc, char** argv){
         IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger(el.n_iqpn,el.n_qp) = el.cplx_val;
     }
 
+    /********** Sending secondly the k points to different processes to precompute the even lambda term necessary to calculate the even contribution **********/
+    MPI_Datatype MPI_DataCorr_struct_t;
+    IPT2::create_mpi_data_struct_corr(MPI_DataCorr_struct_t);
+    std::vector<MPIDataCorr> lambda_even_corr, lambda_even_corr_bcast(iqn.size()*iwn.size()*N_k);
+    IPT2::InfiniteLadders< std::complex<double> >::_lambda_even = arma::Cube< std::complex<double> >(iqn.size(),iwn.size(),N_k);
+    num_elem_remaining = ((double)N_k/(double)world_size-(double)num_elem_per_proc_precomp)*world_size;
+    shift = num_elem_remaining; // to shift the last ranks that do not accomodate the surplus of tasks in order to consider all the processes
+    if (world_rank==root_process){
+        // sending 
+        MPI_send_k_array(world_size,ierr,num_elem_remaining,num_elem_to_send,num_elem_per_proc_precomp,shift,start,end,N_k,k_t_b_array.data());
+        // computing
+        for (size_t i=0; i<=num_elem_per_proc_precomp; i++){
+            k_bar = k_t_b_array[i];
+            // std::cout << "k_bar: " << k_bar << " world_rank " << world_rank << std::endl;
+            qq = 0.0;
+            clock_t begin = clock();
+            try {
+                for (size_t n_iqn=0; n_iqn<iqn.size(); n_iqn++){
+                    for (size_t n_ikn_bar=0; n_ikn_bar<iwn.size(); n_ikn_bar++){
+                        lambda_even_corr.emplace_back( MPIDataCorr{ n_iqn, n_ikn_bar, i, inf_ladder_obj.determine_lambda_even(n_ikn_bar, k_bar, n_iqn, qq) } );
+                    }
+                }
+            } catch(const std::invalid_argument& err){
+                std::cerr << err.what() << "\n";
+                MPI_Abort(MPI_COMM_WORLD,1);
+            }
+            clock_t end = clock();
+            double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+            std::cout << "lambda_even_obj number " << i+1 << "/" << num_elem_per_proc_precomp+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+        }
+        // ierr = MPI_Barrier(MPI_COMM_WORLD); <----------------------------------------------
+        // collecting from the slave processes
+        MPI_recv_k_array_from_slaves<MPIDataCorr>(world_size,ierr,recv_root_num_elem,lambda_even_corr,lambda_even_corr_bcast,status,MPI_DataCorr_struct_t);
+
+    } else{
+        // receiving from root process
+        ierr = MPI_Recv( &num_elem_to_receive, 1, MPI_INT, 
+            root_process, SEND_NUM_TO_SLAVES, MPI_COMM_WORLD, &status);
+        ierr = MPI_Recv( &start, 1 , MPI_INT, root_process, SEND_NUM_START_TO_SLAVES, MPI_COMM_WORLD, &status);
+        std::vector<double> vec_for_slaves(num_elem_to_receive);
+        ierr = MPI_Recv( (void*)(vec_for_slaves.data()), num_elem_to_receive, MPI_DOUBLE, 
+            root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
+
+        for(size_t i = 0; i < num_elem_to_receive; i++) { // this corresponds to k_bar points
+            k_bar = vec_for_slaves[i];
+            // std::cout << "k_bar: " << k_bar << " world_rank " << world_rank << std::endl;
+            qq = 0.0;
+            clock_t begin = clock();
+            try {
+                for (size_t n_iqn=0; n_iqn<iqn.size(); n_iqn++){
+                    for (size_t n_ikn_bar=0; n_ikn_bar<iwn.size(); n_ikn_bar++){
+                        lambda_even_corr.emplace_back( MPIDataCorr{ n_iqn, n_ikn_bar, start+i, inf_ladder_obj.determine_lambda_even(n_ikn_bar, k_bar, n_iqn, qq) } );
+                    }
+                }
+            } catch(const std::invalid_argument& err){
+                std::cerr << err.what() << "\n";
+                MPI_Abort(MPI_COMM_WORLD,1);
+            }
+            clock_t end = clock();
+            double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+            std::cout << "lambda_even_obj number " << i+1 << "/" << num_elem_to_receive << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
+        }
+        num_elem_to_receive *= (int)iqn.size()*(int)iwn.size();
+        // ierr = MPI_Barrier(MPI_COMM_WORLD); <-------------------------------------------------
+        ierr = MPI_Send( &num_elem_to_receive, 1 , MPI_INT, root_process, RETURN_NUM_RECV_TO_ROOT, MPI_COMM_WORLD );
+        ierr = MPI_Send( (void*)(lambda_even_corr.data()), (int)lambda_even_corr.size(), MPI_DataCorr_struct_t, root_process, world_rank+SHIFT_TO_DIFFERENTIATE_TAGS, MPI_COMM_WORLD);
+    }
+    MPI_Bcast( (void*)(lambda_even_corr_bcast.data()), (int)lambda_even_corr_bcast.size(), MPI_DataCorr_struct_t, root_process, MPI_COMM_WORLD );
+    ierr = MPI_Barrier(MPI_COMM_WORLD);
+    std::cout << "BCAST After" << std::endl;
+    // for (auto el : denom_corr_bcast){
+    //     std::cout << " world_rank: " << world_rank << " " << el.n_iqn << " " << el.n_ikn_bar << " " << el.n_k_bar << " " << el.cplx_denom_corr << std::endl;
+    // }
+    // if (world_rank==root_process){
+    //     for (size_t i=0; i<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_rows; i++){
+    //         for (size_t j=0; j<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_cols; j++){
+    //             std::cout << " smaller: " << "(" << i << "," << j << "): " << IPT2::InfiniteLadders< std::complex<double> >::_ladder(i,j) << std::endl;
+    //         }
+    //     }
+    //     for (int i=0; i<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_rows; i++){ // ((int)iqn_big_array.size()/2+(int)Ntau/2)
+    //         for (int j=0; j<IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger.n_cols; j++){
+    //             std::cout << " LARGER: " << "(" << i << "," << j << "): " << IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger(i+((int)iqn_big_array.size()/2-(int)Ntau/2)+1,j) << std::endl;
+    //         }
+    //     }
+    //     MPI_Abort(MPI_COMM_WORLD,0); // terminates all processes associated with MPI_COMM_WORLD
+    // }
+
+    for (auto el : lambda_even_corr_bcast){
+        IPT2::InfiniteLadders< std::complex<double> >::_lambda_even(el.n_iqn,el.n_ikn,el.n_k) = el.cplx_denom_corr;
+    }
+    // if (world_rank==1){
+    //     for (size_t i=0; i<IPT2::InfiniteLadders< std::complex<double> >::_lambda_even.n_rows; i++){
+    //         std::cout << " smaller: " << i << " " << IPT2::InfiniteLadders< std::complex<double> >::_lambda_even(i) << std::endl;
+    //     }
+    //     std::cout << iqn.size()*iwn.size()*N_k << " " << iqn.size() << " " << iwn.size() << " " << N_k << std::endl;
+    //     MPI_Abort(MPI_COMM_WORLD,0);
+    // }
+    MPI_Type_free(&MPI_DataCorr_struct_t);
     #endif
    
     // Setting MPI stuff up
