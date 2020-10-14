@@ -27,13 +27,13 @@ int main(int argc, char** argv){
     const unsigned int Ntau = 2*(unsigned int)atoi(results[2].c_str());
     #else
     const size_t NCA_Ntau = 2*(unsigned int)atoi(results[2].c_str()); // size of the full NCA calculation
-    const size_t Ntau = 2*64; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
+    const size_t Ntau = 2*32; // One has to assume that the number of Matsubara frequencies defining the self-energy is sufficient.
     #endif
     // Has to be a power of two as well: this is no change from IPT.
     assert(Ntau%2==0);
     const int iqn_div = 2;
-    const unsigned int N_q = 15;
-    const unsigned int N_k = 15;
+    const unsigned int N_q = 13;
+    const unsigned int N_k = 13;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling. Depending whether AFM-PM solution is loaded or not, mu=U/2 in PM only scenario and mu=0.0 in AFM-PM scenario.
@@ -54,10 +54,10 @@ int main(int argc, char** argv){
     // k_t_b_array constructed
     std::vector<double> k_t_b_array;
     for (size_t l=0; l<N_k; l++){
-        k_tmp = -M_PI + l*2.0*M_PI/(double)(N_k-1);
+        k_tmp = l*2.0*M_PI/(double)(N_k-1);
         k_t_b_array.push_back(k_tmp);
     }
-
+    
     // HDF5 business
     H5::H5File* file = nullptr;
     #ifdef INFINITE
@@ -298,6 +298,21 @@ int main(int argc, char** argv){
     for (auto el : ladder_corr_bcast){
         IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger(el.n_iqpn,el.n_qp) = el.cplx_val;
     }
+
+    // if (world_rank==root_process){
+    //     for (size_t i=0; i<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_rows; i++){
+    //         for (size_t j=0; j<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_cols; j++){
+    //             std::cout << " smaller: " << "(" << i << "," << j << "): " << IPT2::InfiniteLadders< std::complex<double> >::_ladder(i,j) << std::endl;
+    //         }
+    //     }
+    //     for (int i=0; i<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_rows; i++){ // ((int)iqn_big_array.size()/2+(int)Ntau/2)
+    //         for (int j=0; j<IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger.n_cols; j++){
+    //             std::cout << " LARGER: " << "(" << i << "," << j << "): " << IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger(i+((int)iqn_big_array.size()/2-(int)Ntau/2)+1,j) << std::endl;
+    //         }
+    //     }
+    //     MPI_Abort(MPI_COMM_WORLD,0); // terminates all processes associated with MPI_COMM_WORLD
+    // }
+
 
     #endif
    

@@ -14,7 +14,7 @@
 #define ROOT_FINDING_TOL 0.0001
 // for Gaussian quadratures
 #define ABS_TOL 1e-2
-#define MAX_DEPTH 5
+#define MAX_DEPTH 6
 
 template<class T>
 struct GaussEl{

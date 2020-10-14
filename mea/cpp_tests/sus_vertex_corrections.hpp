@@ -353,7 +353,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
                         int_1D_k[n_qp] = _ladder_larger( ladder_shift_simple+n_iqpn, n_qp 
                         )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn] ) 
                         )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]-qq) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn-n_em] ) 
-                        );
+                        )*velocity(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]);
                     }
                     tmp_qp_even_val += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_1D_k,delta,"simpson");
                 }
@@ -361,9 +361,9 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
                 GG_n_tilde_n_bar_even(n_tilde,n_bar) = GG_n_tilde_n_bar_odd(n_tilde,n_bar)*tmp_qp_even_val;
             }
         }
-        
+        std::cout << "n_k_tilde: " << n_k_tilde << " n_k_bar " << n_k_bar << " n_res: " << k_resizing((int)n_k_tilde-(int)n_k_bar) << "  " << OneLadder< T >::_k_t_b[k_resizing((int)n_k_tilde-(int)n_k_bar)] << std::endl;
         // summing over the internal ikn_tilde and ikn_bar
-        jj_resp_iqn = -2.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*(1.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(arma::accu(GG_n_tilde_n_bar_even)+arma::accu(GG_n_tilde_n_bar_odd));
+        jj_resp_iqn = -2.0*velocity(OneLadder< T >::_k_t_b[n_k_tilde])*(1.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(arma::accu(GG_n_tilde_n_bar_even)+arma::accu(GG_n_tilde_n_bar_odd));
         szsz_resp_iqn = (2.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(arma::accu(GG_n_tilde_n_bar_odd)-arma::accu(GG_n_tilde_n_bar_even));
         MPIData mpi_data_tmp { n_k_tilde, n_k_bar, jj_resp_iqn, szsz_resp_iqn };
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
@@ -920,7 +920,7 @@ void MPI_recv_k_array_from_slaves(int& world_size, int& ierr, int& recv_root_num
     }
     // unpacking denom_corr into denom_corr_tensor
     // Broadcasting the data from the root process for the correction to the denominator
-    assert(container_bcast.size()==local_container.size());
     std::cout << "BCAST Before " << local_container.size() << " " << container_bcast.size() << std::endl;
+    assert(container_bcast.size()==local_container.size());
     container_bcast = std::move(local_container);
 }

@@ -94,7 +94,7 @@ if __name__=="__main__":
         beta = float(findall(r"(?<=beta_)(\d*\.\d+|\d+)",options.data)[0])
         Ntau = int(findall(r"(?<=Ntau_)(\d+)",options.data)[0])
         if "_infinite_" in options.data or "_2D_" in options.data:
-            Ntau = Ntau//1
+            Ntau = Ntau//4
         else:
             Ntau = Ntau//2
         U = float(findall(r"(?<=U_)(\d*\.\d+|\d+)",options.data)[0])
