@@ -32,8 +32,8 @@ int main(int argc, char** argv){
     // Has to be a power of two as well: this is no change from IPT.
     assert(Ntau%2==0);
     const int iqn_div = 2;
-    const unsigned int N_q = 9;
-    const unsigned int N_k = 9;
+    const unsigned int N_q = 15;
+    const unsigned int N_k = 15;
     const double beta = atof(results[1].c_str());
     const double U = atof(results[0].c_str());
     const double mu = U/2.0; // Half-filling. Depending whether AFM-PM solution is loaded or not, mu=U/2 in PM only scenario and mu=0.0 in AFM-PM scenario.
@@ -200,7 +200,7 @@ int main(int argc, char** argv){
     
     // One-ladder calculations
     #ifndef INFINITE
-    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,sigma_iwn,iqn,k_t_b_array,iqn_tilde,mu,U,beta);
+    IPT2::OneLadder< std::complex<double> > one_ladder_obj(splInlineObj,sigma_iwn,iqn,k_t_b_array,iqn_tilde,iqn_big_array,mu,U,beta);
     #else
     IPT2::InfiniteLadders< std::complex<double> > inf_ladder_obj(splInlineObj,sigma_iwn,iqn,k_t_b_array,iqn_tilde,iqn_big_array,mu,U,beta);
     if (is_single_ladder_precomputed){
@@ -212,38 +212,89 @@ int main(int argc, char** argv){
     MPI_Status status;
 
     double k_bar;
-    #ifdef INFINITE
-    
-    double qp;
+
+    //#ifdef INFINITE //( ( INFINITE ) || ( DIM == 2 ) )
+
     // Precompute the different components in the correction
+    #if DIM == 1
+    double qp;
     const int num_elem_per_proc_precomp = (world_size != 1) ? N_k/world_size : N_k-1;
+    num_elem_remaining = ((double)N_k/(double)world_size-(double)num_elem_per_proc_precomp)*world_size;
+    #elif DIM == 2
+    std::vector< MPIDataLadder2D > vec_to_processes_ladder_2D;
+    const int num_elem_per_proc_precomp = (world_size != 1) ? (N_k*N_k)/world_size : (N_k*N_k)-1;
+    num_elem_remaining = ((double)(N_k*N_k)/(double)world_size-(double)num_elem_per_proc_precomp)*world_size;
+    #endif
     /********** Sending first the q points to different processes to precompute the single ladder **********/
     MPI_Datatype MPI_DataLadder_struct_t;
+    #if DIM == 1
     IPT2::create_mpi_data_struct_ladder(MPI_DataLadder_struct_t);
     std::vector<MPIDataLadder> ladder_corr, ladder_corr_bcast(iqn_big_array.size()*N_k);
+    #elif DIM == 2
+    IPT2::create_mpi_data_struct_ladder_2D(MPI_DataLadder_struct_t);
+    std::vector<MPIDataLadder2D> ladder_corr, ladder_corr_bcast(iqn_big_array.size()*N_k*N_k);
+    #endif
+    #ifdef INFINITE
+    #if DIM == 1 
     IPT2::InfiniteLadders< std::complex<double> >::_ladder = arma::Mat< std::complex<double> >(iqn_tilde.size(),N_k);
     IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger = arma::Mat< std::complex<double> >(iqn_big_array.size(),N_k);
-    num_elem_remaining = ((double)N_k/(double)world_size-(double)num_elem_per_proc_precomp)*world_size;
+    #elif DIM == 2
+    IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger = arma::Cube< std::complex<double> >(iqn_big_array.size(),N_k,N_k);
+    #endif
+    #else
+    #if DIM == 1 
+    IPT2::OneLadder< std::complex<double> >::_ladder_larger = arma::Mat< std::complex<double> >(iqn_big_array.size(),N_k);
+    #elif DIM == 2
+    IPT2::OneLadder< std::complex<double> >::_ladder_larger = arma::Cube< std::complex<double> >(iqn_big_array.size(),N_k,N_k);
+    #endif
+    #endif
+    
     shift = num_elem_remaining; // to shift the last ranks that do not accomodate the surplus of tasks in order to consider all the processes
     if (world_rank==root_process){
         // sending 
-        MPI_send_k_array(world_size,ierr,num_elem_remaining,num_elem_to_send,num_elem_per_proc_precomp,shift,start,end,N_k,k_t_b_array.data());
+        #if DIM == 1
+        MPI_send_k_array(world_size,ierr,num_elem_remaining,num_elem_to_send,num_elem_per_proc_precomp,shift,start,end,N_k,k_t_b_array.data(),MPI_DOUBLE);
+        #elif DIM == 2
+        IPT2::set_vector_processes(&vec_to_processes_ladder_2D,N_k);
+        MPI_send_k_array(world_size,ierr,num_elem_remaining,num_elem_to_send,num_elem_per_proc_precomp,shift,start,end,N_k*N_k,vec_to_processes_ladder_2D.data(),MPI_DataLadder_struct_t);
+        #endif
         // computing
         for (size_t i=0; i<=num_elem_per_proc_precomp; i++){
+            #if DIM == 1
             qp = k_t_b_array[i];
+            #elif DIM == 2
+            auto mpidataObj = vec_to_processes_ladder_2D[i];
+            std::cout << "world_rank: " << world_rank << " n_kx: " << mpidataObj.n_kx << " n_ky: " << mpidataObj.n_ky << std::endl;
+            #endif
             clock_t begin = clock();
             try {
+                #ifdef INFINITE
+                #if DIM == 1 
                 for (size_t n_iqpn=0; n_iqpn<iqn_tilde.size(); n_iqpn++){
                     // std::cout << "n_iqpn: " << n_iqpn << std::endl;
                     for (size_t n_qp=0; n_qp<k_t_b_array.size(); n_qp++){
                         IPT2::InfiniteLadders< std::complex<double> >::_ladder(n_iqpn,n_qp) = inf_ladder_obj.ladder(n_iqpn, k_t_b_array[n_qp], (int)(1.0/2.0*(int)Ntau)-1, iqn_tilde);
-                        // ladder_corr.emplace_back( MPIDataCorr{ n_iqpn, i, inf_ladder_obj.ladder(n_iqpn, qp) } );
                     }
                 }
-                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){
+                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){ 
                     ladder_corr.emplace_back( MPIDataLadder{ n_iqpn_l, i, inf_ladder_obj.ladder(n_iqpn_l, qp, (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } );
-                    // ladder_corr.emplace_back( MPIDataCorr{ n_iqpn, i, inf_ladder_obj.ladder(n_iqpn, qp) } );
                 }
+                #elif DIM == 2
+                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){ 
+                    ladder_corr.emplace_back( MPIDataLadder2D{ n_iqpn_l, mpidataObj.n_kx, mpidataObj.n_ky, inf_ladder_obj.ladder(n_iqpn_l, k_t_b_array[mpidataObj.n_kx], k_t_b_array[mpidataObj.n_ky], (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } );
+                }
+                #endif
+                #else
+                #if DIM == 1
+                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){
+                    ladder_corr.emplace_back( MPIDataLadder{ n_iqpn_l, i, one_ladder_obj.ladder(n_iqpn_l, qp, (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } );
+                }
+                #elif DIM == 2 
+                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){ 
+                    ladder_corr.emplace_back( MPIDataLadder2D{ n_iqpn_l, mpidataObj.n_kx, mpidataObj.n_ky, one_ladder_obj.ladder(n_iqpn_l, k_t_b_array[mpidataObj.n_kx], k_t_b_array[mpidataObj.n_ky], (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } );
+                }
+                #endif
+                #endif
             } catch(const std::invalid_argument& err){
                 std::cerr << err.what() << "\n";
                 MPI_Abort(MPI_COMM_WORLD,1);
@@ -252,23 +303,40 @@ int main(int argc, char** argv){
             double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
             std::cout << "ladder_corr_obj number " << i+1 << "/" << num_elem_per_proc_precomp+1 << " of world_rank " << world_rank << " lasted " << elapsed_secs << " secs to be computed" << "\n";
         }
-        // ierr = MPI_Barrier(MPI_COMM_WORLD); <----------------------------------------------
+        // ierr = MPI_Barrier(MPI_COMM_WORLD);
         // collecting from the slave processes
+        #if DIM == 1
         MPI_recv_k_array_from_slaves<MPIDataLadder>(world_size,ierr,recv_root_num_elem,ladder_corr,ladder_corr_bcast,status,MPI_DataLadder_struct_t);
+        #elif DIM == 2
+        MPI_recv_k_array_from_slaves<MPIDataLadder2D>(world_size,ierr,recv_root_num_elem,ladder_corr,ladder_corr_bcast,status,MPI_DataLadder_struct_t);
+        #endif
 
     } else{
         // receiving from root process
         ierr = MPI_Recv( &num_elem_to_receive, 1, MPI_INT, 
             root_process, SEND_NUM_TO_SLAVES, MPI_COMM_WORLD, &status);
         ierr = MPI_Recv( &start, 1 , MPI_INT, root_process, SEND_NUM_START_TO_SLAVES, MPI_COMM_WORLD, &status);
+        #if DIM == 1
         std::vector<double> vec_for_slaves(num_elem_to_receive);
         ierr = MPI_Recv( (void*)(vec_for_slaves.data()), num_elem_to_receive, MPI_DOUBLE, 
             root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
+        #elif DIM == 2
+        std::vector<MPIDataLadder2D> vec_for_slaves(num_elem_to_receive);
+        ierr = MPI_Recv( (void*)(vec_for_slaves.data()), num_elem_to_receive, MPI_DataLadder_struct_t, 
+            root_process, SEND_DATA_TAG, MPI_COMM_WORLD, &status);
+        #endif
 
         for(size_t i = 0; i < num_elem_to_receive; i++) { // this corresponds to k_bar points
+            #if DIM == 1
             qp = vec_for_slaves[i];
+            #elif DIM == 2
+            auto mpidataObj = vec_for_slaves[i];
+            std::cout << "world_rank: " << world_rank << " n_kx: " << mpidataObj.n_kx << " n_ky: " << mpidataObj.n_ky << std::endl;
+            #endif
             clock_t begin = clock();
             try {
+                #ifdef INFINITE
+                #if DIM == 1
                 for (size_t n_iqpn=0; n_iqpn<iqn_tilde.size(); n_iqpn++){
                     // std::cout << "n_iqpn: " << n_iqpn << std::endl;
                     for (size_t n_qp=0; n_qp<k_t_b_array.size(); n_qp++){
@@ -278,7 +346,22 @@ int main(int argc, char** argv){
                 for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){
                     ladder_corr.emplace_back( MPIDataLadder{ n_iqpn_l, start+i, inf_ladder_obj.ladder(n_iqpn_l, qp, (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } ); 
                 }
-                
+                #elif DIM == 2
+                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){ 
+                    ladder_corr.emplace_back( MPIDataLadder2D{ n_iqpn_l, mpidataObj.n_kx, mpidataObj.n_ky, inf_ladder_obj.ladder(n_iqpn_l, k_t_b_array[mpidataObj.n_kx], k_t_b_array[mpidataObj.n_ky], (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } );
+                }
+                #endif
+                #else
+                #if DIM == 1 
+                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){
+                    ladder_corr.emplace_back( MPIDataLadder{ n_iqpn_l, i, one_ladder_obj.ladder(n_iqpn_l, qp, (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } );
+                }
+                #elif DIM == 2 
+                for (size_t n_iqpn_l=0; n_iqpn_l<iqn_big_array.size(); n_iqpn_l++){ 
+                    ladder_corr.emplace_back( MPIDataLadder2D{ n_iqpn_l, mpidataObj.n_kx, mpidataObj.n_ky, one_ladder_obj.ladder(n_iqpn_l, k_t_b_array[mpidataObj.n_kx], k_t_b_array[mpidataObj.n_ky], (int)(6.0/2.0*(int)Ntau)-1, iqn_big_array) } );
+                }
+                #endif
+                #endif
             } catch(const std::invalid_argument& err){
                 std::cerr << err.what() << "\n";
                 MPI_Abort(MPI_COMM_WORLD,1);
@@ -293,13 +376,32 @@ int main(int argc, char** argv){
         ierr = MPI_Send( (void*)(ladder_corr.data()), (int)ladder_corr.size(), MPI_DataLadder_struct_t, root_process, world_rank+SHIFT_TO_DIFFERENTIATE_TAGS, MPI_COMM_WORLD);
     }
     MPI_Bcast( (void*)(ladder_corr_bcast.data()), (int)ladder_corr_bcast.size(), MPI_DataLadder_struct_t, root_process, MPI_COMM_WORLD );
-    ierr = MPI_Barrier(MPI_COMM_WORLD);
+    //ierr = MPI_Barrier(MPI_COMM_WORLD);
     MPI_Type_free(&MPI_DataLadder_struct_t);
+    #ifdef INFINITE
+    #if DIM == 1
     for (auto el : ladder_corr_bcast){
         IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger(el.n_iqpn,el.n_qp) = el.cplx_val;
     }
+    #elif DIM == 2
+    for (auto el : ladder_corr_bcast){
+        IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger(el.n_iqn,el.n_kx,el.n_ky) = el.cplx_denom_corr;
+    }
+    #endif
+    #else
+    #if DIM == 1
+    for (auto el : ladder_corr_bcast){
+        IPT2::OneLadder< std::complex<double> >::_ladder_larger(el.n_iqpn,el.n_qp) = el.cplx_val;
+    }
+    #elif DIM == 2
+    for (auto el : ladder_corr_bcast){
+        IPT2::OneLadder< std::complex<double> >::_ladder_larger(el.n_iqn,el.n_kx,el.n_ky) = el.cplx_denom_corr;
+    }
+    #endif
+    #endif
 
     // if (world_rank==root_process){
+    //     #if DIM == 1 
     //     for (size_t i=0; i<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_rows; i++){
     //         for (size_t j=0; j<IPT2::InfiniteLadders< std::complex<double> >::_ladder.n_cols; j++){
     //             std::cout << " smaller: " << "(" << i << "," << j << "): " << IPT2::InfiniteLadders< std::complex<double> >::_ladder(i,j) << std::endl;
@@ -310,11 +412,15 @@ int main(int argc, char** argv){
     //             std::cout << " LARGER: " << "(" << i << "," << j << "): " << IPT2::InfiniteLadders< std::complex<double> >::_ladder_larger(i+((int)iqn_big_array.size()/2-(int)Ntau/2)+1,j) << std::endl;
     //         }
     //     }
+    //     #elif DIM == 2
+    //     for (int i=0; i<iqn_tilde.size(); i++){ // ((int)iqn_big_array.size()/2+(int)Ntau/2)
+    //         for (int j=0; j<IPT2::OneLadder< std::complex<double> >::_ladder_larger.n_slices; j++){
+    //             std::cout << " LARGER: " << "(" << i << "," << j << "): " << IPT2::OneLadder< std::complex<double> >::_ladder_larger(i+((int)iqn_big_array.size()/2-(int)Ntau/2)+1,0,j) << std::endl;
+    //         }
+    //     }
+    //     #endif
     //     MPI_Abort(MPI_COMM_WORLD,0); // terminates all processes associated with MPI_COMM_WORLD
     // }
-
-
-    #endif
    
     // Setting MPI stuff up
     constexpr int tot_k_size = N_k*N_k;
@@ -328,7 +434,6 @@ int main(int argc, char** argv){
     // Committing custom data type
     MPI_Datatype MPI_Data_struct_t;
     IPT2::create_mpi_data_struct(MPI_Data_struct_t);
-    //std::vector< std::vector<MPIData> >* gathered_MPI_data = new std::vector< std::vector<MPIData> >();
     auto_ptr< std::vector< std::vector<MPIData> > > gathered_MPI_data(new std::vector< std::vector<MPIData> >());
 
     // Dispatching the tasks across the processes called in
@@ -375,7 +480,7 @@ int main(int argc, char** argv){
                 arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
                 GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
-                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde);
+                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde); // k_tildex, k_tildey if DIM == 2
                 #endif
             } catch(const std::invalid_argument& err){
                 std::cerr << err.what() << "\n";
@@ -488,7 +593,7 @@ int main(int argc, char** argv){
                 arma::Mat< std::complex<double> >* mat_slice_ptr = &container_sl.slice(i);
                 GG_iqn = one_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde,is_single_ladder_precomputed,(void*)mat_slice_ptr);
                 #else
-                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde);
+                GG_iqn = inf_ladder_obj(mpidataObj.k_bar,mpidataObj.k_tilde); // k_tildex, k_tildey if DIM == 2
                 #endif
             } catch(const std::invalid_argument& err){
                 std::cerr << err.what() << "\n";

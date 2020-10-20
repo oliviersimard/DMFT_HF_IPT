@@ -352,7 +352,7 @@ if __name__=="__main__":
         for i in range(len(Uss_sl)):
             f.write("{0:.5f}\t\t{1:.5f}\n".format(1.0/Tss_sl[i],Uss_sl[i]))
     f.close()
-    axs.plot(Uss_il,Tss_il,marker='<',ms=ms,c="blue",linewidth=0.5,label="infinite-ladder")
+    # axs.plot(Uss_il,Tss_il,marker='<',ms=ms,c="blue",linewidth=0.5,label="infinite-ladder")
     with open("IPT_IL_BOUNDARY.dat","w") as f:
         for i in range(len(Uss_il)):
             f.write("{0:.5f}\t\t{1:.5f}\n".format(1.0/Tss_il[i],Uss_il[i]))
