@@ -18,7 +18,7 @@ template<typename T, typename... Ts> inline T eps(T,Ts...);
 int main(void){
     
     #ifndef NCA
-    std::string inputFilename("../../build/data/2D_U_2.000000_beta_7.000000_n_0.500000_N_tau_1024/Self_energy_2D_U_2.000000_beta_7.000000_n_0.500000_N_tau_1024_Nit_4.dat");
+    std::string inputFilename("../../build/data/2D_U_2.000000_beta_3.500000_n_0.500000_N_tau_1024/Self_energy_2D_U_2.000000_beta_3.500000_n_0.500000_N_tau_1024_Nit_4.dat");
     #else
     std::string inputFilename("../../../NCA_OCA/data_2D_test_NCA_damping_0.000000/2D_U_14.000000_beta_3.500000_n_0.500000_Ntau_4096/SE_2D_NCA_AFM_U_14.000000_beta_3.500000_N_tau_4096_h_0.000000_Nit_111.dat");
     #endif

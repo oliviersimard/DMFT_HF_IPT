@@ -132,6 +132,7 @@ namespace IPT2{
             }
             #if DIM == 1
             std::vector< MPIData > operator()(size_t n_k_bar, size_t n_k_tilde, double qq=0.0) const noexcept(false);
+            T AL_diagram(size_t n_bar, size_t n_tilde, size_t n_k_bar, size_t n_k_tilde, size_t n_iqn, double qq=0.0) const noexcept;
             #elif DIM == 2
             std::vector< MPIData > operator()(size_t n_k_tildex, size_t n_k_tildey, double qqx=0.0, double qqy=0.0) const noexcept(false);
             #endif
@@ -326,6 +327,40 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_bar, size_t n
 }
 
 template< class T >
+T IPT2::InfiniteLadders< T >::AL_diagram(size_t n_bar, size_t n_tilde, size_t n_k_bar, size_t n_k_tilde, size_t n_iqn, double qq) const noexcept{
+    const Integrals intObj;
+    const size_t NI = OneLadder< T >::_splInlineobj._iwn_array.size();
+    const size_t starting_point_SE = ((double)SE_multiple_matsubara_Ntau/2.0-1.0/2.0)*(int)NI;
+    const size_t q_starting_point_SE = ((double)SE_multiple_matsubara_Ntau/2.0)*(int)NI+1;
+    const int size_k_arr = static_cast<int>(OneLadder< T >::_k_t_b.size());
+    const double delta = 2.0*M_PI/(double)(size_k_arr-1);
+    const int ladder_shift_simple = ((int)OneLadder< T >::_iqn_big_array.size()/2-(int)NI/2)+1;
+    const int ladder_shift_simple_m = ((int)OneLadder< T >::_iqn_big_array.size()/2)-1;
+    std::vector< T > int_1D_k(size_k_arr);
+    T tot_kernel{0.0}, tmp_qp_val{0.0}, tmp_var_corr{0.0};
+
+    tmp_var_corr = ( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]) - OneLadder< T >::_SE[starting_point_SE+n_tilde] ) 
+        )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_iqn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]-qq) - OneLadder< T >::_SE[starting_point_SE+n_tilde-n_iqn] ) 
+        )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]) - OneLadder< T >::_SE[starting_point_SE+n_bar] ) 
+        )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn[n_iqn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-qq) - OneLadder< T >::_SE[starting_point_SE+n_bar-n_iqn] ) );
+    
+    for (size_t n_iqpn=0; n_iqpn<OneLadder< T >::_iqn_tilde.size(); n_iqpn++){
+        for (size_t n_qp=0; n_qp<size_k_arr; n_qp++){
+            int_1D_k[n_qp] = _ladder_larger( ladder_shift_simple+n_iqpn, n_qp 
+            )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn] ) 
+            )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn_tilde[n_iqpn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]-OneLadder< T >::_k_t_b[n_qp]) - OneLadder< T >::_SE[q_starting_point_SE+n_tilde-n_iqpn] ) 
+            )*_ladder_larger( ladder_shift_simple_m-n_iqpn+n_iqn, n_qp // This is implies that qq=0.0
+            );
+        }
+        tmp_qp_val += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_1D_k,delta,"simpson");
+    }
+    tmp_qp_val*=1.0/OneLadder< T >::_beta;
+    tot_kernel = tmp_var_corr*tmp_qp_val;
+
+    return tot_kernel;
+}
+
+template< class T >
 std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, size_t n_k_tilde, double qq) const noexcept(false){
     /*  This method computes the susceptibility given the current-vertex correction for the infinite ladder diagram. It does so for a set
     of momenta (k_bar,ktilde). It uses the dressed Green's functions computed in the paramagnetic state. 
@@ -350,10 +385,7 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     const int size_k_arr = static_cast<int>(OneLadder< T >::_k_t_b.size());
     const double delta = 2.0*M_PI/(double)(size_k_arr-1);
     auto k_resizing = [size_k_arr](int n_k_val) -> int {if (n_k_val>=0) return n_k_val%(size_k_arr-1); else return (size_k_arr-1)+n_k_val%(size_k_arr-1);};
-    // Single ladder and its corrections
-    // arma::Mat< T > GG_n_tilde_n_bar_even_szsz(NI,NI), GG_n_tilde_n_bar_odd_szsz(NI,NI);
-    // arma::Mat< T > GG_n_tilde_n_bar_even_jj(NI,NI), GG_n_tilde_n_bar_odd_jj(NI,NI);
-    T jj_resp_iqn{0.0}, szsz_resp_iqn{0.0}, tmp_var_corr{0.0};
+    T jj_resp_iqn{0.0}, szsz_resp_iqn{0.0}, tmp_var_corr{0.0}, tmp_var_AL{0.0};
     const int ladder_shift_simple = ((int)OneLadder< T >::_iqn_big_array.size()/2-(int)NI/2)+1;
     const int ladder_shift_zero = (int)OneLadder< T >::_iqn_big_array.size()/2;
     std::vector< T > int_1D_k_jj(size_k_arr), int_1D_k_szsz(size_k_arr);
@@ -362,48 +394,53 @@ std::vector< MPIData > IPT2::InfiniteLadders< T >::operator()(size_t n_k_bar, si
     // MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
     for (size_t n_em=0; n_em<OneLadder< T >::_iqn.size(); n_em++){
         begin = clock();
-        T GG_n_tilde_n_bar_even_szsz{0.0}, GG_n_tilde_n_bar_odd_szsz{0.0}, GG_n_tilde_n_bar_even_jj{0.0}, GG_n_tilde_n_bar_odd_jj{0.0};
+        T GG_n_tilde_n_bar_even_szsz{0.0}, GG_n_tilde_n_bar_odd_szsz{0.0}, GG_n_tilde_n_bar_even_jj{0.0}, GG_n_tilde_n_bar_odd_jj{0.0}, GG_AL_jj{0.0}, GG_AL_szsz{0.0};
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
                 T tmp_qp_even_val_szsz{0.0}, tmp_qp_even_val_jj{0.0};
+                // AL diagram
+                tmp_var_AL = AL_diagram(n_bar,n_tilde,n_k_bar,n_k_tilde,n_em);
                 // lowest correction for odd number of ladders
                 tmp_var_corr = ( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]) - OneLadder< T >::_SE[starting_point_SE+n_tilde] ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_tilde]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_tilde]-qq) - OneLadder< T >::_SE[starting_point_SE+n_tilde-n_em] ) 
                     )*_ladder_larger( ladder_shift_zero+n_tilde-n_bar, k_resizing((int)n_k_tilde-(int)n_k_bar)
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]) - OneLadder< T >::_SE[starting_point_SE+n_bar] ) 
                     )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-qq) - OneLadder< T >::_SE[starting_point_SE+n_bar-n_em] ) );
-                // lowest correction for even number of ladders
-                for (size_t n_iqpn=0; n_iqpn<OneLadder< T >::_iqn_tilde.size(); n_iqpn++){
-                    for (size_t n_qp=0; n_qp<size_k_arr; n_qp++){
-                        int_1D_k_jj[n_qp] = _ladder_larger( ladder_shift_simple+n_iqpn, n_qp 
-                        )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn] ) 
-                        )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]-qq) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn-n_em] ) 
-                        )*velocity(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]);
-                        int_1D_k_szsz[n_qp] = _ladder_larger( ladder_shift_simple+n_iqpn, n_qp 
-                        )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn] ) 
-                        )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]-qq) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn-n_em] ) 
-                        );
-                    }
-                    tmp_qp_even_val_szsz += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_1D_k_szsz,delta,"simpson");
-                    tmp_qp_even_val_jj += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_1D_k_jj,delta,"simpson");
-                }
-                tmp_qp_even_val_szsz*=1.0/OneLadder< T >::_beta;
-                tmp_qp_even_val_jj*=1.0/OneLadder< T >::_beta;
-                GG_n_tilde_n_bar_even_jj += velocity(OneLadder< T >::_k_t_b[n_k_tilde])*tmp_var_corr*tmp_qp_even_val_jj;
-                GG_n_tilde_n_bar_even_szsz += tmp_var_corr*tmp_qp_even_val_szsz;
+                // // lowest correction for even number of ladders
+                // for (size_t n_iqpn=0; n_iqpn<OneLadder< T >::_iqn_tilde.size(); n_iqpn++){
+                //     for (size_t n_qp=0; n_qp<size_k_arr; n_qp++){
+                //         int_1D_k_jj[n_qp] = _ladder_larger( ladder_shift_simple+n_iqpn, n_qp 
+                //         )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn] ) 
+                //         )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]-qq) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn-n_em] ) 
+                //         )*velocity(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]);
+                //         int_1D_k_szsz[n_qp] = _ladder_larger( ladder_shift_simple+n_iqpn, n_qp 
+                //         )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn] ) 
+                //         )*( 1.0/( OneLadder< T >::_splInlineobj._iwn_array[n_bar]-OneLadder< T >::_iqn_tilde[n_iqpn]-OneLadder< T >::_iqn[n_em] + OneLadder< T >::_mu - epsilonk(OneLadder< T >::_k_t_b[n_k_bar]-OneLadder< T >::_k_t_b[n_qp]-qq) - OneLadder< T >::_SE[q_starting_point_SE+n_bar-n_iqpn-n_em] ) 
+                //         );
+                //     }
+                //     tmp_qp_even_val_szsz += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_1D_k_szsz,delta,"simpson");
+                //     tmp_qp_even_val_jj += 1.0/(2.0*M_PI)*intObj.I1D_VEC(int_1D_k_jj,delta,"simpson");
+                // }
+                // tmp_qp_even_val_szsz*=1.0/OneLadder< T >::_beta;
+                // tmp_qp_even_val_jj*=1.0/OneLadder< T >::_beta;
+                // GG_n_tilde_n_bar_even_jj += velocity(OneLadder< T >::_k_t_b[n_k_tilde])*tmp_var_corr*tmp_qp_even_val_jj;
+                // GG_n_tilde_n_bar_even_szsz += tmp_var_corr*tmp_qp_even_val_szsz;
                 GG_n_tilde_n_bar_odd_jj += velocity(OneLadder< T >::_k_t_b[n_k_tilde])*velocity(OneLadder< T >::_k_t_b[n_k_bar])*tmp_var_corr;
                 GG_n_tilde_n_bar_odd_szsz += tmp_var_corr;
+                // AL diagram
+                GG_AL_jj += tmp_var_AL*velocity(OneLadder< T >::_k_t_b[n_k_bar])*velocity(OneLadder< T >::_k_t_b[n_k_tilde]);
+                GG_AL_szsz += tmp_var_AL;
             }
         }
         // summing over the internal ikn_tilde and ikn_bar
-        jj_resp_iqn = -2.0*(1.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(GG_n_tilde_n_bar_odd_jj+GG_n_tilde_n_bar_even_jj);
-        szsz_resp_iqn = 0.25*(2.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(GG_n_tilde_n_bar_odd_szsz-GG_n_tilde_n_bar_even_szsz);
+        jj_resp_iqn = -2.0*(1.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(GG_n_tilde_n_bar_odd_jj+GG_AL_jj);//+GG_n_tilde_n_bar_even_jj);
+        szsz_resp_iqn = 0.25*(2.0/OneLadder< T >::_beta/OneLadder< T >::_beta)*(GG_n_tilde_n_bar_odd_szsz-GG_AL_szsz);//-GG_n_tilde_n_bar_even_szsz);
         MPIData mpi_data_tmp { n_k_tilde, n_k_bar, jj_resp_iqn, szsz_resp_iqn };
         GG_iqn.push_back(static_cast<MPIData&&>(mpi_data_tmp));
        
         end = clock();
         double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "n_em: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
+        std::cout << "n_em AL: " << n_em << " done in " << elapsed_secs << " secs.." << "\n";
     }
 
     return GG_iqn;
@@ -504,7 +541,7 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
     const int size_k_arr = static_cast<int>(_k_t_b.size());
     const double delta = 2.0*M_PI/(double)(size_k_arr-1);
     const Integrals integralsObj;
-    T jj_resp_iqn{0}, szsz_resp_iqn{0}, jj_tmp{0}, szsz_tmp{0};
+    T jj_tmp{0}, szsz_tmp{0};
     clock_t begin, end;
     std::vector< T > k_integral_tmp_x_jj(size_k_arr), k_integral_tmp_x_szsz(size_k_arr);
     std::vector< T > k_integral_tmp_y_jj(size_k_arr), k_integral_tmp_y_szsz(size_k_arr);
@@ -514,6 +551,7 @@ std::vector< MPIData > IPT2::OneLadder< T >::operator()(size_t n_k_tilde_x, size
     for (size_t n_em=0; n_em<_iqn.size(); n_em++){
         begin = clock();
         std::cout << "n_em: " << n_em << std::endl;
+        T jj_resp_iqn{0}, szsz_resp_iqn{0};
         // numerator
         for (size_t n_bar=0; n_bar<NI; n_bar++){
             for (size_t n_tilde=0; n_tilde<NI; n_tilde++){
